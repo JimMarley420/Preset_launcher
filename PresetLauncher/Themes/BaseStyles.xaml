@@ -5,9 +5,10 @@
         <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Padding" Value="24,8"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -30,13 +31,14 @@
     </Style>
 
     <Style x:Key="SecondaryButton" TargetType="Button">
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Padding" Value="24,8"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -52,7 +54,7 @@
         </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+                <Setter Property="Background" Value="{DynamicResource CardHoverBrush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -61,9 +63,10 @@
         <Setter Property="Background" Value="{DynamicResource DangerBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Padding" Value="24,8"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -111,18 +114,65 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="16,12"/>
+        <Setter Property="Padding" Value="12,10"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="Margin" Value="4,2"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border Background="{TemplateBinding Background}" 
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
-                                          VerticalAlignment="Center"/>
-                    </Border>
+                    <Grid>
+                        <Border x:Name="SelectionIndicator"
+                                Width="3"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Height="16"
+                                CornerRadius="2"
+                                Margin="-6,0,0,0"
+                                Background="{DynamicResource PrimaryBrush}"
+                                Visibility="Collapsed"/>
+                        <Border x:Name="MainBorder"
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource NavHoverBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="Win11NavButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="Margin" Value="4,2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Border x:Name="MainBorder"
+                                Background="{TemplateBinding Background}" 
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -136,10 +186,11 @@
     <Style x:Key="ModernTextBox" TargetType="TextBox">
         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -163,37 +214,141 @@
     <Style x:Key="ModernCheckBox" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
         <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style x:Key="Win11ToggleSwitch" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ContentPresenter Grid.Column="0" 
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True"/>
+                        <Border x:Name="ToggleBackground" 
+                                Grid.Column="1"
+                                Width="40" Height="20"
+                                CornerRadius="10"
+                                Background="{DynamicResource ToggleOffBrush}"
+                                BorderBrush="{DynamicResource ToggleBorderBrush}"
+                                BorderThickness="1"
+                                Margin="12,0,0,0">
+                            <Ellipse x:Name="ToggleThumb"
+                                     Width="12" Height="12"
+                                     Fill="{DynamicResource ToggleThumbBrush}"
+                                     HorizontalAlignment="Left"
+                                     Margin="3,0,0,0"/>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="ToggleBackground" Property="Background" Value="{DynamicResource ToggleOnBrush}"/>
+                            <Setter TargetName="ToggleBackground" Property="BorderBrush" Value="{DynamicResource ToggleOnBrush}"/>
+                            <Setter TargetName="ToggleThumb" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="ToggleThumb" Property="Margin" Value="0,0,3,0"/>
+                            <Setter TargetName="ToggleThumb" Property="Fill" Value="White"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ToggleThumb" Property="Width" Value="14"/>
+                            <Setter TargetName="ToggleThumb" Property="Height" Value="14"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="CardBorder" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="16"/>
     </Style>
 
+    <Style x:Key="Win11SettingsCard" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="16,14"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <Style x:Key="Win11SettingsCardExpander" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
     <Style x:Key="HeadingText" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontSize" Value="28"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
     </Style>
 
     <Style x:Key="SubheadingText" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="FontSize" Value="18"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
     </Style>
 
     <Style x:Key="BodyText" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
     </Style>
 
     <Style x:Key="SecondaryText" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+    </Style>
+
+    <Style x:Key="SettingsTitleText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+    </Style>
+
+    <Style x:Key="SettingsDescText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <Style x:Key="SettingsCategoryText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="Margin" Value="0,16,0,8"/>
+    </Style>
+
+    <Style x:Key="Win11ComboBox" TargetType="ComboBox">
+        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SubtleBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="MinWidth" Value="160"/>
     </Style>
 
 </ResourceDictionary>

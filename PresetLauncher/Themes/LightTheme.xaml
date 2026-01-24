@@ -2,26 +2,34 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Color x:Key="PrimaryColor">#0078D4</Color>
-    <Color x:Key="PrimaryHoverColor">#106EBE</Color>
-    <Color x:Key="BackgroundColor">#FFFFFF</Color>
-    <Color x:Key="SurfaceColor">#F3F3F3</Color>
+    <Color x:Key="PrimaryHoverColor">#1984D8</Color>
+    <Color x:Key="BackgroundColor">#F3F3F3</Color>
+    <Color x:Key="SurfaceColor">#FAFAFA</Color>
     <Color x:Key="CardColor">#FFFFFF</Color>
-    <Color x:Key="BorderColor">#E0E0E0</Color>
+    <Color x:Key="CardHoverColor">#F9F9F9</Color>
+    <Color x:Key="BorderColor">#E5E5E5</Color>
+    <Color x:Key="SubtleBorderColor">#E0E0E0</Color>
     <Color x:Key="TextPrimaryColor">#1A1A1A</Color>
-    <Color x:Key="TextSecondaryColor">#666666</Color>
-    <Color x:Key="DangerColor">#D32F2F</Color>
-    <Color x:Key="SuccessColor">#388E3C</Color>
-    <Color x:Key="WarningColor">#F57C00</Color>
-    <Color x:Key="NavBackgroundColor">#F0F0F0</Color>
-    <Color x:Key="NavHoverColor">#E0E0E0</Color>
-    <Color x:Key="NavSelectedColor">#D0D0D0</Color>
+    <Color x:Key="TextSecondaryColor">#5D5D5D</Color>
+    <Color x:Key="DangerColor">#C42B1C</Color>
+    <Color x:Key="SuccessColor">#0F7B0F</Color>
+    <Color x:Key="WarningColor">#9D5D00</Color>
+    <Color x:Key="NavBackgroundColor">#F3F3F3</Color>
+    <Color x:Key="NavHoverColor">#E9E9E9</Color>
+    <Color x:Key="NavSelectedColor">#E5E5E5</Color>
+    <Color x:Key="ToggleOnColor">#0078D4</Color>
+    <Color x:Key="ToggleOffColor">#FFFFFF</Color>
+    <Color x:Key="ToggleThumbColor">#1A1A1A</Color>
+    <Color x:Key="ToggleBorderColor">#8A8A8A</Color>
 
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
     <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource PrimaryHoverColor}"/>
     <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
     <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
     <SolidColorBrush x:Key="CardBrush" Color="{StaticResource CardColor}"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="{StaticResource CardHoverColor}"/>
     <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="SubtleBorderBrush" Color="{StaticResource SubtleBorderColor}"/>
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
@@ -30,5 +38,9 @@
     <SolidColorBrush x:Key="NavBackgroundBrush" Color="{StaticResource NavBackgroundColor}"/>
     <SolidColorBrush x:Key="NavHoverBrush" Color="{StaticResource NavHoverColor}"/>
     <SolidColorBrush x:Key="NavSelectedBrush" Color="{StaticResource NavSelectedColor}"/>
+    <SolidColorBrush x:Key="ToggleOnBrush" Color="{StaticResource ToggleOnColor}"/>
+    <SolidColorBrush x:Key="ToggleOffBrush" Color="{StaticResource ToggleOffColor}"/>
+    <SolidColorBrush x:Key="ToggleThumbBrush" Color="{StaticResource ToggleThumbColor}"/>
+    <SolidColorBrush x:Key="ToggleBorderBrush" Color="{StaticResource ToggleBorderColor}"/>
 
 </ResourceDictionary>

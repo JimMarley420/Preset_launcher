@@ -9,60 +9,189 @@
     
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="280"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="{DynamicResource NavBackgroundBrush}">
+        <Border Grid.Column="0" Background="{DynamicResource NavBackgroundBrush}" Padding="12,16">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Margin="16,20">
+                <StackPanel DockPanel.Dock="Top" Margin="8,8,8,24">
                     <TextBlock Text="Lanceur de Presets" 
-                               Style="{StaticResource SubheadingText}"
-                               FontWeight="Bold"/>
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               FontFamily="Segoe UI"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </StackPanel>
 
-                <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,16">
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                     <Button x:Name="BtnSettings" 
-                            Style="{StaticResource NavButton}"
-                            Click="BtnSettings_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚙" FontSize="16" Margin="0,0,10,0"/>
-                            <TextBlock x:Name="NavSettings" Text="Paramètres"/>
-                        </StackPanel>
+                            Style="{StaticResource Win11NavButton}"
+                            Click="BtnSettings_Click"
+                            Padding="12,10">
+                        <Grid Width="220">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="SettingsIndicator"
+                                    Grid.Column="0"
+                                    Width="3"
+                                    Height="16"
+                                    CornerRadius="2"
+                                    Margin="0,0,9,0"
+                                    Background="{DynamicResource PrimaryBrush}"
+                                    Visibility="Collapsed"/>
+                            <Border Grid.Column="1" 
+                                    Width="36" Height="36" 
+                                    CornerRadius="18" 
+                                    Background="{DynamicResource CardBrush}"
+                                    Margin="0,0,12,0">
+                                <TextBlock Text="&#xE713;" 
+                                           FontFamily="Segoe MDL2 Assets" 
+                                           FontSize="16" 
+                                           HorizontalAlignment="Center" 
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            </Border>
+                            <TextBlock Grid.Column="2" 
+                                       x:Name="NavSettings" 
+                                       Text="Parametres"
+                                       VerticalAlignment="Center"
+                                       FontSize="14"
+                                       FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </Grid>
                     </Button>
                 </StackPanel>
 
-                <StackPanel Margin="8,0">
-                    <Button x:Name="BtnPresets" 
-                            Style="{StaticResource NavButton}"
-                            Click="BtnPresets_Click"
-                            Background="{DynamicResource NavSelectedBrush}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📂" FontSize="16" Margin="0,0,10,0"/>
-                            <TextBlock x:Name="NavPresets" Text="Presets"/>
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="BtnHistory" 
-                            Style="{StaticResource NavButton}"
-                            Click="BtnHistory_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📜" FontSize="16" Margin="0,0,10,0"/>
-                            <TextBlock x:Name="NavHistory" Text="Historique"/>
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="BtnStats" 
-                            Style="{StaticResource NavButton}"
-                            Click="BtnStats_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📊" FontSize="16" Margin="0,0,10,0"/>
-                            <TextBlock x:Name="NavStats" Text="Statistiques"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,0,8">
+                    <StackPanel>
+                        <Button x:Name="BtnPresets" 
+                                Style="{StaticResource Win11NavButton}"
+                                Click="BtnPresets_Click"
+                                Background="{DynamicResource NavSelectedBrush}"
+                                Padding="12,10">
+                            <Grid Width="220">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="PresetsIndicator"
+                                        Grid.Column="0"
+                                        Width="3"
+                                        Height="16"
+                                        CornerRadius="2"
+                                        Margin="0,0,9,0"
+                                        Background="{DynamicResource PrimaryBrush}"/>
+                                <Border Grid.Column="1" 
+                                        Width="36" Height="36" 
+                                        CornerRadius="18" 
+                                        Background="{DynamicResource CardBrush}"
+                                        Margin="0,0,12,0">
+                                    <TextBlock Text="&#xE8B7;" 
+                                               FontFamily="Segoe MDL2 Assets" 
+                                               FontSize="16" 
+                                               HorizontalAlignment="Center" 
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                </Border>
+                                <TextBlock Grid.Column="2" 
+                                           x:Name="NavPresets" 
+                                           Text="Presets"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           FontFamily="Segoe UI"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            </Grid>
+                        </Button>
+                        
+                        <Button x:Name="BtnHistory" 
+                                Style="{StaticResource Win11NavButton}"
+                                Click="BtnHistory_Click"
+                                Padding="12,10">
+                            <Grid Width="220">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="HistoryIndicator"
+                                        Grid.Column="0"
+                                        Width="3"
+                                        Height="16"
+                                        CornerRadius="2"
+                                        Margin="0,0,9,0"
+                                        Background="{DynamicResource PrimaryBrush}"
+                                        Visibility="Collapsed"/>
+                                <Border Grid.Column="1" 
+                                        Width="36" Height="36" 
+                                        CornerRadius="18" 
+                                        Background="{DynamicResource CardBrush}"
+                                        Margin="0,0,12,0">
+                                    <TextBlock Text="&#xE81C;" 
+                                               FontFamily="Segoe MDL2 Assets" 
+                                               FontSize="16" 
+                                               HorizontalAlignment="Center" 
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                </Border>
+                                <TextBlock Grid.Column="2" 
+                                           x:Name="NavHistory" 
+                                           Text="Historique"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           FontFamily="Segoe UI"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            </Grid>
+                        </Button>
+                        
+                        <Button x:Name="BtnStats" 
+                                Style="{StaticResource Win11NavButton}"
+                                Click="BtnStats_Click"
+                                Padding="12,10">
+                            <Grid Width="220">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="StatsIndicator"
+                                        Grid.Column="0"
+                                        Width="3"
+                                        Height="16"
+                                        CornerRadius="2"
+                                        Margin="0,0,9,0"
+                                        Background="{DynamicResource PrimaryBrush}"
+                                        Visibility="Collapsed"/>
+                                <Border Grid.Column="1" 
+                                        Width="36" Height="36" 
+                                        CornerRadius="18" 
+                                        Background="{DynamicResource CardBrush}"
+                                        Margin="0,0,12,0">
+                                    <TextBlock Text="&#xE9D2;" 
+                                               FontFamily="Segoe MDL2 Assets" 
+                                               FontSize="16" 
+                                               HorizontalAlignment="Center" 
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                </Border>
+                                <TextBlock Grid.Column="2" 
+                                           x:Name="NavStats" 
+                                           Text="Statistiques"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           FontFamily="Segoe UI"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
-        <Border Grid.Column="1" Padding="24">
+        <Border Grid.Column="1" Padding="40,32" Background="{DynamicResource BackgroundBrush}">
             <Frame x:Name="MainFrame" NavigationUIVisibility="Hidden"/>
         </Border>
     </Grid>
