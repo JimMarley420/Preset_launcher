@@ -33,10 +33,11 @@ public sealed partial class StatisticsPage : Page
         
         TxtUniquePrograms.Text = usageStats.Count.ToString();
 
+        var timesSuffix = App.Localization.Get("stats.times.suffix");
         var mostUsed = usageStats
             .OrderByDescending(x => x.Value)
             .Take(10)
-            .Select(x => new UsageStat { Path = x.Key, Count = x.Value })
+            .Select(x => new UsageStat { Path = x.Key, Count = x.Value, TimesText = $"{x.Value} {timesSuffix}" })
             .ToList();
 
         MostUsedList.ItemsSource = mostUsed;
@@ -46,5 +47,6 @@ public sealed partial class StatisticsPage : Page
     {
         public string Path { get; set; } = string.Empty;
         public int Count { get; set; }
+        public string TimesText { get; set; } = string.Empty;
     }
 }

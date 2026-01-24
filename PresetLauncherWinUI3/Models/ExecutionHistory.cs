@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PresetLauncher.Services;
 
 namespace PresetLauncher.Models
 {
@@ -14,6 +15,8 @@ namespace PresetLauncher.Models
         public int FailedCount { get; set; }
         public TimeSpan Duration { get; set; }
         public List<ExecutionDetail> Details { get; set; } = new();
+        
+        public string SuccessText => $"{SuccessCount}/{ExecutablesCount} {LocalizationService.Instance?.Get("history.success") ?? "reussi(s)"}";
     }
 
     public class ExecutionDetail

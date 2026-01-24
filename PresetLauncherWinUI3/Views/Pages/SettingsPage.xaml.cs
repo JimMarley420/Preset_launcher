@@ -12,8 +12,24 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         this.InitializeComponent();
+        UpdateLocalizedText();
         LoadSettings();
         _isInitializing = false;
+    }
+
+    private void UpdateLocalizedText()
+    {
+        TxtLanguageCategory.Text = App.Localization.Get("settings.language");
+        TxtThemeCategory.Text = App.Localization.Get("settings.theme");
+        TxtOptionsCategory.Text = App.Localization.Get("settings.options");
+        TxtDataCategory.Text = App.Localization.Get("settings.data");
+        TxtConfirmLaunch.Text = App.Localization.Get("settings.confirmLaunch");
+        TxtNotifications.Text = App.Localization.Get("settings.notifications");
+        TxtDataPath.Text = App.Localization.Get("settings.dataPath");
+        TxtCleanup.Text = App.Localization.Get("settings.cleanup");
+        ThemeSystem.Content = App.Localization.Get("settings.theme.system");
+        ThemeLight.Content = App.Localization.Get("settings.theme.light");
+        ThemeDark.Content = App.Localization.Get("settings.theme.dark");
     }
 
     private void LoadSettings()

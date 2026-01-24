@@ -51,12 +51,8 @@
                             </StackPanel>
                             
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                <TextBlock Style="{ThemeResource CaptionTextBlockStyle}">
-                                    <Run Text="{Binding SuccessCount}"/>
-                                    <Run Text="/"/>
-                                    <Run Text="{Binding ExecutablesCount}"/>
-                                    <Run Text=" reussi(s)"/>
-                                </TextBlock>
+                                <TextBlock Text="{Binding SuccessText}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"/>
                                 <TextBlock Text="{Binding Duration}" 
                                            Style="{ThemeResource CaptionTextBlockStyle}"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>

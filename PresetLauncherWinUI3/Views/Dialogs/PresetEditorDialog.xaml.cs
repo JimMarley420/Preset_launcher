@@ -41,6 +41,7 @@ public sealed partial class PresetEditorDialog : ContentDialog
         this.CloseButtonText = App.Localization.Get("dialog.cancel");
         TxtName.Header = App.Localization.Get("preset.name");
         TxtDescription.Header = App.Localization.Get("preset.description");
+        TxtAddExe.Text = App.Localization.Get("exe.add");
         
         ExeList.ItemsSource = _executables;
     }

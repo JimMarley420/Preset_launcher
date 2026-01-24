@@ -94,11 +94,9 @@
                                            VerticalAlignment="Center"/>
                                 
                                 <TextBlock Grid.Column="2" 
+                                           Text="{Binding TimesText}"
                                            Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                           VerticalAlignment="Center">
-                                    <Run Text="{Binding Count}"/>
-                                    <Run Text=" fois"/>
-                                </TextBlock>
+                                           VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
                     </DataTemplate>

@@ -65,11 +65,9 @@
                                 </StackPanel>
                                 
                                 <StackPanel Grid.Row="1" Margin="0,12,0,0">
-                                    <TextBlock Style="{ThemeResource CaptionTextBlockStyle}"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                        <Run Text="{Binding Executables.Count}"/>
-                                        <Run Text=" programmes"/>
-                                    </TextBlock>
+                                    <TextBlock Text="{Binding ProgramsText}"
+                                               Style="{ThemeResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
                                 
                                 <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">

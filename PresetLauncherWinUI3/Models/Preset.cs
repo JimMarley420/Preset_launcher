@@ -1,11 +1,13 @@
 using System;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using PresetLauncher.Services;
 
 namespace PresetLauncher.Models
 {
     public partial class Preset : ObservableObject
     {
+        public string ProgramsText => $"{Executables.Count} {LocalizationService.Instance?.Get("exe.programs") ?? "programmes"}";
         [ObservableProperty]
         private string id = Guid.NewGuid().ToString();
 

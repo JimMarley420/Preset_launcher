@@ -103,7 +103,12 @@ public class LocalizationService
             ["lock.preset"] = "Verrouiller le preset",
             ["unlock.preset"] = "Deverrouiller le preset",
             ["process.title"] = "Processus en cours d'execution",
-            ["process.select"] = "Selectionner"
+            ["process.select"] = "Selectionner",
+            ["exe.admin"] = "Admin",
+            ["exe.normal"] = "Normal",
+            ["exe.sec"] = "sec",
+            ["history.success"] = "reussi(s)",
+            ["stats.times.suffix"] = "fois"
         },
         ["en"] = new Dictionary<string, string>
         {
@@ -199,9 +204,22 @@ public class LocalizationService
             ["lock.preset"] = "Lock preset",
             ["unlock.preset"] = "Unlock preset",
             ["process.title"] = "Running processes",
-            ["process.select"] = "Select"
+            ["process.select"] = "Select",
+            ["exe.admin"] = "Admin",
+            ["exe.normal"] = "Normal",
+            ["exe.sec"] = "sec",
+            ["history.success"] = "succeeded",
+            ["stats.times.suffix"] = "times"
         }
     };
+
+    public static LocalizationService Instance { get; private set; } = null!;
+
+    public LocalizationService()
+    {
+        Instance = this;
+        SetLanguage(_currentLanguage);
+    }
 
     public void SetLanguage(string language)
     {
