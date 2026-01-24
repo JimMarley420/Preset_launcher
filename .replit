@@ -12,30 +12,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Build WPF App"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Build WinUI3 App"
+args = "Instructions"
 
 [[workflows.workflow]]
-name = "Build WPF App"
+name = "Instructions"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd PresetLauncher && dotnet build -c Release && echo \"Build completed! The application is in PresetLauncher/bin/Release/net8.0-windows/\""
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "Build WinUI3 App"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd PresetLauncherWinUI3 && dotnet build -c Release && echo \"Build completed!\""
+args = "echo \"======================================\" && echo \"Application WinUI 3 - Preset Launcher\" && echo \"======================================\" && echo \"\" && echo \"Ce projet WinUI 3 ne peut etre compile que sur Windows.\" && echo \"Le compilateur XAML est un executable Windows (.exe).\" && echo \"\" && echo \"Pour compiler:\" && echo \"1. Telechargez le dossier PresetLauncherWinUI3/\" && echo \"2. Sur votre machine Windows, ouvrez un terminal\" && echo \"3. Executez: cd PresetLauncherWinUI3 && dotnet build -c Release\" && echo \"\" && echo \"L'executable sera dans bin/Release/net8.0-windows10.0.19041.0/\""
 
 [workflows.workflow.metadata]
 outputType = "console"
