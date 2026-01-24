@@ -1,0 +1,119 @@
+🖥️ Projet Replit : Lanceur de Presets Quotidiens pour Windows (WPF)
+🎯 Objectif
+
+Créer une application de bureau Windows permettant à l’utilisateur de :
+
+Créer et gérer des presets contenant des fichiers .exe qu’il utilise régulièrement
+
+Lancer manuellement un preset pour exécuter tous les logiciels associés
+
+Ne pas s’inscrire dans le démarrage automatique de Windows (aucune trace dans le gestionnaire des tâches → onglet Démarrage)
+
+Ajouter des .exe manuellement via file picker ou à partir de la liste des processus actifs
+
+Sauvegarder les presets localement, de façon réutilisable et portable
+
+🧩 Plateforme cible
+
+Desktop Windows
+
+Technologie : .NET WPF (C#)
+
+Style d’interface : natif Windows (utilisation de Fluent/WPF standard UI)
+
+🌐 Environnement
+
+Fonctionne offline, localement
+
+☁️ Hébergement
+
+Application packagée en .exe (portatif ou installable via setup simple)
+
+🎨 Interface
+
+Style natif Windows (WPF Fluent ou Modern UI)
+
+Interface minimaliste et fluide
+
+Thèmes clair / sombre avec détection du thème système
+
+Onglets ou panneaux pour :
+
+Liste des presets
+
+Détails du preset
+
+Ajout/modification de .exe
+
+Historique
+
+🌍 Multilingue
+
+Interface par défaut en Français et Anglais
+
+Traductions via fichiers externes (JSON, RESX, etc.)
+
+Ajout facile de nouvelles langues
+
+🔧 Fonctionnalités principales
+Gestion de Presets
+
+Créer, éditer, supprimer des presets
+
+Ajouter des .exe :
+
+Par sélection manuelle
+
+Depuis la liste des processus actifs
+
+Réorganisation manuelle de l’ordre de lancement
+
+Attribution d’une icône à chaque preset
+
+Exécution
+
+Lancer les .exe d’un preset en un clic
+
+Options par .exe :
+
+Lancement en tant qu'administrateur
+
+Délai de lancement configurable (en secondes)
+
+Fenêtre de retour visuel sur l’exécution
+
+Sauvegarde
+
+Format local : JSON ou SQLite
+
+Emplacement de sauvegarde configurable
+
+Sauvegarde automatique des changements
+
+🌟 Fonctionnalités supplémentaires
+
+✅ Vérification automatique de la validité des chemins .exe
+
+🧠 Ajout via suggestions basées sur fréquence d’usage
+
+🕒 Historique d’exécution (date, heure, durée estimée)
+
+🔍 Recherche dans presets et .exe
+
+📊 Statistiques : programmes les plus utilisés
+
+🔁 Duplication rapide de presets
+
+🧼 Nettoyage des .exe obsolètes
+
+🔒 Verrouillage de certains presets par mot de passe
+
+📂 Import/export de presets
+
+🔌 Architecture modulaire pour extensions futures
+
+🗣️ Langues
+
+Interaction avec Replit Agent : Français
+
+Interface application : Multilingue (FR + EN dès le départ)

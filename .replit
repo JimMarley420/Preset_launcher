@@ -1,0 +1,26 @@
+modules = ["dotnet-8.0"]
+[agent]
+expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Build WPF App"
+
+[[workflows.workflow]]
+name = "Build WPF App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd PresetLauncher && dotnet build -c Release && echo \"Build completed! The application is in PresetLauncher/bin/Release/net8.0-windows/\""
+
+[workflows.workflow.metadata]
+outputType = "console"

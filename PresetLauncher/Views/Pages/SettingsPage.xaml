@@ -1,0 +1,118 @@
+<Page x:Class="PresetLauncher.Views.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{DynamicResource BackgroundBrush}">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="TxtTitle" Grid.Row="0"
+                   Text="Paramètres" 
+                   Style="{StaticResource HeadingText}"
+                   Margin="0,0,0,24"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtLanguageLabel"
+                                   Text="Langue"
+                                   Style="{StaticResource SubheadingText}"
+                                   Margin="0,0,0,12"/>
+                        <ComboBox x:Name="CmbLanguage"
+                                  SelectionChanged="CmbLanguage_SelectionChanged"
+                                  Padding="12,10"
+                                  FontSize="14">
+                            <ComboBoxItem Content="Français" Tag="fr"/>
+                            <ComboBoxItem Content="English" Tag="en"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtThemeLabel"
+                                   Text="Thème"
+                                   Style="{StaticResource SubheadingText}"
+                                   Margin="0,0,0,12"/>
+                        <ComboBox x:Name="CmbTheme"
+                                  SelectionChanged="CmbTheme_SelectionChanged"
+                                  Padding="12,10"
+                                  FontSize="14">
+                            <ComboBoxItem x:Name="ThemeSystem" Content="Système" Tag="system"/>
+                            <ComboBoxItem x:Name="ThemeLight" Content="Clair" Tag="light"/>
+                            <ComboBoxItem x:Name="ThemeDark" Content="Sombre" Tag="dark"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtOptionsLabel"
+                                   Text="Options"
+                                   Style="{StaticResource SubheadingText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <CheckBox x:Name="ChkConfirmLaunch"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  Checked="ChkConfirmLaunch_Changed"
+                                  Unchecked="ChkConfirmLaunch_Changed"
+                                  Margin="0,0,0,12">
+                            <TextBlock x:Name="TxtConfirmLaunch" Text="Confirmer avant le lancement"/>
+                        </CheckBox>
+
+                        <CheckBox x:Name="ChkNotifications"
+                                  Style="{StaticResource ModernCheckBox}"
+                                  Checked="ChkNotifications_Changed"
+                                  Unchecked="ChkNotifications_Changed">
+                            <TextBlock x:Name="TxtNotifications" Text="Afficher les notifications"/>
+                        </CheckBox>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtDataLabel"
+                                   Text="Données"
+                                   Style="{StaticResource SubheadingText}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <TextBlock x:Name="TxtDataPathLabel"
+                                   Text="Emplacement des données"
+                                   Style="{StaticResource BodyText}"
+                                   Margin="0,0,0,8"/>
+                        
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBox x:Name="TxtDataPath"
+                                     Style="{StaticResource ModernTextBox}"
+                                     IsReadOnly="True"/>
+                            <Button x:Name="BtnBrowse" 
+                                    Grid.Column="1"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Click="BtnBrowse_Click"
+                                    Margin="8,0,0,0">
+                                <TextBlock Text="..."/>
+                            </Button>
+                        </Grid>
+
+                        <Button x:Name="BtnCleanup"
+                                Style="{StaticResource SecondaryButton}"
+                                Click="BtnCleanup_Click"
+                                Margin="0,16,0,0"
+                                HorizontalAlignment="Left">
+                            <TextBlock x:Name="TxtCleanup" Text="Nettoyer les exécutables invalides"/>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

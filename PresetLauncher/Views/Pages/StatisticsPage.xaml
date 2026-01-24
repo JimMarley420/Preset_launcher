@@ -1,0 +1,99 @@
+<Page x:Class="PresetLauncher.Views.Pages.StatisticsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="{DynamicResource BackgroundBrush}">
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="TxtTitle" Grid.Row="0"
+                   Text="Statistiques d'utilisation" 
+                   Style="{StaticResource HeadingText}"
+                   Margin="0,0,0,20"/>
+
+        <Grid Grid.Row="1" Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardBorder}" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock x:Name="TxtPresetsLabel" 
+                               Text="Nombre de presets"
+                               Style="{StaticResource SecondaryText}"/>
+                    <TextBlock x:Name="TxtPresetsCount"
+                               Text="0"
+                               Style="{StaticResource HeadingText}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="6,0">
+                <StackPanel>
+                    <TextBlock x:Name="TxtLaunchesLabel"
+                               Text="Lancements totaux"
+                               Style="{StaticResource SecondaryText}"/>
+                    <TextBlock x:Name="TxtLaunchesCount"
+                               Text="0"
+                               Style="{StaticResource HeadingText}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Margin="12,0,0,0">
+                <StackPanel>
+                    <TextBlock x:Name="TxtProgramsLabel"
+                               Text="Programmes uniques"
+                               Style="{StaticResource SecondaryText}"/>
+                    <TextBlock x:Name="TxtProgramsCount"
+                               Text="0"
+                               Style="{StaticResource HeadingText}"
+                               Margin="0,8,0,0"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Name="TxtMostUsed" Grid.Row="0"
+                           Text="Programmes les plus utilisés"
+                           Style="{StaticResource SubheadingText}"
+                           Margin="0,0,0,16"/>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="MostUsedList">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0" 
+                                               Text="{Binding Name}"
+                                               Style="{StaticResource BodyText}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1" 
+                                               Text="{Binding Count, StringFormat='{}{0} fois'}"
+                                               Style="{StaticResource SecondaryText}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

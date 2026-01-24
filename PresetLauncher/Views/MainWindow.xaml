@@ -1,0 +1,69 @@
+<Window x:Class="PresetLauncher.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Lanceur de Presets" 
+        Height="700" Width="1100"
+        MinHeight="500" MinWidth="800"
+        Background="{DynamicResource BackgroundBrush}"
+        WindowStartupLocation="CenterScreen">
+    
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Background="{DynamicResource NavBackgroundBrush}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="16,20">
+                    <TextBlock Text="Lanceur de Presets" 
+                               Style="{StaticResource SubheadingText}"
+                               FontWeight="Bold"/>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,16">
+                    <Button x:Name="BtnSettings" 
+                            Style="{StaticResource NavButton}"
+                            Click="BtnSettings_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" FontSize="16" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="NavSettings" Text="Paramètres"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Margin="8,0">
+                    <Button x:Name="BtnPresets" 
+                            Style="{StaticResource NavButton}"
+                            Click="BtnPresets_Click"
+                            Background="{DynamicResource NavSelectedBrush}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📂" FontSize="16" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="NavPresets" Text="Presets"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="BtnHistory" 
+                            Style="{StaticResource NavButton}"
+                            Click="BtnHistory_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📜" FontSize="16" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="NavHistory" Text="Historique"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="BtnStats" 
+                            Style="{StaticResource NavButton}"
+                            Click="BtnStats_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📊" FontSize="16" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="NavStats" Text="Statistiques"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Column="1" Padding="24">
+            <Frame x:Name="MainFrame" NavigationUIVisibility="Hidden"/>
+        </Border>
+    </Grid>
+</Window>
