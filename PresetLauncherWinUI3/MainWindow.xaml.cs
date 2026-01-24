@@ -12,6 +12,9 @@ public sealed partial class MainWindow : Window
         
         this.Title = App.Localization.Get("app.title");
         ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        
+        AppTitleText.Text = App.Localization.Get("app.title");
         
         App.Theme.SetWindow(this);
         App.Theme.ApplyTheme(App.Settings.CurrentSettings.Theme);

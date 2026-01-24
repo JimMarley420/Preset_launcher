@@ -6,11 +6,28 @@
     xmlns:local="using:PresetLauncher"
     Title="Lanceur de Presets">
 
-    <Grid>
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <Grid x:Name="AppTitleBar" Grid.Row="0" VerticalAlignment="Top" Height="48">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <FontIcon Glyph="&#xE8B7;" FontSize="16" Margin="0,0,12,0"/>
+                <TextBlock x:Name="AppTitleText" Text="Lanceur de Presets" 
+                           Style="{ThemeResource CaptionTextBlockStyle}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+        
         <NavigationView x:Name="NavView"
+                        Grid.Row="1"
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="True"
+                        IsPaneToggleButtonVisible="True"
                         PaneDisplayMode="Left"
+                        OpenPaneLength="200"
                         SelectionChanged="NavView_SelectionChanged"
                         Loaded="NavView_Loaded">
             
