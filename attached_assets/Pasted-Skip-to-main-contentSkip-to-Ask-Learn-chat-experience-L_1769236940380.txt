@@ -1,0 +1,176 @@
+Skip to main contentSkip to Ask Learn chat experience
+Learn
+Sign in
+Windows App Development
+Search
+Find by title
+Build Windows apps
+Introduction
+Overview
+Release channels
+Supported Windows releases
+Latest
+Archive
+WinUI
+App frameworks
+What's new?
+Learn  Windows  App development 
+Latest Windows App SDK downloads
+This page provides links to the latest downloads of the Windows App SDK for all three release channels (stable, preview, and experimental). See Windows App SDK release channels for more details on the Windows App SDK release channels.
+
+Stable release
+Windows App SDK 1.8
+Version	Runtime downloads
+1.8.4 (1.8.260101001)
+01/13/2026
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+1.8.3 (1.8.251106002)
+11/11/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+1.8.2 (1.8.251003001)
+10/14/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+1.8.1 (1.8.250916003)
+09/22/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+1.8.0 (1.8.250907003)
+09/09/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+For older releases, see the Archive of Windows App SDK downloads.
+
+Preview release
+Windows App SDK 1.8 Preview
+Version	Runtime downloads
+1.8 Preview (1.8-preview)
+08/19/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+For older releases, see the Archive of Windows App SDK downloads.
+
+Experimental release
+Windows App SDK 2.0 Experimental
+Version	Runtime downloads
+2.0 Experimental 4 (2.0.0-experimental4)
+01/13/2026
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+2.0 Experimental 3 (2.0.0-experimental3)
+11/11/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+2.0 Experimental 2 (2.0.0-experimental2)
+11/05/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+2.0 Experimental 1 (2.0.250930001-experimental1)
+10/02/2025
+Release notes
+Source	Installer (x64)
+Installer (x86)
+Installer (arm64)
+Redistributable (ZIP)
+For older releases, see the Archive of Windows App SDK downloads.
+
+Other downloads
+Depending on your development scenario, you might also require the following.
+
+SDK downloads
+Tool               	Description
+NuGet package	The Microsoft.WindowsAppSDK NuGet package provides access to APIs provided by the Windows App SDK. The NuGet package is included with the Visual Studio extension project templates. If you have an existing project in which you want to use the Windows App SDK, you can install the latest version of the Windows App SDK NuGet package in your project directly from Visual Studio. For setup instructions, see Use the Windows App SDK in an existing project.
+Runtime downloads
+Apps packaged with external location, and unpackaged apps, that use the Windows App SDK can use the standalone .exe runtime installer or MSIX packages to deploy the Windows App SDK package dependencies with them. For setup instructions, see Windows App SDK deployment guide for framework-dependent apps packaged with external location or unpackaged.
+
+Tool               	Description
+Installer	The standalone .exe installer, WindowsAppRuntimeInstall.exe, is available as a separate download beginning with Windows App SDK 1.0.1. It installs the Windows App SDK Runtime which includes the Framework, Main, Singleton and DDLM packages.
+Redistributable	The Windows App Runtime Redistributable (Microsoft.WindowsAppRuntime.Redist) is a zip file that includes the installer and MSIX packages for all architectures (x64, x86, and ARM64).
+ Collaborate with us on GitHub
+The source for this content can be found on GitHub, where you can also create and review issues and pull requests. For more information, see our contributor guide.
+
+Windows developer feedback
+
+Windows developer is an open source project. Select a link to provide feedback:
+
+ Open a documentation issue
+ Provide product feedback
+Additional resources
+Documentation
+
+Older downloads for the Windows App SDK - Windows apps
+
+Older downloads for the Windows App SDK, including the VSIX, installer, and MSIX packages
+
+Windows App SDK deployment guide for framework-dependent apps packaged with external location or unpackaged - Windows apps
+
+This topic provides guidance about deploying apps that are packaged with external location, or are unpackaged, and that use the Windows App SDK.
+
+Windows App SDK release channels - Windows apps
+
+Learn about the Experimental, Preview, and Stable release channels used to ship the latest version of the Windows App SDK.
+
+Update existing projects to a different release of the Windows App SDK - Windows apps
+
+This article provides instructions for updating a project created with an earlier preview or release version of the Windows App SDK or WinUI 3 to the latest version.
+
+Training
+
+Learning path
+
+Use advance techniques in canvas apps to perform custom updates and optimization - Training
+
+Use advance techniques in canvas apps to perform custom updates and optimization
+
+Certification
+
+Microsoft Certified: Azure Developer Associate - Certifications
+
+Build end-to-end solutions in Microsoft Azure to create Azure Functions, implement and manage web apps, develop solutions utilizing Azure storage, and more.
+
+Last updated on 01/13/2026
+In this article
+Stable release
+Preview release
+Experimental release
+Other downloads
+Was this page helpful?
+
+Manage cookies
+AI Disclaimer
+Previous Versions
+Blog
+Contribute
+Privacy
+Terms of Use
+Trademarks
+© Microsoft 2026
