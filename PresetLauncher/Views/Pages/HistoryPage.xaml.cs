@@ -30,8 +30,8 @@ namespace PresetLauncher.Views.Pages
         private void BtnClear_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
-                "Voulez-vous vraiment effacer tout l'historique?",
-                "Confirmer",
+                App.Localization.Get("history.clearConfirm"),
+                App.Localization.Get("dialog.confirm"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 

@@ -27,9 +27,12 @@ namespace PresetLauncher.Views.Pages
             ThemeSystem.Content = App.Localization.Get("settings.theme.system");
             ThemeLight.Content = App.Localization.Get("settings.theme.light");
             ThemeDark.Content = App.Localization.Get("settings.theme.dark");
+            TxtOptionsLabel.Text = App.Localization.Get("settings.options");
             TxtConfirmLaunch.Text = App.Localization.Get("settings.confirmLaunch");
             TxtNotifications.Text = App.Localization.Get("settings.notifications");
+            TxtDataLabel.Text = App.Localization.Get("settings.data");
             TxtDataPathLabel.Text = App.Localization.Get("settings.dataPath");
+            TxtCleanup.Text = App.Localization.Get("settings.cleanup");
         }
 
         private void LoadSettings()
@@ -116,7 +119,8 @@ namespace PresetLauncher.Views.Pages
         private void BtnCleanup_Click(object sender, RoutedEventArgs e)
         {
             App.Data.CleanupInvalidExecutables();
-            MessageBox.Show("Nettoyage terminé!", "Nettoyage",
+            MessageBox.Show(App.Localization.Get("settings.cleanupDone"), 
+                App.Localization.Get("settings.cleanup"),
                 MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }

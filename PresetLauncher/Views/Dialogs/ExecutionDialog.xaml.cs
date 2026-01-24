@@ -18,7 +18,8 @@ namespace PresetLauncher.Views.Dialogs
             _preset = preset;
             _launcher = launcher;
             
-            TxtTitle.Text = $"Lancement de {preset.Name}...";
+            TxtTitle.Text = App.Localization.Get("execution.inProgress");
+            TxtStatus.Text = App.Localization.Get("execution.preparing");
             ResultList.ItemsSource = _results;
 
             _launcher.StatusChanged += OnStatusChanged;
@@ -48,7 +49,7 @@ namespace PresetLauncher.Views.Dialogs
 
             TxtStatus.Text = history.FailedCount == 0
                 ? App.Localization.Get("execution.success")
-                : $"{history.FailedCount} échec(s) sur {history.ExecutablesCount}";
+                : App.Localization.Get("history.failures", history.FailedCount, history.ExecutablesCount);
 
             BtnClose.IsEnabled = true;
         }

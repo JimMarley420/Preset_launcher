@@ -16,7 +16,7 @@ namespace PresetLauncher.Views.Dialogs
             {
                 Title = App.Localization.Get("dialog.password.set");
                 TxtLabel.Text = App.Localization.Get("dialog.password.set");
-                TxtConfirmLabel.Text = "Confirmez le mot de passe";
+                TxtConfirmLabel.Text = App.Localization.Get("dialog.password.confirm");
                 TxtConfirmLabel.Visibility = Visibility.Visible;
                 PwdConfirm.Visibility = Visibility.Visible;
                 Height = 250;
@@ -40,14 +40,16 @@ namespace PresetLauncher.Views.Dialogs
             {
                 if (PwdPassword.Password != PwdConfirm.Password)
                 {
-                    MessageBox.Show("Les mots de passe ne correspondent pas.", "Erreur",
+                    MessageBox.Show(App.Localization.Get("dialog.password.mismatch"), 
+                        App.Localization.Get("dialog.error"),
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 if (string.IsNullOrEmpty(PwdPassword.Password))
                 {
-                    MessageBox.Show("Le mot de passe ne peut pas être vide.", "Erreur",
+                    MessageBox.Show(App.Localization.Get("dialog.password.empty"), 
+                        App.Localization.Get("dialog.error"),
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }

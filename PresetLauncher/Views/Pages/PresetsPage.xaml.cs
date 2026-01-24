@@ -187,7 +187,8 @@ namespace PresetLauncher.Views.Pages
                 {
                     var json = App.Data.ExportPreset(preset);
                     System.IO.File.WriteAllText(dialog.FileName, json);
-                    MessageBox.Show("Preset exporté avec succès!", "Export", 
+                    MessageBox.Show(App.Localization.Get("preset.exported"), 
+                        App.Localization.Get("dialog.export"), 
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
@@ -210,18 +211,21 @@ namespace PresetLauncher.Views.Pages
                     {
                         App.Data.AddPreset(preset);
                         LoadPresets();
-                        MessageBox.Show("Preset importé avec succès!", "Import",
+                        MessageBox.Show(App.Localization.Get("preset.imported"), 
+                            App.Localization.Get("dialog.import"),
                             MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        MessageBox.Show("Erreur lors de l'import du preset.", "Erreur",
+                        MessageBox.Show(App.Localization.Get("preset.importError"), 
+                            App.Localization.Get("dialog.error"),
                             MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Erreur: {ex.Message}", "Erreur",
+                    MessageBox.Show($"{App.Localization.Get("dialog.error")}: {ex.Message}", 
+                        App.Localization.Get("dialog.error"),
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }

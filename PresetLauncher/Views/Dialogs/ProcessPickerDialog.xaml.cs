@@ -18,7 +18,13 @@ namespace PresetLauncher.Views.Dialogs
         public ProcessPickerDialog()
         {
             InitializeComponent();
+            UpdateLocalizedText();
             LoadProcesses();
+        }
+
+        private void UpdateLocalizedText()
+        {
+            Title = App.Localization.Get("process.title");
         }
 
         private void LoadProcesses()

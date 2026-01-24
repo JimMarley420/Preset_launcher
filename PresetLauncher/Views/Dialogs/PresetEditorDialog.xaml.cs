@@ -43,6 +43,7 @@ namespace PresetLauncher.Views.Dialogs
         {
             TxtNameLabel.Text = App.Localization.Get("preset.name");
             TxtDescLabel.Text = App.Localization.Get("preset.description");
+            TxtExeLabel.Text = App.Localization.Get("exe.executables");
             TxtAddFile.Text = App.Localization.Get("exe.addFromFile");
             TxtAddProcess.Text = App.Localization.Get("exe.addFromProcess");
             TxtCancel.Text = App.Localization.Get("dialog.cancel");
@@ -163,7 +164,8 @@ namespace PresetLauncher.Views.Dialogs
         {
             if (string.IsNullOrWhiteSpace(TxtName.Text))
             {
-                MessageBox.Show("Veuillez entrer un nom pour le preset.", "Erreur",
+                MessageBox.Show(App.Localization.Get("dialog.preset.nameRequired"), 
+                    App.Localization.Get("dialog.error"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
