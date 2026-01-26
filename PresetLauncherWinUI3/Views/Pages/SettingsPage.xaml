@@ -39,9 +39,45 @@
                               Grid.Column="2" 
                               MinWidth="160"
                               SelectionChanged="CmbLanguage_SelectionChanged">
-                        <ComboBoxItem Content="Francais" Tag="fr"/>
-                        <ComboBoxItem Content="English" Tag="en"/>
+                        <ComboBoxItem x:Name="LangFr" Content="Francais" Tag="fr"/>
+                        <ComboBoxItem x:Name="LangEn" Content="English" Tag="en"/>
                     </ComboBox>
+                </Grid>
+            </Border>
+
+            <!-- Accent color and transparency -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16,12"
+                    Margin="0,0,0,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <FontIcon Grid.Column="0" Glyph="&#xE790;" FontSize="20" Margin="0,0,16,0"/>
+                    
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtAccent" Text="Couleur d'accent" Style="{ThemeResource BodyTextBlockStyle}"/>
+                        <TextBlock Text="Personnalisez la couleur d'accent et la transparence" 
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="2" Orientation="Vertical">
+                        <ComboBox x:Name="CmbAccent" MinWidth="160" SelectionChanged="CmbAccent_SelectionChanged">
+                            <ComboBoxItem x:Name="AccentBlue" Content="Bleu" Tag="Blue"/>
+                            <ComboBoxItem x:Name="AccentRed" Content="Rouge" Tag="Red"/>
+                            <ComboBoxItem x:Name="AccentGreen" Content="Vert" Tag="Green"/>
+                            <ComboBoxItem x:Name="AccentPurple" Content="Violet" Tag="Purple"/>
+                        </ComboBox>
+                        <ToggleSwitch x:Name="TglUseAccent" Margin="0,8,0,0" Toggled="TglUseAccent_Toggled"/>
+                        <ToggleSwitch x:Name="TglTransparency" Margin="0,8,0,0" Toggled="TglTransparency_Toggled"/>
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -79,6 +115,40 @@
                         <ComboBoxItem x:Name="ThemeSystem" Content="Systeme" Tag="system"/>
                         <ComboBoxItem x:Name="ThemeLight" Content="Clair" Tag="light"/>
                         <ComboBoxItem x:Name="ThemeDark" Content="Sombre" Tag="dark"/>
+                    </ComboBox>
+                </Grid>
+            </Border>
+
+            <!-- Backdrop / Materials setting -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16,12"
+                    Margin="0,0,0,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <FontIcon Grid.Column="0" Glyph="&#xE9F1;" FontSize="20" Margin="0,0,16,0"/>
+                    
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtBackdrop" Text="Materiaux" Style="{ThemeResource BodyTextBlockStyle}"/>
+                        <TextBlock Text="Choisissez un effet d'arriere-plan (Mica, Acrylic, Aucun)" 
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    
+                    <ComboBox x:Name="CmbBackdrop" 
+                              Grid.Column="2" 
+                              MinWidth="160"
+                              SelectionChanged="CmbBackdrop_SelectionChanged">
+                        <ComboBoxItem x:Name="BackdropNone" Content="Aucun" Tag="none"/>
+                        <ComboBoxItem x:Name="BackdropMica" Content="Mica" Tag="mica"/>
+                        <ComboBoxItem x:Name="BackdropAcrylic" Content="Acrylic" Tag="acrylic"/>
                     </ComboBox>
                 </Grid>
             </Border>

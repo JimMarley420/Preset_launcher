@@ -18,6 +18,8 @@ public sealed partial class MainWindow : Window
         
         App.Theme.SetWindow(this);
         App.Theme.ApplyTheme(App.Settings.CurrentSettings.Theme);
+        // Apply saved backdrop/materials
+        App.Theme.ApplyBackdrop(App.Settings.CurrentSettings.Backdrop);
         
         UpdateLocalizedText();
     }

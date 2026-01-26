@@ -69,6 +69,30 @@ public class SettingsService
         Save();
     }
 
+    public void UpdateBackdrop(string backdrop)
+    {
+        CurrentSettings.Backdrop = backdrop;
+        Save();
+    }
+
+    public void UpdateAccentColor(string colorName)
+    {
+        CurrentSettings.AccentColor = colorName;
+        Save();
+    }
+
+    public void UpdateUseAccent(bool use)
+    {
+        CurrentSettings.UseAccent = use;
+        Save();
+    }
+
+    public void UpdateUseTransparency(bool use)
+    {
+        CurrentSettings.UseTransparency = use;
+        Save();
+    }
+
     public void UpdateLanguage(string language)
     {
         CurrentSettings.Language = language;

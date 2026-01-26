@@ -6,6 +6,14 @@ namespace PresetLauncher.Models
     {
         public string Language { get; set; } = "fr";
         public string Theme { get; set; } = "system";
+        // Backdrop: none | mica | acrylic
+        public string Backdrop { get; set; } = "none";
+        // Accent color name, e.g. "Blue", "Red"
+        public string AccentColor { get; set; } = "Blue";
+        // Whether to use accent color for titlebar/background
+        public bool UseAccent { get; set; } = true;
+        // Whether to use transparency/translucency effects
+        public bool UseTransparency { get; set; } = true;
         public string DataPath { get; set; } = string.Empty;
         public bool MinimizeToTray { get; set; } = false;
         public bool ConfirmBeforeLaunch { get; set; } = true;
