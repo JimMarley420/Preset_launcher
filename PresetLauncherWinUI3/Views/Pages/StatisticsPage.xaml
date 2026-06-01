@@ -6,193 +6,129 @@
     xmlns:local="using:PresetLauncher.Views.Pages">
 
     <ScrollViewer>
-        <StackPanel Spacing="20" Padding="0,0,24,32">
-            
-            <!-- ========== TITLE ========== -->
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="TxtStatisticsTitle" Text="Statistiques" 
+        <StackPanel Spacing="16" Padding="0,0,4,32">
+
+            <!-- Title -->
+            <StackPanel Spacing="2">
+                <TextBlock x:Name="TxtStatisticsTitle" Text="Statistiques"
                            Style="{ThemeResource TitleLargeTextBlockStyle}"
                            FontWeight="SemiBold"/>
-                <TextBlock x:Name="TxtStatisticsSubtitle" Text="Analyse de votre utilisation et activite" 
-                           Style="{ThemeResource BodyTextBlockStyle}"
+                <TextBlock x:Name="TxtStatisticsSubtitle" Text=""
+                           Style="{ThemeResource CaptionTextBlockStyle}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
-            
-            <!-- ========== KPI CARDS ========== -->
-            <Grid>
+
+            <!-- KPI cards -->
+            <Grid ColumnSpacing="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Grid.ColumnSpacing>12</Grid.ColumnSpacing>
-                
-                <!-- KPI 1 -->
+
                 <Border Grid.Column="0"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24,20">
-                    <StackPanel Spacing="12">
-                        <Border Background="{ThemeResource PrimaryBlueBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="40" 
-                                Width="40"
-                                Opacity="0.15">
-                            <FontIcon Glyph="&#xE8B7;" 
-                                      FontSize="20" 
-                                      Foreground="{ThemeResource PrimaryBlueBrush}" 
-                                      HorizontalAlignment="Center" 
-                                      VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel>
-                            <TextBlock x:Name="TxtPresetsCount" 
-                                       Text="0" 
-                                       Style="{ThemeResource TitleTextBlockStyle}"
-                                       FontWeight="Bold"
-                                       Foreground="{ThemeResource PrimaryBlueBrush}"/>
-                            <TextBlock x:Name="TxtPresetsLabel" 
-                                       Text="Presets actifs" 
-                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
-                        </StackPanel>
+                        CornerRadius="8"
+                        Padding="20,16">
+                    <StackPanel Spacing="8">
+                        <FontIcon Glyph="&#xE8B7;" FontSize="22"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtPresetsCount" Text="0"
+                                   Style="{ThemeResource TitleTextBlockStyle}"
+                                   FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtPresetsLabel" Text="Presets"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </Border>
 
-                <!-- KPI 2 -->
                 <Border Grid.Column="1"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24,20">
-                    <StackPanel Spacing="12">
-                        <Border Background="{ThemeResource PrimaryPurpleBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="40" 
-                                Width="40"
-                                Opacity="0.15">
-                            <FontIcon Glyph="&#xE768;" 
-                                      FontSize="20" 
-                                      Foreground="{ThemeResource PrimaryPurpleBrush}" 
-                                      HorizontalAlignment="Center" 
-                                      VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel>
-                            <TextBlock x:Name="TxtTotalLaunches" 
-                                       Text="0" 
-                                       Style="{ThemeResource TitleTextBlockStyle}"
-                                       FontWeight="Bold"
-                                       Foreground="{ThemeResource PrimaryPurpleBrush}"/>
-                            <TextBlock x:Name="TxtTotalLaunchesLabel" 
-                                       Text="Lancements totaux" 
-                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
-                        </StackPanel>
+                        CornerRadius="8"
+                        Padding="20,16">
+                    <StackPanel Spacing="8">
+                        <FontIcon Glyph="&#xE768;" FontSize="22"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtTotalLaunches" Text="0"
+                                   Style="{ThemeResource TitleTextBlockStyle}"
+                                   FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtTotalLaunchesLabel" Text="Lancements"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </Border>
 
-                <!-- KPI 3 -->
                 <Border Grid.Column="2"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="24,20">
-                    <StackPanel Spacing="12">
-                        <Border Background="{ThemeResource AccentGreenBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="40" 
-                                Width="40"
-                                Opacity="0.15">
-                            <FontIcon Glyph="&#xE756;" 
-                                      FontSize="20" 
-                                      Foreground="{ThemeResource AccentGreenBrush}" 
-                                      HorizontalAlignment="Center" 
-                                      VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel>
-                            <TextBlock x:Name="TxtUniquePrograms" 
-                                       Text="0" 
-                                       Style="{ThemeResource TitleTextBlockStyle}"
-                                       FontWeight="Bold"
-                                       Foreground="{ThemeResource AccentGreenBrush}"/>
-                            <TextBlock x:Name="TxtUniqueProgramsLabel" 
-                                       Text="Programmes uniques" 
-                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
-                        </StackPanel>
+                        CornerRadius="8"
+                        Padding="20,16">
+                    <StackPanel Spacing="8">
+                        <FontIcon Glyph="&#xE756;" FontSize="22"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtUniquePrograms" Text="0"
+                                   Style="{ThemeResource TitleTextBlockStyle}"
+                                   FontWeight="Bold"/>
+                        <TextBlock x:Name="TxtUniqueProgramsLabel" Text="Programmes"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </Border>
             </Grid>
-            
-            <!-- ========== MOST USED PROGRAMS ========== -->
+
+            <!-- Most used programs -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
-                    CornerRadius="12"
-                    Padding="24,20">
-                <StackPanel Spacing="16">
-                    <StackPanel Spacing="4">
-                        <TextBlock x:Name="TxtMostUsed" 
-                                   Text="Programmes les plus utilises" 
-                                   Style="{ThemeResource SubtitleTextBlockStyle}"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock x:Name="TxtMostUsedDescription"
-                                   Text="Classement par nombre de lancements" 
+                    CornerRadius="8"
+                    Padding="20">
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Name="TxtMostUsed" Text="Programmes les plus utilisés"
+                                   Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                        <TextBlock x:Name="TxtMostUsedDescription" Text=""
                                    Style="{ThemeResource CaptionTextBlockStyle}"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
 
-                    <ListView x:Name="MostUsedList" 
-                              SelectionMode="None">
+                    <ListView x:Name="MostUsedList" SelectionMode="None">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,8" ColumnSpacing="12">
+                                <Grid Margin="0,0,0,10" ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    
-                                    <Border Grid.Column="0" 
-                                            Background="{ThemeResource AccentGreenBrush}" 
-                                            CornerRadius="6" 
-                                            Padding="8" 
-                                            Height="36" 
-                                            Width="36"
-                                            Opacity="0.15">
-                                        <FontIcon Glyph="&#xE756;" 
-                                                  FontSize="18" 
-                                                  Foreground="{ThemeResource AccentGreenBrush}" 
-                                                  HorizontalAlignment="Center" 
-                                                  VerticalAlignment="Center"/>
-                                    </Border>
-                                    
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                                        <TextBlock Text="{Binding Path}" 
+
+                                    <StackPanel Grid.Column="0" Spacing="5" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Path}"
                                                    Style="{ThemeResource BodyTextBlockStyle}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   FontWeight="Medium"/>
-                                        <ProgressBar Value="{Binding Percentage}" 
+                                                   FontWeight="Medium"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <ProgressBar Value="{Binding Percentage}"
                                                      Maximum="100"
-                                                     Height="4"
-                                                     CornerRadius="2"
-                                                     Foreground="{ThemeResource AccentGreenBrush}"/>
+                                                     Height="3"
+                                                     CornerRadius="2"/>
                                     </StackPanel>
-                                    
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                                Spacing="1" MinWidth="48">
                                         <TextBlock Text="{Binding TimesText}"
                                                    Style="{ThemeResource BodyStrongTextBlockStyle}"
                                                    TextAlignment="Right"/>
-                                        <TextBlock Text="{Binding PercentageText}" 
+                                        <TextBlock Text="{Binding PercentageText}"
                                                    Style="{ThemeResource CaptionTextBlockStyle}"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                    TextAlignment="Right"/>
@@ -203,7 +139,7 @@
                     </ListView>
                 </StackPanel>
             </Border>
-            
+
         </StackPanel>
     </ScrollViewer>
 </Page>

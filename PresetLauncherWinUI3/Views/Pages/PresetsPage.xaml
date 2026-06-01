@@ -11,158 +11,130 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ========== HEADER SECTION ========== -->
-        <StackPanel Grid.Row="0" Spacing="16" Margin="0,0,0,20">
-            <!-- Title -->
-            <StackPanel Spacing="6">
-                <TextBlock x:Name="TxtPresetsTitle" Text="Presets" 
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtPresetsTitle" Text="Presets"
                            Style="{ThemeResource TitleLargeTextBlockStyle}"
                            FontWeight="SemiBold"/>
-                <TextBlock x:Name="PresetCountText"
-                           Text="Tous les presets" 
-                           Style="{ThemeResource BodyTextBlockStyle}"
+                <TextBlock x:Name="PresetCountText" Text=""
+                           Style="{ThemeResource CaptionTextBlockStyle}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
-            <!-- Controls -->
-            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
-                <Button x:Name="BtnNewPreset" 
-                        Style="{ThemeResource AccentButtonStyle}" 
-                        Padding="24,10"
-                        Click="BtnNewPreset_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <FontIcon Glyph="&#xE710;" FontSize="16"/>
-                        <TextBlock x:Name="TxtNewPreset" Text="Nouveau preset" FontWeight="Medium"/>
-                    </StackPanel>
-                </Button>
-                
-                <Button x:Name="BtnImport" 
-                        Padding="16,10"
-                        Click="BtnImport_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <FontIcon Glyph="&#xE8B5;" FontSize="16"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <AutoSuggestBox x:Name="SearchBox"
+                                PlaceholderText="Rechercher..."
+                                QueryIcon="Find"
+                                Width="220"
+                                TextChanged="SearchBox_TextChanged"/>
+                <Button x:Name="BtnImport"
+                        Padding="12,8"
+                        Click="BtnImport_Click"
+                        ToolTipService.ToolTip="Importer">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE8B5;" FontSize="14"/>
                         <TextBlock x:Name="TxtImport" Text="Importer"/>
                     </StackPanel>
                 </Button>
-                
-                <!-- Search box with styling -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="12,4"
-                        MaxWidth="300">
-                    <AutoSuggestBox x:Name="SearchBox" 
-                                    PlaceholderText="Rechercher un preset..." 
-                                    QueryIcon="Find"
-                                    TextChanged="SearchBox_TextChanged"
-                                    BorderThickness="0"
-                                    Background="Transparent"/>
-                </Border>
+                <Button x:Name="BtnNewPreset"
+                        Style="{ThemeResource AccentButtonStyle}"
+                        Padding="16,8"
+                        Click="BtnNewPreset_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                        <TextBlock x:Name="TxtNewPreset" Text="Nouveau" FontWeight="Medium"/>
+                    </StackPanel>
+                </Button>
             </StackPanel>
-        </StackPanel>
+        </Grid>
 
-        <!-- ========== PRESETS GRID ========== -->
+        <!-- Preset list -->
         <ScrollViewer Grid.Row="1">
             <ItemsRepeater x:Name="PresetsRepeater" ItemsSource="{x:Bind FilteredPresets, Mode=OneWay}">
                 <ItemsRepeater.Layout>
-                    <UniformGridLayout MinItemWidth="320" MinItemHeight="240" 
-                                       MinColumnSpacing="12" MinRowSpacing="12"/>
+                    <StackLayout Spacing="8"/>
                 </ItemsRepeater.Layout>
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate>
-                        <!-- Modern Premium Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
-                                CornerRadius="12"
-                                Padding="20">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                
-                                <!-- Header with Icon -->
-                                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
-                                    <Border Background="{ThemeResource AccentGreenBrush}" 
-                                            CornerRadius="8" 
-                                            Padding="10" 
-                                            Height="48" 
-                                            Width="48"
-                                            Opacity="0.15">
-                                        <FontIcon Glyph="&#xE8B7;" 
-                                                  FontSize="24" 
-                                                  Foreground="{ThemeResource AccentGreenBrush}" 
-                                                  HorizontalAlignment="Center" 
-                                                  VerticalAlignment="Center"/>
-                                    </Border>
-                                    
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}" 
-                                                   Style="{ThemeResource SubtitleTextBlockStyle}"
-                                                   FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding Description}" 
-                                                   Style="{ThemeResource CaptionTextBlockStyle}"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   MaxLines="1"
-                                                   Margin="0,4,0,0"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                
-                                <!-- Programs Info -->
-                                    <StackPanel Grid.Row="1" Margin="0,12,0,0" Spacing="8">
-                                    <TextBlock x:Name="TxtProgramsLabel" Text="Programmes associes:" 
-                                               Style="{ThemeResource CaptionTextBlockStyle}"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                CornerRadius="8"
+                                Padding="16,14">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Icon -->
+                                <Border Grid.Column="0"
+                                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                        CornerRadius="6"
+                                        Width="40" Height="40"
+                                        VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8B7;" FontSize="18"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Text="{Binding Name}"
+                                               Style="{ThemeResource BodyStrongTextBlockStyle}"/>
                                     <TextBlock Text="{Binding ProgramsText}"
-                                               Style="{ThemeResource BodyTextBlockStyle}"
-                                               Foreground="{ThemeResource TextFillColorTertiary}"
-                                               TextWrapping="Wrap"/>
+                                               Style="{ThemeResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
-                                
-                                <!-- Action Buttons -->
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
-                                    <Button x:Name="BtnLaunch" 
-                                            Style="{ThemeResource AccentButtonStyle}" 
-                                            Tag="{Binding}" 
-                                            Padding="16,8"
+
+                                <!-- Actions -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                            Spacing="4" VerticalAlignment="Center">
+                                    <Button Style="{ThemeResource AccentButtonStyle}"
+                                            Tag="{Binding}"
+                                            Padding="14,7"
                                             Click="BtnLaunch_Click">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <FontIcon Glyph="&#xE768;" FontSize="14"/>
-                                                    <TextBlock Text="Lancer" FontWeight="Medium"/>
-                                                </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE768;" FontSize="13"/>
+                                            <TextBlock Text="Lancer" FontWeight="Medium"/>
+                                        </StackPanel>
                                     </Button>
-                                    <Button x:Name="BtnEdit" 
-                                            Tag="{Binding}" 
-                                            Padding="10,8"
-                                            ToolTipService.ToolTip="Editer"
+                                    <Button Tag="{Binding}"
+                                            Padding="9,7"
+                                            ToolTipService.ToolTip="Modifier"
                                             Click="BtnEdit_Click">
-                                        <FontIcon Glyph="&#xE70F;" FontSize="14"/>
+                                        <FontIcon Glyph="&#xE70F;" FontSize="13"/>
                                     </Button>
-                                    <Button x:Name="BtnMore" 
-                                            Tag="{Binding}" 
-                                            Padding="10,8"
-                                            ToolTipService.ToolTip="Plus">
-                                        <FontIcon Glyph="&#xE712;" FontSize="14"/>
+                                    <Button Tag="{Binding}"
+                                            Padding="9,7"
+                                            ToolTipService.ToolTip="Plus d'options">
+                                        <FontIcon Glyph="&#xE712;" FontSize="13"/>
                                         <Button.Flyout>
                                             <MenuFlyout>
-                                                <MenuFlyoutItem Text="Fermer les processus" 
-                                                                Click="BtnCloseProcesses_Click" 
-                                                                Tag="{Binding}">
+                                                <MenuFlyoutItem Text="Fermer les processus"
+                                                                Tag="{Binding}"
+                                                                Click="BtnCloseProcesses_Click">
                                                     <MenuFlyoutItem.Icon>
-                                                        <FontIcon Glyph="&#xE73E;"/>
+                                                        <FontIcon Glyph="&#xE8BB;"/>
                                                     </MenuFlyoutItem.Icon>
                                                 </MenuFlyoutItem>
                                                 <MenuFlyoutSeparator/>
-                                                <MenuFlyoutItem Text="Supprimer" 
-                                                                Foreground="{ThemeResource ErrorRedBrush}"
-                                                                Click="BtnDelete_Click" 
-                                                                Tag="{Binding}">
+                                                <MenuFlyoutItem Text="Supprimer"
+                                                                Tag="{Binding}"
+                                                                Click="BtnDelete_Click"
+                                                                Foreground="{ThemeResource SystemFillColorCriticalBrush}">
                                                     <MenuFlyoutItem.Icon>
-                                                        <FontIcon Glyph="&#xE74D;"/>
+                                                        <FontIcon Glyph="&#xE74D;"
+                                                                  Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
                                                     </MenuFlyoutItem.Icon>
                                                 </MenuFlyoutItem>
                                             </MenuFlyout>
@@ -177,13 +149,29 @@
         </ScrollViewer>
 
         <!-- Empty state -->
-        <TextBlock x:Name="TxtNoPresets"
-                   Grid.Row="1"
-                   Text="Aucun preset"
-                   Style="{ThemeResource BodyTextBlockStyle}"
-                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Visibility="Collapsed"/>
+        <StackPanel x:Name="EmptyStatePanel"
+                    Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="12"
+                    Visibility="Collapsed">
+            <FontIcon Glyph="&#xE8B7;" FontSize="40"
+                      Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                      HorizontalAlignment="Center"/>
+            <TextBlock x:Name="TxtNoPresets"
+                       Text="Aucun preset"
+                       Style="{ThemeResource SubtitleTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Center"/>
+            <Button Style="{ThemeResource AccentButtonStyle}"
+                    HorizontalAlignment="Center"
+                    Padding="20,10"
+                    Click="BtnNewPreset_Click">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                    <TextBlock Text="Créer un preset" FontWeight="Medium"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
     </Grid>
 </Page>

@@ -4,9 +4,9 @@
 
 #define AppName "PresetLauncher"
 #ifndef AppVersion
-  #define AppVersion "1.2.5"
+  #define AppVersion "1.2.6"
 #endif
-#define AppPublisher "BurningBox"
+#define AppPublisher "JimmyMarley"
 #define AppExeName "PresetLauncherWinUI3.exe"
 #define AppURL "https://version.multichat.cloud/PresetLauncher"
 
@@ -65,5 +65,5 @@ Filename: "{app}\{#AppExeName}"; \
   Description: "{cm:LaunchProgram,{#AppName}}"; \
   Flags: nowait postinstall skipifsilent
 
-[UninstallDelete]
-Type: filesandordirs; Name: "{localappdata}\{#AppName}"
+; [UninstallDelete] intentionnellement absent : les données utilisateur
+; ({localappdata}\PresetLauncher\) sont conservées à la désinstallation.

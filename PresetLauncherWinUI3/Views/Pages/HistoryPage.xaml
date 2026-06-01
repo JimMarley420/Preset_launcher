@@ -11,128 +11,120 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- ========== HEADER ========== -->
-        <StackPanel Grid.Row="0" Spacing="16" Margin="0,0,0,20">
-            <StackPanel Spacing="6">
-                <TextBlock x:Name="TxtHistoryTitle" Text="" 
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtHistoryTitle" Text=""
                            Style="{ThemeResource TitleLargeTextBlockStyle}"
                            FontWeight="SemiBold"/>
-                <TextBlock x:Name="HistoryCountText"
-                           Text="" 
-                           Style="{ThemeResource BodyTextBlockStyle}"
+                <TextBlock x:Name="HistoryCountText" Text=""
+                           Style="{ThemeResource CaptionTextBlockStyle}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
 
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <Button x:Name="BtnClear" 
-                        Padding="16,10"
-                        Click="BtnClear_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <FontIcon Glyph="&#xE74D;" FontSize="16"/>
-                        <TextBlock x:Name="TxtClear" Text="" FontWeight="Medium"/>
-                    </StackPanel>
-                </Button>
-                
-                <ComboBox x:Name="FilterCombo" 
-                          Padding="12,6"
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <ComboBox x:Name="FilterCombo"
+                          MinWidth="140"
                           SelectionChanged="FilterCombo_SelectionChanged">
                     <ComboBoxItem x:Name="FilterAll" Content="" IsSelected="True"/>
                     <ComboBoxItem x:Name="FilterSuccess" Content=""/>
                     <ComboBoxItem x:Name="FilterFailures" Content=""/>
                     <ComboBoxItem x:Name="FilterToday" Content=""/>
                 </ComboBox>
+                <Button x:Name="BtnClear"
+                        Padding="12,8"
+                        Click="BtnClear_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE74D;" FontSize="13"/>
+                        <TextBlock x:Name="TxtClear" Text="" FontWeight="Medium"/>
+                    </StackPanel>
+                </Button>
             </StackPanel>
-        </StackPanel>
+        </Grid>
 
-        <!-- ========== HISTORY LIST ========== -->
-        <ListView x:Name="HistoryList" 
-                  Grid.Row="1" 
+        <!-- History list -->
+        <ListView x:Name="HistoryList"
+                  Grid.Row="1"
                   SelectionMode="None">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0,0,0,6"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                </Style>
+            </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="12"
-                            Padding="20"
-                            Margin="0,0,0,12">
-                        <Grid ColumnSpacing="16">
+                            CornerRadius="8"
+                            Padding="16,12">
+                        <Grid ColumnSpacing="14">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            
-                            <!-- Status Icon -->
-                            <Border Grid.Column="0" 
-                                    Background="{ThemeResource AccentGreenBrush}" 
-                                    CornerRadius="8" 
-                                    Padding="10" 
-                                    Height="48" 
-                                    Width="48"
-                                    Opacity="0.15"
-                                    VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE768;" 
-                                          FontSize="24" 
-                                          Foreground="{ThemeResource AccentGreenBrush}" 
-                                          HorizontalAlignment="Center" 
-                                          VerticalAlignment="Center"/>
-                            </Border>
-                            
+
                             <!-- Info -->
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="{Binding PresetName}" 
-                                               Style="{ThemeResource SubtitleTextBlockStyle}"
-                                               FontWeight="SemiBold"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="12">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <FontIcon Glyph="&#xE81C;" FontSize="14" 
-                                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                            <TextBlock Text="{Binding ExecutedAt}" 
-                                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                        </StackPanel>
-                                        <TextBlock Text="•" 
-                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <FontIcon Glyph="&#xE73E;" FontSize="14" 
-                                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                            <TextBlock Text="{Binding Duration}" 
-                                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                        </StackPanel>
+                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding PresetName}"
+                                           Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon Glyph="&#xE81C;" FontSize="12"
+                                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                  VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ExecutedAt}"
+                                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                     </StackPanel>
+                                    <TextBlock Text="·"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                               Style="{ThemeResource CaptionTextBlockStyle}"/>
+                                    <TextBlock Text="{Binding Duration}"
+                                               Style="{ThemeResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </StackPanel>
                             </StackPanel>
-                            
-                            <!-- Status Badge -->
-                            <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                <Border Background="{ThemeResource AccentGreenBrush}" 
-                                        CornerRadius="6" 
-                                        Padding="10,6"
-                                        Opacity="0.2">
-                                    <TextBlock Text="{Binding SuccessText}"
-                                               Style="{ThemeResource CaptionTextBlockStyle}"
-                                               Foreground="{ThemeResource AccentGreenBrush}"
-                                               FontWeight="Medium"
-                                               TextAlignment="Center"/>
-                                </Border>
-                            </StackPanel>
+
+                            <!-- Status badge -->
+                            <Border Grid.Column="1"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    CornerRadius="6"
+                                    Padding="10,5"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding SuccessText}"
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           FontWeight="Medium"/>
+                            </Border>
                         </Grid>
                     </Border>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
 
-        <!-- ========== EMPTY STATE ========== -->
-        <TextBlock x:Name="TxtEmpty"
-                   Grid.Row="1"
-                   Text="Aucun historique"
-                   Style="{ThemeResource BodyTextBlockStyle}"
-                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Visibility="Collapsed"/>
+        <!-- Empty state -->
+        <StackPanel x:Name="EmptyStatePanel"
+                    Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="10"
+                    Visibility="Collapsed">
+            <FontIcon Glyph="&#xE81C;" FontSize="36"
+                      Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                      HorizontalAlignment="Center"/>
+            <TextBlock x:Name="TxtEmpty"
+                       Text="Aucun historique"
+                       Style="{ThemeResource SubtitleTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
     </Grid>
 </Page>

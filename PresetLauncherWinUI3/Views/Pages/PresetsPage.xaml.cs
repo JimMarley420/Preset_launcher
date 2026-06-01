@@ -110,7 +110,7 @@ public sealed partial class PresetsPage : Page
             FilteredPresets.Add(preset);
         }
 
-        TxtNoPresets.Visibility = FilteredPresets.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyStatePanel.Visibility = FilteredPresets.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)

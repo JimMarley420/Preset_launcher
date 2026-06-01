@@ -6,51 +6,42 @@
     xmlns:local="using:PresetLauncher"
     Title="">
 
-    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="60"/>
+            <RowDefinition Height="36"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        
-        <!-- PREMIUM TITLE BAR -->
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-            <Grid.BorderBrush>
-                <SolidColorBrush Color="{ThemeResource CardStrokeColorDefault}" Opacity="0.5"/>
-            </Grid.BorderBrush>
-            <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0" Spacing="12">
-                    <!-- Logo Icon with gradient background -->
-                    <Border Background="{ThemeResource AccentButtonBackground}" 
-                            CornerRadius="8" 
-                            Padding="8" 
-                            Height="40" 
-                            Width="40">
-                        <FontIcon Glyph="&#xE8B7;" FontSize="20" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Border>
-                    
-                    <!-- App Title -->
-                    <TextBlock x:Name="AppTitleText" 
-                               Text="" 
-                               Style="{ThemeResource SubtitleTextBlockStyle}"
-                               VerticalAlignment="Center"
-                               FontWeight="SemiBold"/>
+
+        <!-- Compact title bar / drag region -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0"
+              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+            <Border BorderThickness="0,0,0,1"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                            Margin="14,0" Spacing="8">
+                    <FontIcon Glyph="&#xE8B7;" FontSize="13"
+                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    <TextBlock x:Name="AppTitleText" Text=""
+                               Style="{ThemeResource CaptionTextBlockStyle}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Grid>
-        
-        <!-- MODERN NAVIGATION VIEW -->
+
+        <!-- Left navigation -->
         <NavigationView x:Name="NavView"
                         Grid.Row="1"
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="True"
                         IsPaneToggleButtonVisible="True"
-                        PaneDisplayMode="Top"
-                        OpenPaneLength="260"
-                        CompactPaneLength="54"
+                        PaneDisplayMode="Left"
+                        OpenPaneLength="200"
+                        CompactPaneLength="52"
                         SelectionChanged="NavView_SelectionChanged"
                         Loaded="NavView_Loaded"
-                        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-            
+                        Background="Transparent">
+
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="NavPresets" Content="" Tag="presets">
                     <NavigationViewItem.Icon>
@@ -68,10 +59,8 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
-            
 
-            
-            <Frame x:Name="ContentFrame" Padding="28,24"/>
+            <Frame x:Name="ContentFrame" Padding="28,20,28,0"/>
         </NavigationView>
     </Grid>
 </Window>

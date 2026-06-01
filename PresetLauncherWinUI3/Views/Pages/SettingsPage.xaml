@@ -6,387 +6,262 @@
     xmlns:local="using:PresetLauncher.Views.Pages">
 
     <ScrollViewer>
-        <StackPanel Spacing="20" Padding="0,0,24,32">
-            
-            <!-- ========== TITLE ========== -->
-            <StackPanel Spacing="8">
-                <TextBlock x:Name="TxtSettingsTitle" Text="Paramètres" 
+        <StackPanel Spacing="6" Padding="0,0,4,32">
+
+            <!-- Title -->
+            <StackPanel Spacing="2" Margin="0,0,0,14">
+                <TextBlock x:Name="TxtSettingsTitle" Text="Paramètres"
                            Style="{ThemeResource TitleLargeTextBlockStyle}"
                            FontWeight="SemiBold"/>
-                <TextBlock x:Name="TxtSettingsSubtitle" Text="Personnalisez l'apparence et le comportement de l'application" 
-                           Style="{ThemeResource BodyTextBlockStyle}"
+                <TextBlock x:Name="TxtSettingsSubtitle" Text=""
+                           Style="{ThemeResource CaptionTextBlockStyle}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
             </StackPanel>
-            
-            <!-- ========== APPEARANCE SECTION ========== -->
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="TxtAppearanceTitle" Text="Apparence" 
-                           Style="{ThemeResource SubtitleTextBlockStyle}"
-                           FontWeight="SemiBold"
-                           Margin="0,8,0,0"/>
 
-                <!-- Theme Selection -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
+            <!-- ── Apparence ── -->
+            <TextBlock x:Name="TxtAppearanceTitle" Text="Apparence"
+                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                       Margin="4,8,0,4"/>
+
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+                    <!-- Theme -->
+                    <Grid Padding="16,14" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource PrimaryBlueBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE790;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtThemeLabel" Text="Thème" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtThemeSubtitle" Text="Choisissez le thème de l'application" 
+                        <FontIcon Grid.Column="0" Glyph="&#xE790;" FontSize="16"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                  VerticalAlignment="Center" Width="20"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="TxtThemeLabel" Text="Thème"
+                                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                            <TextBlock x:Name="TxtThemeSubtitle" Text=""
                                        Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
-                        
-                        <ComboBox x:Name="CmbTheme" 
-                                  Grid.Column="2" 
-                                  MinWidth="160"
+                        <ComboBox x:Name="CmbTheme" Grid.Column="2" MinWidth="150"
                                   SelectionChanged="CmbTheme_SelectionChanged">
                             <ComboBoxItem x:Name="ThemeSystem" Content="Système" Tag="system" IsSelected="True"/>
                             <ComboBoxItem x:Name="ThemeLight" Content="Clair" Tag="light"/>
                             <ComboBoxItem x:Name="ThemeDark" Content="Sombre" Tag="dark"/>
                         </ComboBox>
                     </Grid>
-                </Border>
 
-                <!-- Language Selection -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
+                    <Border BorderThickness="0,1,0,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+                    <!-- Language -->
+                    <Grid Padding="16,14" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource PrimaryPurpleBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE774;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtLanguageLabel" Text="Langue" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtLanguageSubtitle" Text="Langue de l'interface" 
+                        <FontIcon Grid.Column="0" Glyph="&#xE774;" FontSize="16"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                  VerticalAlignment="Center" Width="20"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="TxtLanguageLabel" Text="Langue"
+                                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                            <TextBlock x:Name="TxtLanguageSubtitle" Text=""
                                        Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
-                        
-                        <ComboBox x:Name="CmbLanguage" 
-                                  Grid.Column="2" 
-                                  MinWidth="160"
+                        <ComboBox x:Name="CmbLanguage" Grid.Column="2" MinWidth="150"
                                   SelectionChanged="CmbLanguage_SelectionChanged">
                             <ComboBoxItem x:Name="LangFr" Content="Français" Tag="fr" IsSelected="True"/>
-                            <ComboBoxItem x:Name="LangEn" Content="Anglais" Tag="en"/>
+                            <ComboBoxItem x:Name="LangEn" Content="English" Tag="en"/>
                         </ComboBox>
                     </Grid>
-                </Border>
 
-                <!-- Backdrop/Materials -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
+                    <Border BorderThickness="0,1,0,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+                    <!-- Backdrop -->
+                    <Grid Padding="16,14" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource AccentGreenBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE9F1;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtBackdropLabel" Text="Effet de fond" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtBackdropSubtitle" Text="Choisissez un matériau pour la fenêtre" 
+                        <FontIcon Grid.Column="0" Glyph="&#xE9F1;" FontSize="16"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                  VerticalAlignment="Center" Width="20"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="TxtBackdropLabel" Text="Effet de fond"
+                                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                            <TextBlock x:Name="TxtBackdropSubtitle" Text=""
                                        Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
-                        
-                        <ComboBox x:Name="CmbBackdrop" 
-                                  Grid.Column="2" 
-                                  MinWidth="160"
+                        <ComboBox x:Name="CmbBackdrop" Grid.Column="2" MinWidth="150"
                                   SelectionChanged="CmbBackdrop_SelectionChanged">
                             <ComboBoxItem x:Name="BackdropNone" Content="Aucun" Tag="none" IsSelected="True"/>
                             <ComboBoxItem x:Name="BackdropMica" Content="Mica" Tag="mica"/>
                             <ComboBoxItem x:Name="BackdropAcrylic" Content="Acrylique" Tag="acrylic"/>
                         </ComboBox>
                     </Grid>
-                </Border>
-            </StackPanel>
+                </StackPanel>
+            </Border>
 
-            <!-- ========== BEHAVIOR SECTION ========== -->
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="TxtBehaviorTitle" Text="Comportement" 
-                           Style="{ThemeResource SubtitleTextBlockStyle}"
-                           FontWeight="SemiBold"
-                           Margin="0,8,0,0"/>
+            <!-- ── Comportement ── -->
+            <TextBlock x:Name="TxtBehaviorTitle" Text="Comportement"
+                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                       Margin="4,14,0,4"/>
 
-                <!-- Confirm Launch -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8">
+                <Grid Padding="16,14" ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Grid.Column="0" Glyph="&#xE7BA;" FontSize="16"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                              VerticalAlignment="Center" Width="20"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                        <TextBlock x:Name="TxtConfirmLaunchLabel" Text="Confirmation avant lancement"
+                                   Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                        <TextBlock x:Name="TxtConfirmLaunchSubtitle" Text=""
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    <ToggleSwitch x:Name="TglConfirmLaunch" Grid.Column="2"
+                                  Margin="0" Padding="0"
+                                  Toggled="TglConfirmLaunch_Toggled"/>
+                </Grid>
+            </Border>
+
+            <!-- ── Données ── -->
+            <TextBlock x:Name="TxtDataTitle" Text="Données"
+                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                       Margin="4,14,0,4"/>
+
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8">
+                <StackPanel>
+                    <!-- Data path -->
+                    <Grid Padding="16,14" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource WarningAmberBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE7BA;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtConfirmLaunchLabel" Text="Confirmer avant lancement" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtConfirmLaunchSubtitle" Text="Afficher une confirmation avant de lancer un preset" 
+                        <FontIcon Grid.Column="0" Glyph="&#xE838;" FontSize="16"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                  VerticalAlignment="Center" Width="20"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="TxtDataPathLabel" Text="Fichier de données"
+                                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                            <TextBlock x:Name="TxtDataPathValue" Text=""
                                        Style="{ThemeResource CaptionTextBlockStyle}"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
-                        </StackPanel>
-                        
-                        <ToggleSwitch x:Name="TglConfirmLaunch" 
-                                      Grid.Column="2"
-                                      Toggled="TglConfirmLaunch_Toggled"/>
-                    </Grid>
-                </Border>
-            </StackPanel>
-
-            <!-- ========== DATA SECTION ========== -->
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="TxtDataTitle" Text="Données" 
-                           Style="{ThemeResource SubtitleTextBlockStyle}"
-                           FontWeight="SemiBold"
-                           Margin="0,8,0,0"/>
-
-                <!-- Data Path -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource PrimaryBlueBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE838;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtDataPathLabel" Text="Chemin des données" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtDataPathValue" 
-                                       Text="Aucun chemin défini" 
-                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"
                                        TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        
-                        <Button x:Name="BtnBrowse" 
-                                Grid.Column="2" 
-                                Content="Parcourir..."
-                                Click="BtnBrowse_Click"
-                                Padding="16,8"/>
+                        <Button x:Name="BtnBrowse" Grid.Column="2"
+                                Padding="14,7"
+                                Click="BtnBrowse_Click">
+                            <TextBlock x:Name="TxtBrowse" Text="Exporter"/>
+                        </Button>
                     </Grid>
-                </Border>
 
-                <!-- Cleanup -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
+                    <Border BorderThickness="0,1,0,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+                    <!-- Cleanup -->
+                    <Grid Padding="16,14" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource WarningAmberBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE74C;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtCleanupLabel" Text="Nettoyage" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtCleanupSubtitle" Text="Supprime les fichiers temporaires et obsolètes" 
+                        <FontIcon Grid.Column="0" Glyph="&#xE74C;" FontSize="16"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                  VerticalAlignment="Center" Width="20"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="TxtCleanupLabel" Text="Nettoyage"
+                                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                            <TextBlock x:Name="TxtCleanupSubtitle" Text=""
                                        Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
-                        
-                        <Button x:Name="BtnCleanup" 
-                                Grid.Column="2" 
-                                Content="Nettoyer"
-                                Click="BtnCleanup_Click"
-                                Padding="16,8"/>
+                        <Button x:Name="BtnCleanup" Grid.Column="2"
+                                Padding="14,7"
+                                Click="BtnCleanup_Click">
+                            <TextBlock x:Name="TxtCleanupBtn" Text="Nettoyer"/>
+                        </Button>
                     </Grid>
-                </Border>
 
-                <!-- Reset -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
+                    <Border BorderThickness="0,1,0,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+
+                    <!-- Reset -->
+                    <Grid Padding="16,14" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource ErrorRedBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE72C;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtResetLabel" Text="Réinitialiser" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtResetSubtitle" Text="Réinitialise les paramètres aux valeurs par défaut" 
+                        <FontIcon Grid.Column="0" Glyph="&#xE72C;" FontSize="16"
+                                  Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                  VerticalAlignment="Center" Width="20"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock x:Name="TxtResetLabel" Text="Réinitialiser"
+                                       Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"
+                                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                            <TextBlock x:Name="TxtResetSubtitle" Text=""
                                        Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                         </StackPanel>
-                        
-                        <Button x:Name="BtnReset" 
-                                Grid.Column="2" 
-                                Content="Réinitialiser"
+                        <Button x:Name="BtnReset" Grid.Column="2"
+                                Padding="14,7"
                                 Click="BtnReset_Click"
-                                Padding="16,8"
-                                Foreground="{ThemeResource ErrorRedBrush}"/>
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}">
+                            <TextBlock x:Name="TxtResetBtn" Text="Réinitialiser"/>
+                        </Button>
                     </Grid>
-                </Border>
-            </StackPanel>
+                </StackPanel>
+            </Border>
 
-            <!-- ========== ABOUT SECTION ========== -->
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="TxtAboutTitle" Text="À propos" 
-                           Style="{ThemeResource SubtitleTextBlockStyle}"
-                           FontWeight="SemiBold"
-                           Margin="0,8,0,0"/>
+            <!-- ── À propos ── -->
+            <TextBlock x:Name="TxtAboutTitle" Text="À propos"
+                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                       Margin="4,14,0,4"/>
 
-                <!-- Version -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="20,16">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <Border Grid.Column="0" 
-                                Background="{ThemeResource PrimaryPurpleBrush}" 
-                                CornerRadius="8" 
-                                Padding="10" 
-                                Height="44" 
-                                Width="44">
-                            <FontIcon Glyph="&#xE783;" FontSize="20" Foreground="White" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtVersionLabel" Text="Version" 
-                                       Style="{ThemeResource BodyTextBlockStyle}"
-                                       FontWeight="Medium"/>
-                            <TextBlock x:Name="TxtVersionValue" 
-                                       Text="Non disponible" 
-                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       Margin="0,4,0,0"/>
-                        </StackPanel>
-                        
-                        <Button x:Name="BtnCheckUpdate" 
-                                Grid.Column="2" 
-                                Content="Vérifier les mises à jour"
-                                Click="BtnCheckUpdate_Click"
-                                Padding="16,8"/>
-                    </Grid>
-                </Border>
-            </StackPanel>
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1" CornerRadius="8">
+                <Grid Padding="16,14" ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Grid.Column="0" Glyph="&#xE783;" FontSize="16"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                              VerticalAlignment="Center" Width="20"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                        <TextBlock x:Name="TxtVersionLabel" Text="Version"
+                                   Style="{ThemeResource BodyTextBlockStyle}" FontWeight="Medium"/>
+                        <TextBlock x:Name="TxtVersionValue" Text=""
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    <Button x:Name="BtnCheckUpdate" Grid.Column="2"
+                            Padding="14,7"
+                            Click="BtnCheckUpdate_Click">
+                        <TextBlock x:Name="TxtCheckUpdateBtn" Text="Vérifier les mises à jour"/>
+                    </Button>
+                </Grid>
+            </Border>
 
         </StackPanel>
     </ScrollViewer>

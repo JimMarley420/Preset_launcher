@@ -36,8 +36,8 @@ public sealed partial class HistoryPage : Page
         if (App.Data?.Data?.History != null && HistoryList != null)
         {
             HistoryList.ItemsSource = App.Data.Data.History;
-            if (TxtEmpty != null)
-                TxtEmpty.Visibility = App.Data.Data.History.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (EmptyStatePanel != null)
+                EmptyStatePanel.Visibility = App.Data.Data.History.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 
