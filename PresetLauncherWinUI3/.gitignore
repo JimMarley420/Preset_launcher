@@ -1,0 +1,27 @@
+# Build results
+dist/
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.sln.DotSettings
+*.user
+*.userosscache
+
+# NuGet
+*.nupkg
+.nuget/
+packages/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.log
