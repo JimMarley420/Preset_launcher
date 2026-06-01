@@ -3,8 +3,10 @@
 ; dotnet publish -r win-x64 --self-contained -c Release -o ..\publish\win-x64 PresetLauncherWinUI3\PresetLauncherWinUI3.csproj
 
 #define AppName "PresetLauncher"
-#define AppVersion "1.2.5"
-#define AppPublisher "Jimmy Marley"
+#ifndef AppVersion
+  #define AppVersion "1.2.5"
+#endif
+#define AppPublisher "BurningBox"
 #define AppExeName "PresetLauncherWinUI3.exe"
 #define AppURL "https://version.multichat.cloud/PresetLauncher"
 
