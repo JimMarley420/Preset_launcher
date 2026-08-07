@@ -6,7 +6,7 @@
 
 Organisez vos programmes en groupes et lancez-les en un clic.
 
-[![GitHub release](https://img.shields.io/github/v/release/Wailroth/PresetLauncher?style=flat-square&logo=github)](https://github.com/Wailroth/PresetLauncher/releases/latest)
+[![GitHub release](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square&logo=github)](https://github.com/JimMarley420/Preset_launcher/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-purple?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/download/dotnet/8.0)
 [![Windows](https://img.shields.io/badge/Windows-10%2B-blue?style=flat-square&logo=windows)](https://www.microsoft.com/windows/)
@@ -63,7 +63,7 @@ Organisez vos programmes en groupes et lancez-les en un clic.
 
 ### Via l'installeur (recommande)
 
-1. Telecharger la derniere version depuis la page [Releases](https://github.com/Wailroth/PresetLauncher/releases/latest)
+1. Telecharger la derniere version depuis la page [Releases](https://github.com/JimMarley420/Preset_launcher/releases/latest)
 2. Lancer l'installateur `PresetLauncher-x.x.x-setup.exe`
 3. Suivre les instructions d'installation
 
@@ -131,7 +131,7 @@ Les donnees sont stockees dans `%LocalAppData%\PresetLauncher\` :
 
 ## Contribuer
 
-Les contributions sont bienvenues ! Veuillez ouvrir une [issue](https://github.com/Wailroth/PresetLauncher/issues) pour signaler un bug ou suggerer une amelioration.
+Les contributions sont bienvenues ! Veuillez ouvrir une [issue](https://github.com/JimMarley420/Preset_launcher/issues) pour signaler un bug ou suggerer une amelioration.
 
 1. Fork le depot
 2. Creer une branche (`git checkout -b feature/nouvelle-fonctionnalite`)
@@ -141,7 +141,7 @@ Les contributions sont bienvenues ! Veuillez ouvrir une [issue](https://github.c
 
 ## Bugs et suggestions
 
-Si vous rencontrez un bug ou avez une idee d'amelioreation, n'hesitez pas a ouvrir une issue sur le [depot GitHub](https://github.com/Wailroth/PresetLauncher/issues).
+Si vous rencontrez un bug ou avez une idee d'amelioreation, n'hesitez pas a ouvrir une issue sur le [depot GitHub](https://github.com/JimMarley420/Preset_launcher/issues).
 
 ## Licence
 
