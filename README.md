@@ -21,7 +21,8 @@ Organisez vos programmes en groupes et lancez-les en un clic.
 
 ## Capture d'ecran
 
-> A venir
+<img width="856" height="628" alt="image" src="https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71" />
+
 
 ## Fonctionnalites
 
