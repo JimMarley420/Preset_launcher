@@ -1,0 +1,50 @@
+name: Suggestion d'amelioration
+description: Proposer une nouvelle fonctionnalite ou une amelioreation
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de votre suggestion ! Decrivez votre idee en detail.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Probleme ou besion
+      description: Decrivez le probleme que cette fonctionnalite resoudrait.
+      placeholder: Je souhaite pouvoir...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution souhaitee
+      description: Decrivez la solution que vous aimeriez voir.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagees
+      description: Decrivez d'autres solutions ou fonctionnalites similaires que vous avez envisagees.
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Maquettes ou captures
+      description: Ajoutez des maquettes ou captures si applicable.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Informations complementaires
+      description: Ajoutez tout autre contexte, references ou captures d'ecran.
+    validations:
+      required: false

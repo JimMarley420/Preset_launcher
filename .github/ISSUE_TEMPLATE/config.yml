@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions et discussions
+    url: https://github.com/Wailroth/PresetLauncher/discussions
+    about: Posez vos questions ou discutez de l'application
