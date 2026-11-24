@@ -15,7 +15,7 @@ API = f"https://api.github.com/repos/{REPO}"
 PLAN = Path("artifacts/release-plan.json")
 OUTPUT = Path("artifacts/verified-installer")
 VERSION = re.compile(r"v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\Z")
-POLICY = re.compile(r"^<!-- presetlauncher:min-supported=([0-9.]+) -->$", re.M)
+POLICY = re.compile(r"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", re.M)
 CONVENTIONAL = re.compile(r"^([a-z]+)(?:\([^()\r\n]+\))?(!)?: .+")
 
 
@@ -86,6 +86,21 @@ def make_plan(previous, messages, sha):
             "minimum_supported_version": format_version(next_version if required else floor)}
 
 
+def installer_asset(release):
+    tag = release["tag_name"]
+    name = f"PresetLauncher_Setup_{format_version(version(tag))}.exe"
+    assets = [asset for asset in release["assets"] if asset["name"] == name]
+    if len(assets) != 1:
+        raise ValueError("Expected one previous release installer")
+    asset = assets[0]
+    url = f"https://github.com/{REPO}/releases/download/{tag}/{name}"
+    if (asset["state"] != "uploaded" or asset["browser_download_url"] != url
+            or not 0 < asset["size"] <= 1024**3
+            or not re.fullmatch(r"sha256:[0-9a-fA-F]{64}", asset.get("digest") or "")):
+        raise ValueError("Invalid previous installer metadata")
+    return {"url": url, "size": asset["size"], "sha256": asset["digest"][7:].lower()}
+
+
 def request(url, method="GET", payload=None, token=None, file=None):
     headers = {"Accept": "application/vnd.github+json",
                "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "PresetLauncher-CI"}
@@ -124,6 +139,8 @@ def plan():
     subprocess.run(["git", "merge-base", "--is-ancestor", tag_sha, sha], check=True)
     messages = git("log", "--format=%B%x00", f"{tag_sha}..{sha}").split("\0")
     result = make_plan(previous, messages, sha)
+    if result["release"]:
+        result["previous_installer"] = installer_asset(previous)
     PLAN.parent.mkdir(parents=True, exist_ok=True)
     PLAN.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
@@ -164,6 +181,14 @@ def publish():
             raise
     else:
         raise ValueError("Release tag already exists; inspect it before retrying")
+    page = 1
+    while True:
+        releases = request(API + f"/releases?per_page=100&page={page}", token=token)
+        if any(item["tag_name"] == tag for item in releases):
+            raise ValueError("Release or draft already exists; inspect it before retrying")
+        if len(releases) < 100:
+            break
+        page += 1
     notes = request(API + "/releases/generate-notes", "POST",
                     {"tag_name": tag, "target_commitish": data["sha"],
                      "previous_tag_name": data["previous"]}, token)

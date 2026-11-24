@@ -12,7 +12,7 @@ public sealed class UpdateService
     private const string Repository = "JimMarley420/Preset_launcher";
     private const string LatestUrl = "https://api.github.com/repos/" + Repository + "/releases/latest";
     private const long MaxInstallerSize = 1024L * 1024 * 1024;
-    private static readonly Regex StableVersion = new(@"^v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$", RegexOptions.CultureInvariant);
+    private static readonly Regex StableVersion = new(@"^v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\z", RegexOptions.CultureInvariant);
     private static readonly Regex Policy = new(@"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
     private static readonly HttpClient SharedClient = CreateClient();
     private readonly HttpClient _client;
@@ -99,7 +99,7 @@ public sealed class UpdateService
         if (item.GetProperty("state").GetString() != "uploaded" ||
             item.GetProperty("browser_download_url").GetString() != expectedUrl ||
             size <= 0 || size > MaxInstallerSize ||
-            digest is null || !Regex.IsMatch(digest, @"^sha256:[0-9a-fA-F]{64}$"))
+            digest is null || !Regex.IsMatch(digest, @"^sha256:[0-9a-fA-F]{64}\z"))
             throw new InvalidDataException("Invalid installer metadata.");
 
         return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest[7..]);

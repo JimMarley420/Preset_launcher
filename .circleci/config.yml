@@ -107,6 +107,8 @@ jobs:
     executor: windows-x64
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - prepare-dotnet
       - restore-nuget-cache
       - run:
@@ -117,7 +119,8 @@ jobs:
             $results = Join-Path (Get-Location).Path 'artifacts\test-results'
             $junit = Join-Path (Get-Location).Path 'artifacts\junit'
             New-Item -ItemType Directory -Force $results, $junit | Out-Null
-            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
+            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true -p:Version=$version --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             [xml]$report = Get-Content (Join-Path $junit 'junit.xml') -Raw
             if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'No test cases reported' }
@@ -176,8 +179,7 @@ jobs:
           no_output_timeout: 10m
           command: |
             $ErrorActionPreference = 'Stop'
-            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            & .\.circleci\smoke-installer.ps1 -Version $version
+            & .\.circleci\smoke-installer.ps1 -PlanPath artifacts/release-plan.json
       - store_artifacts:
           path: artifacts/installer-logs
           destination: installer-logs
@@ -227,6 +229,7 @@ workflows:
       - test-windows:
           requires:
             - dependency-audit
+            - plan-release
       - package-installer:
           requires:
             - build-windows

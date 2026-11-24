@@ -17,6 +17,8 @@ public sealed class UpdateCoordinator
         _checking = true;
         var installed = _service.GetInstalledVersion();
         var settings = App.Settings.CurrentSettings;
+        if (!UpdateService.TryVersion(settings.MinimumSupportedVersion, out _))
+            settings.MinimumSupportedVersion = "0.0.0";
         var required = _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
         try
         {

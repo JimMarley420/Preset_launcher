@@ -1,60 +1,19 @@
 # Run only on an isolated Windows CI VM, never on a developer's installed copy.
-param([Parameter(Mandatory = $true)][ValidatePattern('^\d+\.\d+\.\d+
-Set-StrictMode -Version Latest
-
-$root = Split-Path $PSScriptRoot -Parent
-$setup = Join-Path $root "Installer\Output\PresetLauncher_Setup_$version.exe"
-$logs = Join-Path $root 'artifacts\installer-logs'
-New-Item -ItemType Directory -Force $logs | Out-Null
-$installDir = Join-Path $env:TEMP "PresetLauncher-CI-$([guid]::NewGuid())"
-$dataDir = Join-Path $env:LOCALAPPDATA 'PresetLauncher'
-$marker = Join-Path $dataDir 'ci-preservation.txt'
-$uninstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1'
-$registryPath = "HKCU:\$uninstallKey"
-
-if ($env:CIRCLECI -ne 'true') { throw 'Smoke test requires an isolated CircleCI VM' }
-if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path "HKLM:\$uninstallKey") -or (Test-Path "$env:LOCALAPPDATA\Programs\PresetLauncher")) {
-    throw 'Existing PresetLauncher installation or data; refusing to run smoke test'
-}
-if (-not (Test-Path $setup -PathType Leaf)) { throw "Installer not found: $setup" }
-
-New-Item -ItemType Directory $dataDir | Out-Null
-$token = [guid]::NewGuid().ToString()
-Set-Content -Path $marker -Value $token -Encoding ASCII -NoNewline
-try {
-    $install = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR=`"$installDir`" /TASKS=`"`" /LOG=`"$logs\install.log`"" -Wait -PassThru
-    if ($install.ExitCode -ne 0) { throw "Setup failed: $($install.ExitCode)" }
-    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
-    $dll = Join-Path $installDir 'PresetLauncherWinUI3.dll'
-    foreach ($file in @($exe, $dll, (Join-Path $installDir 'coreclr.dll'), (Join-Path $installDir 'Microsoft.UI.Xaml.dll'))) {
-        if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installed file: $file" }
-    }
-    if ((Get-Item $dll).VersionInfo.FileVersion -ne "$version.0") { throw 'Installed assembly version does not match installer version' }
-    if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $version) { throw 'Unexpected installed registry version' }
-    $uninstaller = Join-Path $installDir 'unins000.exe'
-    if (-not (Test-Path $uninstaller)) { throw 'Uninstaller missing' }
-    $remove = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=`"$logs\uninstall.log`"" -Wait -PassThru
-    if ($remove.ExitCode -ne 0) { throw "Uninstall failed: $($remove.ExitCode)" }
-    if ((Test-Path $exe) -or (Test-Path $dll) -or (Test-Path $registryPath)) { throw 'Uninstall left application files or registry entry' }
-    if (-not (Test-Path $marker) -or (Get-Content $marker -Raw) -ne $token) { throw 'Uninstall modified user data' }
-    Write-Host 'Installer smoke test passed.'
-}
-finally {
-    if (Test-Path $marker) { Remove-Item $marker -Force }
-    if ((Test-Path $dataDir) -and -not (Get-ChildItem $dataDir -Force)) { Remove-Item $dataDir }
-}
-)][string]$Version)
+param([Parameter(Mandatory = $true)][string]$PlanPath)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = Split-Path $PSScriptRoot -Parent
-$version = (Select-String -Path "$root\Installer\PresetLauncher.iss" -Pattern '#define AppVersion "([^"]+)"').Matches[0].Groups[1].Value
+$plan = Get-Content $PlanPath -Raw | ConvertFrom-Json
+$version = [string]$plan.version
+if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid planned version' }
 $setup = Join-Path $root "Installer\Output\PresetLauncher_Setup_$version.exe"
 $logs = Join-Path $root 'artifacts\installer-logs'
 New-Item -ItemType Directory -Force $logs | Out-Null
 $installDir = Join-Path $env:TEMP "PresetLauncher-CI-$([guid]::NewGuid())"
 $dataDir = Join-Path $env:LOCALAPPDATA 'PresetLauncher'
-$marker = Join-Path $dataDir 'ci-preservation.txt'
+$dataFile = Join-Path $dataDir 'data.json'
+$settingsFile = Join-Path $dataDir 'settings.json'
 $uninstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1'
 $registryPath = "HKCU:\$uninstallKey"
 
@@ -64,28 +23,79 @@ if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path "HKLM:\$un
 }
 if (-not (Test-Path $setup -PathType Leaf)) { throw "Installer not found: $setup" }
 
-New-Item -ItemType Directory $dataDir | Out-Null
-$token = [guid]::NewGuid().ToString()
-Set-Content -Path $marker -Value $token -Encoding ASCII -NoNewline
-try {
-    $install = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR=`"$installDir`" /TASKS=`"`" /LOG=`"$logs\install.log`"" -Wait -PassThru
-    if ($install.ExitCode -ne 0) { throw "Setup failed: $($install.ExitCode)" }
-    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
+function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogName) {
+    $log = Join-Path $logs $LogName
+    $process = Start-Process -FilePath $Path -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log) -Wait -PassThru
+    if ($process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode)" }
+    if (-not (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe') -PathType Leaf)) { throw 'Installed executable missing' }
+    if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $ExpectedVersion) { throw 'Unexpected installed registry version' }
+}
+
+function Assert-CurrentPackage {
     $dll = Join-Path $installDir 'PresetLauncherWinUI3.dll'
-    foreach ($file in @($exe, $dll, (Join-Path $installDir 'coreclr.dll'), (Join-Path $installDir 'Microsoft.UI.Xaml.dll'))) {
+    foreach ($file in @($dll, (Join-Path $installDir 'coreclr.dll'), (Join-Path $installDir 'Microsoft.UI.Xaml.dll'))) {
         if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installed file: $file" }
     }
     if ((Get-Item $dll).VersionInfo.FileVersion -ne "$version.0") { throw 'Installed assembly version does not match installer version' }
-    if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $version) { throw 'Unexpected installed registry version' }
+}
+
+function Assert-UserData {
+    if ((Get-FileHash $dataFile -Algorithm SHA256).Hash -ne $dataHash -or
+        (Get-FileHash $settingsFile -Algorithm SHA256).Hash -ne $settingsHash) {
+        throw 'Installer modified user data'
+    }
+}
+
+function Remove-Package([string]$LogName) {
     $uninstaller = Join-Path $installDir 'unins000.exe'
+    $log = Join-Path $logs $LogName
     if (-not (Test-Path $uninstaller)) { throw 'Uninstaller missing' }
-    $remove = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=`"$logs\uninstall.log`"" -Wait -PassThru
-    if ($remove.ExitCode -ne 0) { throw "Uninstall failed: $($remove.ExitCode)" }
-    if ((Test-Path $exe) -or (Test-Path $dll) -or (Test-Path $registryPath)) { throw 'Uninstall left application files or registry entry' }
-    if (-not (Test-Path $marker) -or (Get-Content $marker -Raw) -ne $token) { throw 'Uninstall modified user data' }
+    $process = Start-Process -FilePath $uninstaller -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="{0}"' -f $log) -Wait -PassThru
+    if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
+    if ((Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe')) -or
+        (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.dll')) -or (Test-Path $registryPath)) {
+        throw 'Uninstall left application files or registry entry'
+    }
+    Assert-UserData
+}
+
+New-Item -ItemType Directory $dataDir | Out-Null
+'{"Presets":[{"Id":"ci-fixture","Name":"Preserve me","Executables":[]}],"History":[],"UsageStats":{}}' | Set-Content $dataFile -Encoding UTF8
+'{"Language":"en","Theme":"dark"}' | Set-Content $settingsFile -Encoding UTF8
+$dataHash = (Get-FileHash $dataFile -Algorithm SHA256).Hash
+$settingsHash = (Get-FileHash $settingsFile -Algorithm SHA256).Hash
+$previousSetup = Join-Path $env:TEMP "PresetLauncher-previous-$([guid]::NewGuid()).exe"
+try {
+    Install-Package $setup $version 'install.log'
+    Assert-CurrentPackage
+    Assert-UserData
+    Remove-Package 'uninstall.log'
+
+    if ($plan.release) {
+        $previous = ([string]$plan.previous).TrimStart('v')
+        $asset = $plan.previous_installer
+        $expectedUrl = "https://github.com/JimMarley420/Preset_launcher/releases/download/$($plan.previous)/PresetLauncher_Setup_$previous.exe"
+        if ($previous -notmatch '^\d+\.\d+\.\d+$' -or $asset.url -cne $expectedUrl -or
+            $asset.sha256 -notmatch '^[0-9a-f]{64}$' -or $asset.size -le 0 -or $asset.size -gt 1GB) {
+            throw 'Invalid previous installer plan'
+        }
+        Invoke-WebRequest -Uri $expectedUrl -UseBasicParsing -OutFile $previousSetup -TimeoutSec 300
+        if ((Get-Item $previousSetup).Length -ne $asset.size -or
+            (Get-FileHash $previousSetup -Algorithm SHA256).Hash -ine $asset.sha256) {
+            throw 'Previous installer verification failed'
+        }
+        Install-Package $previousSetup $previous 'upgrade-from.log'
+        Assert-UserData
+        Install-Package $setup $version 'upgrade-to.log'
+        Assert-CurrentPackage
+        Assert-UserData
+        Remove-Package 'upgrade-uninstall.log'
+    }
     Write-Host 'Installer smoke test passed.'
 }
 finally {
-    if (Test-Path $marker) { Remove-Item $marker -Force }
+    if (Test-Path $previousSetup) { Remove-Item $previousSetup -Force }
+    if (Test-Path $dataFile) { Remove-Item $dataFile -Force }
+    if (Test-Path $settingsFile) { Remove-Item $settingsFile -Force }
     if ((Test-Path $dataDir) -and -not (Get-ChildItem $dataDir -Force)) { Remove-Item $dataDir }
 }
