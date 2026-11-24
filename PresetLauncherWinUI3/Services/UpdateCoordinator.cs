@@ -19,16 +19,16 @@ public sealed class UpdateCoordinator
         var settings = App.Settings.CurrentSettings;
         if (!UpdateService.TryVersion(settings.MinimumSupportedVersion, out _))
             settings.MinimumSupportedVersion = "0.0.0";
-        var required = _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
+        var required = installed != "0.0.0" && _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
         try
         {
-            SetGate(required);
             if (installed == "0.0.0")
             {
                 if (manual) await MessageAsync(root, "settings.checkUpdate", T("update.sourceBuild"));
                 return;
             }
 
+            SetGate(required);
             while (true)
             {
                 ReleaseUpdate? update;
@@ -130,11 +130,7 @@ public sealed class UpdateCoordinator
             // A known mandatory update cannot be bypassed by a failed modal dialog.
             if (required) CloseApp();
         }
-        finally
-        {
-            if (!required) SetGate(false);
-            _checking = false;
-        }
+        finally { _checking = false; }
     }
 
     private static void SetGate(bool blocked)

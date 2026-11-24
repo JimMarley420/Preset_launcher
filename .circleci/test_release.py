@@ -1,4 +1,13 @@
+import hashlib
+import json
+import os
+from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
+from urllib.error import HTTPError
+
+import release
 from release import make_plan, version
 
 
@@ -44,6 +53,100 @@ class ReleasePlanTests(unittest.TestCase):
         self.previous = {"tag_name": "v1.3.0", "body": "missing policy"}
         with self.assertRaises(ValueError):
             self.plan("fix: a")
+
+
+class PublishTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.output = root / "verified"
+        self.output.mkdir()
+        self.installer = self.output / "PresetLauncher_Setup_1.2.7.exe"
+        self.installer.write_bytes(b"test installer")
+        digest = hashlib.sha256(self.installer.read_bytes()).hexdigest()
+        self.sums = self.output / "SHA256SUMS.txt"
+        self.sums.write_text(f"{digest}  {self.installer.name}\n", encoding="ascii")
+        self.previous = {"tag_name": "1.2.6", "body": ""}
+        self.sha = "a" * 40
+        self.plan = root / "plan.json"
+        self.plan.write_text(json.dumps(make_plan(self.previous, ["fix: repair"], self.sha)), encoding="utf-8")
+        self.calls = []
+        for patcher in (
+            patch.object(release, "PLAN", self.plan),
+            patch.object(release, "OUTPUT", self.output),
+            patch.object(release, "git", return_value=self.sha),
+            patch.dict(os.environ, {"CIRCLE_BRANCH": "main", "GH_RELEASE_TOKEN": "test-token"}),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def response(self, url, method="GET", payload=None, token=None, file=None):
+        self.calls.append((method, url, payload))
+        if url.endswith("/releases/latest"):
+            return self.previous
+        if url.endswith("/git/ref/heads/main"):
+            return {"object": {"sha": self.sha}}
+        if "/git/ref/tags/" in url:
+            raise HTTPError(url, 404, "Not found", None, None)
+        if "/releases?per_page=" in url:
+            return []
+        if url.endswith("/releases/generate-notes"):
+            return {"body": "Changes"}
+        if url.endswith("/releases") and method == "POST":
+            self.assertTrue(payload["draft"])
+            self.assertEqual(payload["target_commitish"], self.sha)
+            return {"id": 42}
+        if "/assets?" in url:
+            digest = hashlib.sha256(file.read_bytes()).hexdigest()
+            return {"name": file.name, "state": "uploaded", "digest": f"sha256:{digest}"}
+        if url.endswith("/releases/42") and method == "PATCH":
+            return {"draft": False, "tag_name": "v1.2.7", "html_url": "https://github.com/example"}
+        self.fail(f"Unexpected API request: {method} {url}")
+
+    def test_no_release_never_contacts_api(self):
+        self.plan.write_text(json.dumps(make_plan(self.previous, ["docs: typo"], self.sha)), encoding="utf-8")
+        with patch.object(release, "request") as request:
+            release.publish()
+            request.assert_not_called()
+
+    def test_branch_cannot_publish(self):
+        with patch.dict(os.environ, {"CIRCLE_BRANCH": "feature"}), patch.object(release, "request") as request:
+            with self.assertRaises(ValueError):
+                release.publish()
+            request.assert_not_called()
+
+    def test_stale_plan_fails_before_mutation(self):
+        self.previous = {"tag_name": "v1.2.7", "body": "<!-- presetlauncher:min-supported=0.0.0 -->"}
+        with patch.object(release, "request", side_effect=self.response):
+            with self.assertRaises(ValueError):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
+
+    def test_tampered_installer_fails_before_mutation(self):
+        self.installer.write_bytes(b"modified")
+        with patch.object(release, "request", side_effect=self.response):
+            with self.assertRaises(ValueError):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
+
+    def test_upload_digest_mismatch_leaves_draft_unpublished(self):
+        def wrong_digest(url, method="GET", payload=None, token=None, file=None):
+            result = self.response(url, method, payload, token, file)
+            if "/assets?" in url:
+                result["digest"] = "sha256:" + "0" * 64
+            return result
+        with patch.object(release, "request", side_effect=wrong_digest):
+            with self.assertRaises(ValueError):
+                release.publish()
+        self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
+
+    def test_publish_occurs_after_both_uploads(self):
+        with patch.object(release, "request", side_effect=self.response):
+            release.publish()
+        self.assertEqual(sum("/assets?" in url for _, url, _ in self.calls), 2)
+        self.assertEqual(self.calls[-1][0], "PATCH")
+        self.assertFalse(self.calls[-1][2]["draft"])
 
 
 if __name__ == "__main__":
