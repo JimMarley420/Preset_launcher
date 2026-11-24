@@ -13,8 +13,8 @@ def main():
         metadata, path = entry.split("\t", 1)
         name = path.rsplit("/", 1)[-1].casefold()
         if name.endswith((".csproj", ".fsproj", ".vbproj", ".proj", ".props", ".targets",
-                          ".sln", ".slnx", ".pubxml", ".lock.json")) or name in (
-            "global.json", "nuget.config", "packages.config", "config.yml"
+                          ".sln", ".slnx", ".pubxml", ".lock.json", ".nupkg")) or name in (
+            "global.json", "nuget.config", "packages.config", "config.yml", "dotnet-sdk.sha512"
         ):
             inputs[path] = metadata.split()[1]
     if not inputs:
