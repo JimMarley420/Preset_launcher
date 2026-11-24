@@ -9,6 +9,8 @@ executors:
     environment:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
       DOTNET_NOLOGO: "1"
+      Platform: x64
+      ContinuousIntegrationBuild: "true"
       NuGetAudit: "true"
       NuGetAuditMode: all
       NuGetAuditLevel: low
@@ -39,7 +41,7 @@ jobs:
           name: Restore and audit dependencies
           command: |
             $ErrorActionPreference = 'Stop'
-            dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release
+            dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - save_cache:
           key: v1-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
@@ -51,13 +53,17 @@ jobs:
           command: |
             $ErrorActionPreference = 'Stop'
             $results = Join-Path (Get-Location).Path 'artifacts\test-results'
-            New-Item -ItemType Directory -Force $results | Out-Null
-            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true --no-restore --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$results\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
+            $junit = Join-Path (Get-Location).Path 'artifacts\junit'
+            New-Item -ItemType Directory -Force $results, $junit | Out-Null
+            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true --no-restore --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            [xml]$report = Get-Content (Join-Path $results 'junit.xml') -Raw
+            [xml]$report = Get-Content (Join-Path $junit 'junit.xml') -Raw
             if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'No test cases reported' }
       - store_test_results:
-          path: artifacts/test-results
+          path: artifacts/junit
+      - store_artifacts:
+          path: artifacts/junit
+          destination: junit
       - store_artifacts:
           path: artifacts/test-results
           destination: test-reports

@@ -104,6 +104,25 @@ public sealed class DataServiceTests
     }
 
     [TestMethod]
+    public void ClearHistoryPreservesPresetsAndUsage()
+    {
+        var service = new DataService(dataPath);
+        service.AddPreset(new Preset("Keep"));
+        service.UpdateUsageStats("example.exe");
+        service.Data.History.Add(new ExecutionHistory { PresetName = "Keep", SuccessCount = 1 });
+        service.Save();
+
+        var reloaded = new DataService(dataPath);
+        reloaded.Load();
+        Assert.AreEqual(1, reloaded.Data.History.Count);
+        reloaded.ClearHistory();
+        service.Load();
+        Assert.AreEqual(0, service.Data.History.Count);
+        Assert.AreEqual("Keep", service.Data.Presets.Single().Name);
+        Assert.AreEqual(1, service.Data.UsageStats["example.exe"]);
+    }
+
+    [TestMethod]
     public void RemoveAndResetPersist()
     {
         var service = new DataService(dataPath);
