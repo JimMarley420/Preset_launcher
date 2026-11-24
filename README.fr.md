@@ -4,7 +4,9 @@ Lancez ensemble les applications Windows que vous utilisez régulièrement, sans
 
 [English](README.md) · **Français**
 
-[![Version](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![Licence MIT](https://img.shields.io/badge/licence-MIT-lightgrey?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![Licence MIT](https://img.shields.io/badge/licence-MIT-lightgrey?style=flat-square)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases)
+
+[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?style=flat-square)](https://www.microsoft.com/windows/) [![C#](https://img.shields.io/badge/C%23-239120?style=flat-square)](https://learn.microsoft.com/dotnet/csharp/) [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0) [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/) [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-1.8-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/windows-app-sdk/) [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6-555555?style=flat-square)](https://jrsoftware.org/isinfo.php)
 
 [Télécharger pour Windows](https://github.com/JimMarley420/Preset_launcher/releases/latest) · [Signaler un problème](https://github.com/JimMarley420/Preset_launcher/issues/new/choose) · [Compiler le projet](#compiler-le-projet)
 
