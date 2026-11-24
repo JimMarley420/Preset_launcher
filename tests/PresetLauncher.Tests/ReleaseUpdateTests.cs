@@ -15,11 +15,11 @@ public sealed class ReleaseUpdateTests
     private static readonly string Digest = Convert.ToHexString(SHA256.HashData(Payload)).ToLowerInvariant();
 
     private static string Release(string floor = "1.2.6", string? digest = null, string url = Url,
-        string tag = "v1.3.0", bool draft = false, bool prerelease = false, int size = 4, bool includeAsset = true)
+        string tag = "v1.3.0", bool draft = false, bool prerelease = false, int size = 4, bool includeAsset = true, string policy = "optional")
     {
         var asset = new { name = "PresetLauncher_Setup_1.3.0.exe", state = "uploaded",
             browser_download_url = url, size, digest = digest ?? $"sha256:{Digest}" };
-        return JsonSerializer.Serialize(new { tag_name = tag, body = $"<!-- presetlauncher:min-supported={floor} -->",
+        return JsonSerializer.Serialize(new { tag_name = tag, body = $"<!-- presetlauncher:min-supported={floor} -->\n<!-- presetlauncher:update-policy={policy} -->",
             draft, prerelease, assets = new[] { asset }.Where(_ => includeAsset).ToArray() });
     }
 
@@ -38,6 +38,21 @@ public sealed class ReleaseUpdateTests
     }
 
     [TestMethod]
+    public void RecommendedUpdateCannotBeSkippedAndRespectsVersionScopedReminder()
+    {
+        var update = UpdateService.ParseRelease(Release(policy: "recommended"), new Version(1, 2, 6))!;
+        var now = new DateTimeOffset(2026, 11, 24, 12, 0, 0, TimeSpan.Zero);
+        Assert.AreEqual(UpdatePolicy.Recommended, update.Policy);
+        Assert.IsTrue(UpdateService.ShouldPrompt("1.2.6", update, "1.3.0", false));
+        Assert.IsFalse(UpdateService.ShouldPrompt("1.2.6", update, "", false, "1.3.0", now.AddHours(24), now));
+        Assert.IsTrue(UpdateService.ShouldPrompt("1.2.6", update, "", false, "1.3.0", now, now));
+        Assert.IsTrue(UpdateService.ShouldPrompt("1.2.6", update, "", false, "1.2.7", now.AddHours(24), now));
+        Assert.IsTrue(UpdateService.ShouldPrompt("1.2.6", update, "", true, "1.3.0", now.AddHours(24), now));
+        var required = UpdateService.ParseRelease(Release(floor: "1.3.0", policy: "required"), new Version(1, 2, 6))!;
+        Assert.IsTrue(UpdateService.ShouldPrompt("1.2.6", required, "1.3.0", false, "1.3.0", now.AddHours(24), now));
+    }
+
+    [TestMethod]
     public void CurrentAndNewerVersionsNeverDowngrade()
     {
         Assert.IsNull(UpdateService.ParseRelease(Release(), new Version(1, 3, 0)));
@@ -49,6 +64,8 @@ public sealed class ReleaseUpdateTests
     {
         foreach (var json in new[]
         {
+            Release(policy: "unknown"),
+            Release(policy: "required", floor: "1.2.6"),
             Release(floor: "2.0.0"),
             Release(floor: "not-a-version"),
             Release(digest: "sha256:bad"),

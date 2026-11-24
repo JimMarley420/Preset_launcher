@@ -22,6 +22,8 @@ namespace PresetLauncher.Models
         public DateTime? LastBackup { get; set; }
         public string AppVersion { get; set; } = "v1.0.0";
         public string SkippedUpdateVersion { get; set; } = "";
+        public string DeferredUpdateVersion { get; set; } = "";
+        public DateTimeOffset? DeferredUpdateUntil { get; set; }
         public string MinimumSupportedVersion { get; set; } = "0.0.0";
     }
 }

@@ -66,23 +66,31 @@ public sealed class UpdateCoordinator
 
                 required |= UpdateService.IsRequired(installed, update);
                 SetGate(required);
-                if (!required && !UpdateService.ShouldPrompt(installed, update, settings.SkippedUpdateVersion, manual))
+                if (!required && !UpdateService.ShouldPrompt(installed, update, settings.SkippedUpdateVersion, manual,
+                    settings.DeferredUpdateVersion, settings.DeferredUpdateUntil))
                     return;
 
+                var recommended = !required && update.Policy == UpdatePolicy.Recommended;
                 var dialog = new ContentDialog
                 {
                     XamlRoot = root,
-                    Title = T(required ? "update.requiredTitle" : "settings.updateAvailable"),
-                    Content = T(required ? "update.requiredMessage" : "update.optionalMessage", installed, update.Version.ToString(3)),
+                    Title = T(required ? "update.requiredTitle" : recommended ? "update.recommendedTitle" : "settings.updateAvailable"),
+                    Content = T(required ? "update.requiredMessage" : recommended ? "update.recommendedMessage" : "update.optionalMessage", installed, update.Version.ToString(3)),
                     PrimaryButtonText = T("update.install"),
-                    SecondaryButtonText = required ? "" : T("update.skip"),
-                    CloseButtonText = T(required ? "update.exit" : "update.later"),
+                    SecondaryButtonText = required || recommended ? "" : T("update.skip"),
+                    CloseButtonText = T(required ? "update.exit" : recommended ? "update.remindTomorrow" : "update.later"),
                     DefaultButton = ContentDialogButton.Primary
                 };
                 var choice = await dialog.ShowAsync();
                 if (choice != ContentDialogResult.Primary)
                 {
                     if (required) CloseApp();
+                    else if (recommended)
+                    {
+                        settings.DeferredUpdateVersion = update.Version.ToString(3);
+                        settings.DeferredUpdateUntil = DateTimeOffset.UtcNow.AddHours(24);
+                        App.Settings.Save();
+                    }
                     else if (choice == ContentDialogResult.Secondary)
                     {
                         settings.SkippedUpdateVersion = update.Version.ToString(3);

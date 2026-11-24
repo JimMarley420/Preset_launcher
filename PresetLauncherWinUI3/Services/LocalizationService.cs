@@ -11,6 +11,9 @@ public class LocalizationService
     {
         ["fr"] = new Dictionary<string, string>
         {
+            ["update.recommendedTitle"] = "Mise à jour recommandée",
+            ["update.recommendedMessage"] = "Version installée : {0}\nNouvelle version : {1}\n\nNous vous recommandons cette mise à jour.",
+            ["update.remindTomorrow"] = "Me rappeler demain",
             ["update.requiredTitle"] = "Mise à jour obligatoire",
             ["update.requiredMessage"] = "Votre version ({0}) n'est plus prise en charge. Installez la version {1} pour continuer.",
             ["update.optionalMessage"] = "Version installée : {0}\nNouvelle version : {1}",
@@ -189,6 +192,9 @@ public class LocalizationService
         },
         ["en"] = new Dictionary<string, string>
         {
+            ["update.recommendedTitle"] = "Update recommended",
+            ["update.recommendedMessage"] = "Installed version: {0}\nNew version: {1}\n\nWe recommend installing this update.",
+            ["update.remindTomorrow"] = "Remind me tomorrow",
             ["update.requiredTitle"] = "Update required",
             ["update.requiredMessage"] = "Your version ({0}) is no longer supported. Install version {1} to continue.",
             ["update.optionalMessage"] = "Installed version: {0}\nNew version: {1}",

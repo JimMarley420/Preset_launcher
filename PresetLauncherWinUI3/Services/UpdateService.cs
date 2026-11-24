@@ -5,7 +5,9 @@ using System.Text.RegularExpressions;
 
 namespace PresetLauncher.Services;
 
-public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVersion, Uri DownloadUri, long Size, string Sha256);
+public enum UpdatePolicy { Optional, Recommended, Required }
+
+public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVersion, Uri DownloadUri, long Size, string Sha256, UpdatePolicy Policy = UpdatePolicy.Optional);
 
 public sealed class UpdateService
 {
@@ -14,6 +16,7 @@ public sealed class UpdateService
     private const long MaxInstallerSize = 1024L * 1024 * 1024;
     private static readonly Regex StableVersion = new(@"^v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\z", RegexOptions.CultureInvariant);
     private static readonly Regex Policy = new(@"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    private static readonly Regex PolicyLevel = new(@"^<!-- presetlauncher:update-policy=(optional|recommended|required) -->\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
     private static readonly HttpClient SharedClient = CreateClient();
     private readonly HttpClient _client;
 
@@ -50,9 +53,15 @@ public sealed class UpdateService
     public static bool IsRequired(string installed, ReleaseUpdate update) =>
         TryVersion(installed, out var current) && current < update.MinimumSupportedVersion;
 
-    public static bool ShouldPrompt(string installed, ReleaseUpdate update, string? skippedVersion, bool manual) =>
-        TryVersion(installed, out var current) && current < update.Version &&
-        (manual || IsRequired(installed, update) || skippedVersion != update.Version.ToString(3));
+    public static bool ShouldPrompt(string installed, ReleaseUpdate update, string? skippedVersion, bool manual,
+        string? deferredVersion = null, DateTimeOffset? deferredUntil = null, DateTimeOffset? now = null)
+    {
+        if (!TryVersion(installed, out var current) || current >= update.Version) return false;
+        if (manual || IsRequired(installed, update)) return true;
+        var version = update.Version.ToString(3);
+        if (update.Policy == UpdatePolicy.Optional) return skippedVersion != version;
+        return deferredVersion != version || deferredUntil is null || deferredUntil <= (now ?? DateTimeOffset.UtcNow);
+    }
 
     public async Task<ReleaseUpdate?> GetLatestUpdateAsync(string installed, CancellationToken ct = default)
     {
@@ -86,6 +95,22 @@ public sealed class UpdateService
         else if (matches.Count != 1 || !TryVersion(matches[0].Groups[1].Value, out minimum) || minimum > latest)
             throw new InvalidDataException("Invalid update policy.");
 
+        var levels = PolicyLevel.Matches(release.GetProperty("body").GetString() ?? "");
+        var policy = UpdatePolicy.Optional;
+        if (levels.Count == 0 && tag == "1.2.6") { }
+        else if (levels.Count != 1)
+            throw new InvalidDataException("Missing or ambiguous update policy level.");
+        else
+            policy = levels[0].Groups[1].Value switch
+            {
+                "optional" => UpdatePolicy.Optional,
+                "recommended" => UpdatePolicy.Recommended,
+                "required" => UpdatePolicy.Required,
+                _ => throw new InvalidDataException("Invalid update policy level.")
+            };
+        if (policy == UpdatePolicy.Required && minimum != latest)
+            throw new InvalidDataException("Required release must advance the minimum version.");
+
         var name = $"PresetLauncher_Setup_{latest.ToString(3)}.exe";
         var assets = release.GetProperty("assets").EnumerateArray()
             .Where(asset => asset.GetProperty("name").GetString() == name).ToArray();
@@ -102,7 +127,7 @@ public sealed class UpdateService
             digest is null || !Regex.IsMatch(digest, @"^sha256:[0-9a-fA-F]{64}\z"))
             throw new InvalidDataException("Invalid installer metadata.");
 
-        return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest[7..]);
+        return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest[7..], policy);
     }
 
     public async Task<string> DownloadVerifiedAsync(ReleaseUpdate update, IProgress<int>? progress = null, CancellationToken ct = default)
