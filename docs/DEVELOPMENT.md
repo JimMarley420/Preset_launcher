@@ -32,7 +32,17 @@ Record the Windows version, configuration and results in the pull request. Do no
 
 ## Continuous integration
 
-CircleCI runs a Windows x64 validation workflow on branch pushes. It restores dependencies with NuGet auditing, compiles the application in Release, runs the MSTest suite, creates the existing self-contained Inno Setup package, and tests silent installation and removal on a disposable VM. Only a package that passes all checks is staged as a CircleCI artifact, with its SHA-256 digest. Nothing is uploaded to GitHub Releases or to the existing update server.
+CircleCI runs five Windows x64 jobs on branch pushes:
+
+| Job | Responsibility |
+| --- | --- |
+| dependency-audit | Restore and audit application, publish and test dependencies; populate the NuGet cache. |
+| build-windows | Publish the self-contained Release application to the workflow workspace. |
+| test-windows | Build and execute the MSTest suite; retain JUnit, TRX and coverage reports. Runs independently of the publish job after the audit. |
+| package-installer | Wait for both build and tests; compile the existing Inno Setup script from the published files without republishing. |
+| smoke-installer | Install and uninstall the exact packaged executable in a fresh Windows VM; verify user data preservation and stage the installer with a SHA-256 digest. |
+
+Only a package that passes all checks is staged as a verified CircleCI artifact. Workspaces carry build outputs and the installer between jobs in the same workflow; the NuGet cache carries dependencies between runs. The test job compiles the test project independently of the self-contained publish. Separate VMs increase startup and workspace overhead compared with a single job, but expose failures independently and allow build and tests to run concurrently. Nothing is uploaded to GitHub Releases or to the existing update server.
 
 The .NET SDK is pinned in global.json to 8.0.428, the final .NET 8 SDK. .NET 8 reached end of support on 2026-11-10; migrating to a supported LTS version is a separate priority. Inno Setup 6.7.1 and the Windows machine image are also pinned. Update these intentionally after validation.
 
@@ -44,6 +54,6 @@ dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj -c Release -r
 
 Tests exercise real application classes with temporary files, not mocked copies. They do not launch or kill external applications, contact the update server, or automate WinUI controls. The installer smoke test intentionally does not start the application. It refuses to run outside CircleCI or against an existing installation. UI interactions, actual application launching, update download/install, upgrade compatibility and older Windows versions still require separate validation.
 
-CircleCI setup: connect this GitHub repository and select .circleci/config.yml. Enable branch-push triggers (including main), avoid duplicate push/PR triggers, and enable auto-cancel of redundant non-default-branch workflows. Once the first Windows run succeeds, add its observed status check as a required GitHub branch protection check. Keep secrets unavailable to fork builds. Use the Tests and Artifacts tabs to review results, coverage and installer logs. The Linux open-source credit allowance does not cover Windows builds; monitor Windows credits and artifact storage.
+CircleCI setup: connect this GitHub repository and select .circleci/config.yml. Enable branch-push triggers (including main), avoid duplicate push/PR triggers, and enable auto-cancel of redundant non-default-branch workflows. Once the first Windows run succeeds, add the observed job status checks (or the complete workflow check) to GitHub branch protection. Keep commit status updates enabled for individual job status on pull requests; the CircleCI Checks app reports the workflow status separately. Keep secrets unavailable to fork builds. Use the Tests and Artifacts tabs to review results, coverage and installer logs. The Linux open-source credit allowance does not cover Windows builds; monitor Windows credits and artifact storage.
 
 References: [Windows execution](https://circleci.com/docs/guides/execute/using-windows/), [dependency caching](https://circleci.com/docs/guides/optimize/caching/), [test results](https://circleci.com/docs/guides/test/collect-test-data/), [auto-cancel](https://circleci.com/docs/guides/orchestrate/skip-build/), [WinUI testing](https://learn.microsoft.com/en-us/windows/apps/develop/testing/).
