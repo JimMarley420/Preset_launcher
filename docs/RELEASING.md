@@ -56,7 +56,15 @@ If publication fails after creating a draft, inspect the draft and its target co
 
 ### PROD ruleset
 
-Keep the existing individual required CircleCI checks for PR metadata, release planning, dependency audit, Windows build and tests, packaging, and smoke validation. Every PR runs these named jobs. In the fast lane, the installer jobs report success after checking the plan and log that installer work was unnecessary. Windows application compilation still runs in the required test job. Keep `publish-release` outside the required PR checks because it runs only on main. The main workflow requires real publish, package integrity verification and smoke testing before publication.
+The active PROD ruleset for the default branch requires these CircleCI checks. The optimized workflow keeps all five names and the same CircleCI integration, so the ruleset needs no change.
+
+- `ci/circleci: plan-release`
+- `ci/circleci: dependency-audit`
+- `ci/circleci: build-windows`
+- `ci/circleci: test-windows`
+- `ci/circleci: package-installer`
+
+CircleCI also reports `validate-pr-title` and `smoke-installer` individually. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
 
 ## Migration from the legacy update server
 

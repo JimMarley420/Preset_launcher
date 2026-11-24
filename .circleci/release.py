@@ -125,7 +125,7 @@ def needs_installer(paths):
                 or name in ("global.json", "nuget.config", "packages.lock.json", "packages.config")
                 or (name.endswith(".cs") and ("update" in name or name in ("app.xaml.cs", "appsettings.cs",
                                                                           "settingsservice.cs")))
-                or name == "app.xaml"):
+                or name in ("app.xaml", "favicon.ico")):
             return True
     return False
 

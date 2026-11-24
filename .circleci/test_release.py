@@ -72,6 +72,7 @@ class InstallerLaneTests(unittest.TestCase):
     def test_installer_updater_and_publish_paths_require_full_lane(self):
         for path in (
             ".circleci/config.yml", "Installer/PresetLauncher.iss", "global.json",
+            "PresetLauncherWinUI3/favicon.ico",
             "PresetLauncherWinUI3/Services/UpdateService.cs", "PresetLauncherWinUI3/App.xaml.cs",
             "PresetLauncherWinUI3/Models/AppSettings.cs", "Directory.Build.props",
             "PresetLauncherWinUI3/Properties/PublishProfiles/win-x64.pubxml", "NuGet.Config",
