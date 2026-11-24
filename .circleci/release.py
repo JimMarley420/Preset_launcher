@@ -90,18 +90,33 @@ def collect_decisions(previous, sha, branch):
     base = git("merge-base", sha, "FETCH_HEAD")
     subprocess.run(["git", "merge-base", "--is-ancestor", start, base], check=True)
     decisions = merged_decisions(start, base)
-    query = urlencode({"state": "open", "base": "main", "per_page": 100})
-    page = 1
-    matches = []
-    while True:
-        pulls = request(API + "/pulls?" + query + f"&page={page}")
-        matches.extend(pr for pr in pulls if pr["head"]["sha"] == sha and pr["head"]["ref"] == branch)
-        if len(pulls) < 100:
-            break
-        page += 1
+    matches = open_prs(sha, branch)
     if len(matches) != 1:
-        raise ValueError("Expected one open PR targeting main for this commit")
-    return decisions + [pr_decision(matches[0])]
+        raise ValueError("Expected one eligible open PR for this commit")
+    return decisions + [branch_decision(matches[0])]
+
+
+def open_prs(sha, branch):
+    matches = []
+    page = 1
+    while True:
+        query = urlencode({"state": "open", "per_page": 100, "page": page})
+        pulls = request(API + "/pulls?" + query)
+        matches.extend(pr for pr in pulls if pr["head"]["sha"] == sha
+                       and pr["head"]["ref"] == branch
+                       and pr["base"]["repo"]["full_name"] == REPO)
+        if len(pulls) < 100:
+            return matches
+        page += 1
+
+
+def branch_decision(pr):
+    decision = pr_decision(pr)
+    if pr["base"]["ref"] != "main":
+        head_repo = pr["head"]["repo"]
+        if decision["rank"] or not head_repo or head_repo["full_name"] != REPO:
+            raise ValueError("Stacked validation requires a non-releasing PR from this repository")
+    return decision
 
 
 def installer_asset(release):
@@ -156,7 +171,7 @@ def plan():
     tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
     subprocess.run(["git", "merge-base", "--is-ancestor", tag_sha, sha], check=True)
     result = make_plan(previous, collect_decisions(previous, sha, os.environ.get("CIRCLE_BRANCH", "")), sha)
-    if result["release"]:
+    if result["release"] or os.environ.get("CIRCLE_BRANCH") != "main":
         result["previous_installer"] = installer_asset(previous)
     PLAN.parent.mkdir(parents=True, exist_ok=True)
     PLAN.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

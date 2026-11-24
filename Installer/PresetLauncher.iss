@@ -2,6 +2,12 @@
 ; Build output expected at: ..\publish\win-x64\
 ; dotnet publish -r win-x64 --self-contained -c Release -o ..\publish\win-x64 PresetLauncherWinUI3\PresetLauncherWinUI3.csproj
 
+#ifdef RequirePinnedCompiler
+  #if VER != EncodeVer(6,7,1)
+    #error Expected Inno Setup 6.7.1
+  #endif
+#endif
+
 #define AppName "PresetLauncher"
 #ifndef AppVersion
   #define AppVersion "0.0.0"

@@ -1,6 +1,6 @@
 # Development notes
 
-The desktop application uses C#, .NET 8, WinUI 3 and Windows App SDK 1.8. It references CommunityToolkit.Mvvm and Newtonsoft.Json. The installer uses Inno Setup 6.
+The desktop application uses C#, .NET 10 LTS, WinUI 3 and Windows App SDK 2.7. It references CommunityToolkit.Mvvm and Newtonsoft.Json. The installer uses Inno Setup 6.
 
 ## Source layout
 
@@ -12,7 +12,7 @@ The desktop application uses C#, .NET 8, WinUI 3 and Windows App SDK 1.8. It ref
 | `PresetLauncherWinUI3/Views/Dialogs/` | Preset editor. |
 | `Installer/` | Publishing and installer packaging. |
 
-Open `PresetLauncherWinUI3/PresetLauncherWinUI3.sln` in Visual Studio and select x64. Build and run the application locally. For packaging, follow the [root README](../README.md).
+Open `PresetLauncherWinUI3/PresetLauncherWinUI3.sln` in Visual Studio 2026 with the WinUI workload and select x64. Build and run the application locally. For packaging, follow the [root README](../README.md).
 
 ## Manual checks
 
@@ -42,20 +42,22 @@ CircleCI runs five Windows x64 jobs and a Linux planning job on branch pushes. A
 | build-windows | Publish the self-contained Release application to the workflow workspace. |
 | test-windows | Build and execute the MSTest suite; retain JUnit, TRX and coverage reports. Runs independently of the publish job after the audit. |
 | package-installer | Wait for both build and tests; compile the existing Inno Setup script from the published files without republishing. |
-| smoke-installer | Install and uninstall the exact packaged executable in a fresh Windows VM; verify user data preservation and stage the installer with a SHA-256 digest. For releasing changes, also upgrade from the previous public installer. |
+| smoke-installer | Install and uninstall the exact packaged executable in a fresh Windows VM; verify user data preservation and stage the installer with a SHA-256 digest. On PR branches and for main builds that plan a release, also upgrade from the previous public installer. |
 | publish-release | Publish the verified installer and checksum to GitHub only on main when a release is planned. |
 
 Only a package that passes all checks is staged as a verified CircleCI artifact. Workspaces carry build outputs and the installer between jobs in the same workflow; the NuGet cache carries dependencies between runs. The test job compiles the test project independently of the self-contained publish. Separate VMs increase startup and workspace overhead compared with a single job, but expose failures independently and allow build and tests to run concurrently. Publication requires the restricted CircleCI context, as described in [RELEASING.md](RELEASING.md). The old update server is not changed by CI.
 
-The .NET SDK is pinned in global.json to 8.0.428, the final .NET 8 SDK. .NET 8 reached end of support on 2026-11-10; migrating to a supported LTS version is a separate priority. Inno Setup 6.7.1 and the Windows machine image are also pinned. Update these intentionally after validation.
+Install the [.NET 10 LTS SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and run `dotnet --version` from the repository root. `global.json` requires 10.0.404 or a later patch in the 10.0.4xx feature band. CircleCI uses the exact pin and installs it from Microsoft when the Windows Server 2022 image ships an older patch. CircleCI also pins Inno Setup 6.7.1.
+
+The x64 Release installer bundles both the .NET and Windows App SDK runtimes. It uses ReadyToRun and disables trimming to preserve reflection-based serialization and WinUI behavior. The Windows API target remains build 19041 and the installer minimum remains build 17763. The production packaging path uses Inno Setup.
 
 Run the non-UI tests locally on Windows:
 
 ```powershell
-dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj -c Release -r win-x64 -p:Platform=x64 --settings tests/ci.runsettings
+dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj -c Release -r win-x64 -p:Platform=x64 --settings tests/ci.runsettings --collect "Code Coverage;Format=Cobertura"
 ```
 
-Tests exercise real application classes with temporary files, not mocked copies. They do not launch or kill external applications, contact GitHub, or automate WinUI controls. Updater tests use a deterministic HTTP handler to exercise the real verification code. The installer smoke test intentionally does not start the application. It refuses to run outside CircleCI or against an existing installation. The smoke test also checks upgrading from the latest public release when a new version is planned. UI interactions, actual application launching, live updater download/install and older Windows versions still require separate validation.
+Tests exercise real application classes with temporary files, not mocked copies. They do not launch or kill external applications, contact GitHub, or automate WinUI controls. Updater tests use a deterministic HTTP handler to exercise the real verification code. The installer smoke test waits for the installed WinUI application to open its main window. It refuses to run outside CircleCI or against an existing installation. The smoke test also checks upgrading from the latest public release on PR branches and when a new version is planned. UI interactions, actual application launching, live updater download/install and older Windows versions still require separate validation.
 
 CircleCI setup: connect this GitHub repository and select .circleci/config.yml. Enable branch-push triggers (including main), avoid duplicate push/PR triggers, and enable auto-cancel of redundant non-default-branch workflows. Once the first Windows run succeeds, add the observed job status checks (or the complete workflow check) to GitHub branch protection. Keep commit status updates enabled for individual job status on pull requests; the CircleCI Checks app reports the workflow status separately. Keep secrets unavailable to fork builds. Use the Tests and Artifacts tabs to review results, coverage and installer logs. The Linux open-source credit allowance does not cover Windows builds; monitor Windows credits and artifact storage.
 

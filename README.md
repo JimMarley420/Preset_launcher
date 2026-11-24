@@ -6,7 +6,7 @@ Launch the Windows apps you use together, without opening each one by hand.
 
 [![Release](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases) [![CircleCI](https://dl.circleci.com/status-badge/img/gh/JimMarley420/Preset_launcher/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/JimMarley420/Preset_launcher/tree/main)
 
-[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?style=flat-square)](https://www.microsoft.com/windows/) [![C#](https://img.shields.io/badge/C%23-239120?style=flat-square)](https://learn.microsoft.com/dotnet/csharp/) [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0) [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/) [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-1.8-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/windows-app-sdk/) [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6-555555?style=flat-square)](https://jrsoftware.org/isinfo.php)
+[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?style=flat-square)](https://www.microsoft.com/windows/) [![C#](https://img.shields.io/badge/C%23-239120?style=flat-square)](https://learn.microsoft.com/dotnet/csharp/) [![.NET 10 LTS](https://img.shields.io/badge/.NET-10%20LTS-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0) [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/) [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-2.7-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/windows-app-sdk/) [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6-555555?style=flat-square)](https://jrsoftware.org/isinfo.php)
 
 [Download for Windows](https://github.com/JimMarley420/Preset_launcher/releases/latest) · [Report a problem](https://github.com/JimMarley420/Preset_launcher/issues/new/choose) · [Build from source](#build-from-source)
 
@@ -40,7 +40,7 @@ The history filter controls and the launch-confirmation preference are present b
 
 ## Install
 
-Use a Windows 10 or 11 PC compatible with the x64 installer. The installer declares Windows 10 build 17763 as its minimum; the project targets build 19041. Compatibility with older builds has not been verified.
+Use a Windows 10 or 11 PC compatible with the x64 installer. The installer declares Windows 10 build 17763 as its minimum; the project targets build 19041. Compatibility with older builds has not been verified. The installer bundles .NET 10 and the Windows App SDK.
 
 1. Open the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 2. Download `PresetLauncher_Setup_<version>.exe` and run it.
@@ -61,7 +61,7 @@ The installer preserves user data on uninstall. Back up both files manually with
 
 ## Build from source
 
-Use Windows with the .NET 8 SDK and Visual Studio 2022 with WinUI / Windows App SDK development tools. From PowerShell:
+Use Windows with the .NET 10 LTS SDK (10.0.404 or a later 10.0.4xx patch) and Visual Studio 2026 with WinUI / Windows App SDK development tools. From PowerShell:
 
 ```powershell
 git clone https://github.com/JimMarley420/Preset_launcher.git

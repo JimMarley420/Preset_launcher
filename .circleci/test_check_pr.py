@@ -1,5 +1,6 @@
 import unittest
 from policy import pr_decision
+from release import REPO, branch_decision
 
 
 def pr(title, labels=(), body=""):
@@ -34,3 +35,16 @@ class PullRequestPolicyTests(unittest.TestCase):
     def test_breaking_footer(self):
         self.assertEqual(pr_decision(pr("fix: change format", ["update: recommended"],
                                        "BREAKING CHANGE: incompatible"))["rank"], 3)
+
+
+    def test_stacked_pr_metadata(self):
+        metadata = pr("build: migrate runtime")
+        metadata["base"] = {"ref": "feat/github-release-updater"}
+        metadata["head"] = {"repo": {"full_name": REPO}}
+        self.assertEqual(branch_decision(metadata)["rank"], 0)
+        with self.assertRaises(ValueError):
+            branch_decision({**metadata, **pr("feat: change behavior", ["update: optional"])})
+        with self.assertRaises(ValueError):
+            branch_decision({**metadata, **pr("build: migrate runtime", ["update: optional"])})
+        with self.assertRaises(ValueError):
+            branch_decision({**metadata, "head": {"repo": {"full_name": "example/fork"}}})
