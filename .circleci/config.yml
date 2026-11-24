@@ -133,11 +133,14 @@ jobs:
           name: Install pinned Inno Setup compiler
           command: |
             $ErrorActionPreference = 'Stop'
-            choco install innosetup --version=6.7.1 --yes --no-progress
+            $installer = Join-Path $env:TEMP 'innosetup-6.7.1.exe'
+            $target = Join-Path (Get-Location).Path 'artifacts/inno-compiler'
+            curl.exe -fsSL --connect-timeout 20 --max-time 90 --retry 2 --retry-max-time 120 https://github.com/jrsoftware/issrc/releases/download/is-6_7_1/innosetup-6.7.1.exe -o $installer
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-            if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
-            if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler missing' }
+            $sha256 = '4d11e8050b6185e0d49bd9e8cc661a7a59f44959a621d31d11033124c4e8a7b0'
+            if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ine $sha256) { throw 'Inno Setup download SHA-256 mismatch' }
+            $process = Start-Process -FilePath $installer -ArgumentList ('/PORTABLE=1 /VERYSILENT /CURRENTUSER /NORESTART /DIR="{0}"' -f $target) -WindowStyle Hidden -Wait -PassThru
+            if ($process.ExitCode -ne 0 -or -not (Test-Path (Join-Path $target 'ISCC.exe') -PathType Leaf)) { throw 'Pinned Inno Setup installation failed' }
       - run:
           name: Compile Inno Setup installer and record its SHA-256
           no_output_timeout: 20m
@@ -145,8 +148,7 @@ jobs:
             $ErrorActionPreference = 'Stop'
             $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
             if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published application missing' }
-            $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-            if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
+            $iscc = Join-Path (Get-Location).Path 'artifacts/inno-compiler/ISCC.exe'
             $outputDir = Join-Path (Get-Location).Path 'Installer\Output'
             New-Item -ItemType Directory -Force $outputDir | Out-Null
             & $iscc "/DRequirePinnedCompiler" "/DAppVersion=$version" "/O$outputDir" 'Installer/PresetLauncher.iss'
