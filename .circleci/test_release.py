@@ -62,6 +62,52 @@ class ReleasePlanTests(unittest.TestCase):
             self.plan("fix: a")
 
 
+class InstallerLaneTests(unittest.TestCase):
+    def test_regular_changes_use_fast_lane(self):
+        self.assertFalse(release.needs_installer([
+            "README.md", "tests/PresetLauncher.Tests/ServiceTests.cs",
+            "PresetLauncherWinUI3/Services/LauncherService.cs",
+        ]))
+
+    def test_installer_updater_and_publish_paths_require_full_lane(self):
+        for path in (
+            ".circleci/config.yml", "Installer/PresetLauncher.iss", "global.json",
+            "PresetLauncherWinUI3/favicon.ico",
+            "PresetLauncherWinUI3/MainWindow.xaml.cs",
+            "PresetLauncherWinUI3/Views/Pages/SettingsPage.xaml.cs",
+            "PresetLauncherWinUI3/Services/LocalizationService.cs",
+            "presetlauncherwinui3/views/pages/SETTINGSPAGE.XAML",
+            "iNsTaLlEr/presetlauncher.iss",
+            "PresetLauncherWinUI3/Services/UpdateService.cs", "PresetLauncherWinUI3/App.xaml.cs",
+            "PresetLauncherWinUI3/Models/AppSettings.cs", "Directory.Build.props",
+            "PresetLauncherWinUI3/Properties/PublishProfiles/win-x64.pubxml", "NuGet.Config",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(release.needs_installer([path]))
+
+    def test_main_always_uses_full_lane(self):
+        with patch.object(release, "git") as git:
+            self.assertTrue(release.validate_installer("main", None, "head"))
+            git.assert_not_called()
+
+    def test_stacked_pr_uses_its_actual_base(self):
+        metadata = {"base": {"ref": "feat/github-release-updater"}}
+        with patch.object(release, "git", side_effect=["", "merge-base", "README.md\0"]) as git:
+            self.assertFalse(release.validate_installer("feat/dotnet-10-migration", metadata, "head"))
+        self.assertEqual(git.call_args_list[0].args[-1], "refs/heads/feat/github-release-updater")
+        self.assertEqual(git.call_args_list[-1].args, (
+            "diff", "--name-only", "--no-renames", "-z", "merge-base", "head", "--",
+        ))
+
+
+    def test_renamed_sensitive_file_still_requires_full_lane(self):
+        metadata = {"base": {"ref": "main"}}
+        paths = "docs/archive.txt\0PresetLauncherWinUI3/Services/LocalizationService.cs\0"
+        with patch.object(release, "git", side_effect=["", "merge-base", paths]) as git:
+            self.assertTrue(release.validate_installer("feature", metadata, "head"))
+        self.assertIn("--no-renames", git.call_args.args)
+
+
 class PublishTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()

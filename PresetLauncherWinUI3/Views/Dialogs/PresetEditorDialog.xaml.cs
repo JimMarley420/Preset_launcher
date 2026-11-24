@@ -120,7 +120,7 @@ public sealed partial class PresetEditorDialog : ContentDialog
         set => SetValue(ExeSecProperty, value);
     }
 
-    private async void BtnAddFromProcess_Click(object sender, RoutedEventArgs e)
+    private void BtnAddFromProcess_Click(object sender, RoutedEventArgs e)
     {
         if (_processesLoaded) 
         {
@@ -222,7 +222,7 @@ public sealed partial class PresetEditorDialog : ContentDialog
         {
             try
             {
-                string resolvedPath = null;
+                string? resolvedPath = null;
                 
                 // Try to resolve path (with multiple fallbacks)
                 if (_launcher.TryGetExecutablePath(pi.Id, out var path1) && !string.IsNullOrEmpty(path1))

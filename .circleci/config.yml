@@ -3,7 +3,7 @@ version: 2.1
 executors:
   windows-x64:
     machine:
-      image: windows-server-2022-gui:2026.05.1
+      image: windows-server-2022-gui:2026.10.2
     resource_class: windows.medium
     shell: powershell.exe -NoProfile -ExecutionPolicy Bypass
     environment:
@@ -19,28 +19,46 @@ executors:
 commands:
   prepare-dotnet:
     steps:
-      - run:
-          name: Select pinned .NET SDK
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $version = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
-            if (-not (dotnet --list-sdks | Where-Object { $_ -match "^$([regex]::Escape($version)) " })) {
-              $script = Join-Path $env:TEMP 'dotnet-install.ps1'
-              Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -UseBasicParsing -OutFile $script
-              & $script -Version $version -Architecture x64 -InstallDir "$env:ProgramFiles\dotnet" -NoPath
-            }
-            $actual = dotnet --version
-            if ($LASTEXITCODE -ne 0 -or $actual -ne $version) { throw "Expected SDK $version, got $actual" }
-            dotnet --info
-  restore-nuget-cache:
-    steps:
       - restore_cache:
           keys:
-            - v1-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+            - v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+            - v1-sdk-archive-windows-x64-main-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+      - run:
+          name: Select pinned .NET SDK
+          command: '& .circleci/prepare-dotnet.ps1'
+  save-sdk-cache:
+    steps:
+      - save_cache:
+          key: v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+          paths:
+            - artifacts/sdk-cache
+  require-installer-plan:
+    steps:
+      - run:
+          name: Select installer validation lane
+          command: |
+            $ErrorActionPreference = 'Stop'
+            $plan = Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json
+            if ($plan.sha -ne $env:CIRCLE_SHA1 -or $plan.validate_installer -isnot [bool]) { throw 'Invalid installer validation plan' }
+            if (-not $plan.validate_installer) {
+              if ($env:CIRCLE_BRANCH -eq 'main') { throw 'Main requires installer validation' }
+              Write-Host 'Installer validation is not required for these PR paths. See plan-release.'
+              circleci-agent step halt
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+  restore-nuget-cache:
+    steps:
+      - run:
+          name: Fingerprint tracked NuGet inputs
+          command: python .circleci/nuget_inputs.py
+      - restore_cache:
+          keys:
+            - v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
+            - v3-nuget-windows-x64-main-{{ checksum "artifacts/nuget-inputs.json" }}
   save-nuget-cache:
     steps:
       - save_cache:
-          key: v1-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+          key: v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
           paths:
             - ~/.nuget/packages
 
@@ -90,9 +108,8 @@ jobs:
             $ErrorActionPreference = 'Stop'
             dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            dotnet restore PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release -p:SelfContained=true -p:PublishReadyToRun=true -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - save-nuget-cache
+      - save-sdk-cache
 
   build-windows:
     executor: windows-x64
@@ -100,6 +117,7 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - require-installer-plan
       - prepare-dotnet
       - restore-nuget-cache
       - run:
@@ -108,13 +126,42 @@ jobs:
           command: |
             $ErrorActionPreference = 'Stop'
             $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishReadyToRun=true -p:Version=$version --output publish/win-x64
+            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishTrimmed=false -p:PublishReadyToRun=false '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905' -p:Version=$version --output publish/win-x64
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published executable missing' }
+      - run:
+          name: Install pinned Inno Setup compiler
+          command: |
+            $ErrorActionPreference = 'Stop'
+            $installer = Join-Path $env:TEMP 'innosetup-6.7.1.exe'
+            $target = Join-Path (Get-Location).Path 'artifacts/inno-compiler'
+            curl.exe -fsSL --connect-timeout 20 --max-time 90 --retry 2 --retry-max-time 120 https://github.com/jrsoftware/issrc/releases/download/is-6_7_1/innosetup-6.7.1.exe -o $installer
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $sha256 = '4d11e8050b6185e0d49bd9e8cc661a7a59f44959a621d31d11033124c4e8a7b0'
+            if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ine $sha256) { throw 'Inno Setup download SHA-256 mismatch' }
+            $process = Start-Process -FilePath $installer -ArgumentList ('/PORTABLE=1 /VERYSILENT /CURRENTUSER /NORESTART /DIR="{0}"' -f $target) -WindowStyle Hidden -Wait -PassThru
+            if ($process.ExitCode -ne 0 -or -not (Test-Path (Join-Path $target 'ISCC.exe') -PathType Leaf)) { throw 'Pinned Inno Setup installation failed' }
+      - run:
+          name: Compile Inno Setup installer and record its SHA-256
+          no_output_timeout: 20m
+          command: |
+            $ErrorActionPreference = 'Stop'
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
+            if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published application missing' }
+            $iscc = Join-Path (Get-Location).Path 'artifacts/inno-compiler/ISCC.exe'
+            $outputDir = Join-Path (Get-Location).Path 'Installer\Output'
+            New-Item -ItemType Directory -Force $outputDir | Out-Null
+            & $iscc "/DRequirePinnedCompiler" "/DAppVersion=$version" "/O$outputDir" 'Installer/PresetLauncher.iss'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $name = "PresetLauncher_Setup_$version.exe"
+            $file = Join-Path $outputDir $name
+            if (-not (Test-Path $file -PathType Leaf)) { throw 'Installer missing' }
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $name" | Set-Content (Join-Path $outputDir 'SHA256SUMS.txt') -Encoding ASCII
       - persist_to_workspace:
           root: .
           paths:
-            - publish/win-x64
+            - Installer/Output
 
   test-windows:
     executor: windows-x64
@@ -136,7 +183,21 @@ jobs:
             dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true -p:Version=$version --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             [xml]$report = Get-Content (Join-Path $junit 'junit.xml') -Raw
-            if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'No test cases reported' }
+            if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'JUnit report contains no test cases' }
+            [xml]$trx = Get-Content (Join-Path $results 'tests.trx') -Raw
+            if ($trx.DocumentElement.LocalName -ne 'TestRun' -or
+                $trx.SelectNodes("//*[local-name()='UnitTestResult']").Count -eq 0) { throw 'TRX report contains no test results' }
+            # VSTest can write a second copy outside the TRX deployment folder.
+            $deployment = $trx.SelectSingleNode("//*[local-name()='Deployment']/@runDeploymentRoot")
+            $coverage = $trx.SelectNodes("//*[local-name()='Collector'][@uri='datacollector://microsoft/CodeCoverage/2.0']//*[local-name()='A']/@href")
+            if (-not $deployment -or $coverage.Count -ne 1 -or $coverage[0].Value -notlike '*.cobertura.xml') {
+              throw 'TRX must reference one Cobertura coverage report'
+            }
+            $attachmentDir = Join-Path (Join-Path $results $deployment.Value) 'In'
+            [xml]$cobertura = Get-Content (Join-Path $attachmentDir $coverage[0].Value) -Raw
+            $appLines = $cobertura.SelectNodes("//package[@name='PresetLauncherWinUI3']//line[@hits > 0]")
+            if ($appLines.Count -eq 0 -or $cobertura.DocumentElement.LocalName -ne 'coverage' -or
+                [int]$cobertura.coverage.'lines-covered' -le 0) { throw 'Cobertura report contains no covered application lines' }
       - store_test_results:
           path: artifacts/junit
       - store_artifacts:
@@ -147,39 +208,37 @@ jobs:
           destination: test-reports
 
   package-installer:
-    executor: windows-x64
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
     steps:
-      - checkout
       - attach_workspace:
           at: .
       - run:
-          name: Install pinned Inno Setup compiler
+          name: Verify packaged installer integrity
           command: |
-            $ErrorActionPreference = 'Stop'
-            choco install innosetup --version=6.7.1 --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-            if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
-            if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler missing' }
-            if ((Get-Item $iscc).VersionInfo.ProductVersion -notmatch '^6\.7\.1(?:\.|$)') { throw 'Unexpected Inno Setup version' }
-      - run:
-          name: Compile Inno Setup installer from published application
-          no_output_timeout: 20m
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Build workspace missing' }
-            $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-            if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
-            $outputDir = Join-Path (Get-Location).Path 'Installer\Output'
-            New-Item -ItemType Directory -Force $outputDir | Out-Null
-            & $iscc "/DAppVersion=$version" "/O$outputDir" 'Installer/PresetLauncher.iss'
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            if (-not (Test-Path (Join-Path $outputDir "PresetLauncher_Setup_$version.exe") -PathType Leaf)) { throw 'Installer missing' }
-      - persist_to_workspace:
-          root: .
-          paths:
-            - Installer/Output
+            python - \<<'PY'
+            import hashlib
+            import json
+            import os
+            from pathlib import Path
+
+            plan = json.loads(Path("artifacts/release-plan.json").read_text())
+            if plan["sha"] != os.environ["CIRCLE_SHA1"] or type(plan["validate_installer"]) is not bool:
+                raise SystemExit("Invalid installer validation plan")
+            if not plan["validate_installer"]:
+                if os.environ["CIRCLE_BRANCH"] == "main":
+                    raise SystemExit("Main requires installer validation")
+                print("Installer validation is not required for these PR paths. See plan-release.")
+                raise SystemExit(0)
+            directory = Path("Installer/Output")
+            name = f"PresetLauncher_Setup_{plan['version']}.exe"
+            with (directory / name).open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            if (directory / "SHA256SUMS.txt").read_text(encoding="ascii").strip() != f"{digest}  {name}":
+                raise SystemExit("Packaged installer checksum mismatch")
+            print(f"Verified {name}")
+            PY
 
   smoke-installer:
     executor: windows-x64
@@ -187,11 +246,16 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - require-installer-plan
       - run:
           name: Smoke test installation and uninstallation
           no_output_timeout: 10m
           command: |
             $ErrorActionPreference = 'Stop'
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
+            $name = "PresetLauncher_Setup_$version.exe"
+            $digest = (Get-FileHash (Join-Path 'Installer/Output' $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ((Get-Content Installer/Output/SHA256SUMS.txt -Raw).Trim() -cne "$digest  $name") { throw 'Packaged installer checksum mismatch' }
             & .\.circleci\smoke-installer.ps1 -PlanPath artifacts/release-plan.json
       - store_artifacts:
           path: artifacts/installer-logs
@@ -207,7 +271,9 @@ jobs:
             New-Item -ItemType Directory -Force artifacts/verified-installer | Out-Null
             Copy-Item $file artifacts/verified-installer/
             $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $name" | Set-Content artifacts/verified-installer/SHA256SUMS.txt -Encoding ASCII
+            $sums = (Get-Content Installer/Output/SHA256SUMS.txt -Raw).Trim()
+            if ($sums -cne "$hash  $name") { throw 'Smoke-tested installer checksum mismatch' }
+            Copy-Item Installer/Output/SHA256SUMS.txt artifacts/verified-installer/
       - store_artifacts:
           path: artifacts/verified-installer
           destination: verified-ci-installer
@@ -215,7 +281,7 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - artifacts/verified-installer
+            - artifacts/verified-installer/SHA256SUMS.txt
 
   publish-release:
     docker:
@@ -228,7 +294,9 @@ jobs:
       - run:
           name: Publish verified GitHub release
           no_output_timeout: 15m
-          command: python .circleci/release.py publish
+          command: |
+            cp Installer/Output/PresetLauncher_Setup_*.exe artifacts/verified-installer/
+            python .circleci/release.py publish
 
 workflows:
   ci:
@@ -237,21 +305,21 @@ workflows:
       - plan-release:
           requires:
             - validate-pr-title
-      - dependency-audit
+      - dependency-audit:
+          serial-group: << pipeline.project.slug >>/nuget/<< pipeline.git.branch >>
       - build-windows:
           requires:
-            - dependency-audit
             - plan-release
             - validate-pr-title
       - test-windows:
           requires:
-            - dependency-audit
             - plan-release
             - validate-pr-title
       - package-installer:
           requires:
             - build-windows
             - test-windows
+            - dependency-audit
       - smoke-installer:
           requires:
             - package-installer

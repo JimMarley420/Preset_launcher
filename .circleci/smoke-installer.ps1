@@ -25,7 +25,10 @@ if (-not (Test-Path $setup -PathType Leaf)) { throw "Installer not found: $setup
 
 function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogName) {
     $log = Join-Path $logs $LogName
-    $process = Start-Process -FilePath $Path -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log) -Wait -PassThru
+    Write-Host "Running $LogName"
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    $process = Start-Process -FilePath $Path -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log) -WindowStyle Hidden -Wait -PassThru
+    Write-Host ("{0}: {1:F2}s" -f $LogName, $timer.Elapsed.TotalSeconds)
     if ($process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode)" }
     if (-not (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe') -PathType Leaf)) { throw 'Installed executable missing' }
     if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $ExpectedVersion) { throw 'Unexpected installed registry version' }
@@ -36,7 +39,37 @@ function Assert-CurrentPackage {
     foreach ($file in @($dll, (Join-Path $installDir 'coreclr.dll'), (Join-Path $installDir 'Microsoft.UI.Xaml.dll'))) {
         if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installed file: $file" }
     }
+    $runtime = (Get-Content (Join-Path $installDir 'PresetLauncherWinUI3.runtimeconfig.json') -Raw | ConvertFrom-Json).runtimeOptions
+    if ($runtime.tfm -ne 'net10.0' -or -not ($runtime.includedFrameworks | Where-Object {
+        $_.name -eq 'Microsoft.NETCore.App' -and $_.version -match '^10\.0\.'
+    })) { throw 'Expected a bundled .NET 10 runtime' }
+    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
+    if ((Get-Item $exe).VersionInfo.FileVersion -ne "$version.0") { throw 'Installed executable version does not match installer version' }
     if ((Get-Item $dll).VersionInfo.FileVersion -ne "$version.0") { throw 'Installed assembly version does not match installer version' }
+}
+
+function Assert-ApplicationStarts([string]$Phase) {
+    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
+    Write-Host "Starting application ($Phase)"
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -PassThru
+    try {
+        do {
+            $process.Refresh()
+            if ($process.HasExited) { throw "Application exited during startup: $($process.ExitCode)" }
+            if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
+                Write-Host ("Startup ({0}): {1:F2}s" -f $Phase, $timer.Elapsed.TotalSeconds)
+                return
+            }
+            Start-Sleep -Milliseconds 250
+        } while ($timer.Elapsed.TotalSeconds -lt 30)
+        throw 'Application main window did not initialize within 30 seconds'
+    }
+    finally {
+        if (-not $process.HasExited) { Stop-Process -InputObject $process -Force }
+        $process.WaitForExit()
+        $process.Dispose()
+    }
 }
 
 function Assert-UserData {
@@ -50,7 +83,8 @@ function Remove-Package([string]$LogName) {
     $uninstaller = Join-Path $installDir 'unins000.exe'
     $log = Join-Path $logs $LogName
     if (-not (Test-Path $uninstaller)) { throw 'Uninstaller missing' }
-    $process = Start-Process -FilePath $uninstaller -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="{0}"' -f $log) -Wait -PassThru
+    Write-Host "Running $LogName"
+    $process = Start-Process -FilePath $uninstaller -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="{0}"' -f $log) -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
     if ((Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe')) -or
         (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.dll')) -or (Test-Path $registryPath)) {
@@ -69,9 +103,10 @@ try {
     Install-Package $setup $version 'install.log'
     Assert-CurrentPackage
     Assert-UserData
+    Assert-ApplicationStarts fresh
     Remove-Package 'uninstall.log'
 
-    if ($plan.release) {
+    if ($plan.PSObject.Properties['previous_installer']) {
         $previous = ([string]$plan.previous).TrimStart('v')
         $asset = $plan.previous_installer
         $expectedUrl = "https://github.com/JimMarley420/Preset_launcher/releases/download/$($plan.previous)/PresetLauncher_Setup_$previous.exe"
@@ -79,6 +114,7 @@ try {
             $asset.sha256 -notmatch '^[0-9a-f]{64}$' -or $asset.size -le 0 -or $asset.size -gt 1GB) {
             throw 'Invalid previous installer plan'
         }
+        Write-Host "Downloading verified baseline installer $previous"
         Invoke-WebRequest -Uri $expectedUrl -UseBasicParsing -OutFile $previousSetup -TimeoutSec 300
         if ((Get-Item $previousSetup).Length -ne $asset.size -or
             (Get-FileHash $previousSetup -Algorithm SHA256).Hash -ine $asset.sha256) {
@@ -89,6 +125,7 @@ try {
         Install-Package $setup $version 'upgrade-to.log'
         Assert-CurrentPackage
         Assert-UserData
+        Assert-ApplicationStarts upgrade
         Remove-Package 'upgrade-uninstall.log'
     }
     Write-Host 'Installer smoke test passed.'
