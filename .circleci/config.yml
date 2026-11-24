@@ -140,9 +140,14 @@ jobs:
             [xml]$trx = Get-Content (Join-Path $results 'tests.trx') -Raw
             if ($trx.DocumentElement.LocalName -ne 'TestRun' -or
                 $trx.SelectNodes("//*[local-name()='UnitTestResult']").Count -eq 0) { throw 'TRX report contains no test results' }
-            $coverage = @(Get-ChildItem $results -Recurse -File -Filter '*.cobertura.xml')
-            if ($coverage.Count -ne 1) { throw 'Expected one Cobertura coverage report' }
-            [xml]$cobertura = Get-Content $coverage[0].FullName -Raw
+            # VSTest can write a second copy outside the TRX deployment folder.
+            $deployment = $trx.SelectSingleNode("//*[local-name()='Deployment']/@runDeploymentRoot")
+            $coverage = $trx.SelectNodes("//*[local-name()='Collector'][@uri='datacollector://microsoft/CodeCoverage/2.0']//*[local-name()='A']/@href")
+            if (-not $deployment -or $coverage.Count -ne 1 -or $coverage[0].Value -notlike '*.cobertura.xml') {
+              throw 'TRX must reference one Cobertura coverage report'
+            }
+            $attachmentDir = Join-Path (Join-Path $results $deployment.Value) 'In'
+            [xml]$cobertura = Get-Content (Join-Path $attachmentDir $coverage[0].Value) -Raw
             $appLines = $cobertura.SelectNodes("//package[@name='PresetLauncherWinUI3']//line[@hits > 0]")
             if ($appLines.Count -eq 0 -or $cobertura.DocumentElement.LocalName -ne 'coverage' -or
                 [int]$cobertura.coverage.'lines-covered' -le 0) { throw 'Cobertura report contains no covered application lines' }
