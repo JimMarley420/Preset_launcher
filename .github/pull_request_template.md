@@ -8,7 +8,16 @@
 
 ## Release impact
 
-<!-- Patch, minor, major or non-releasing change. Use a Conventional Commit title for squash merges. Update-Required: true is reserved for deliberate minimum-version changes. See docs/RELEASING.md. -->
+<!-- REQUIRED TITLE: feat(scope): description | fix(scope): description | perf: description | feat!: breaking change | docs: description | ci: description | test: description | refactor: description | chore: description | build: description | style: description | revert: description
+The scope is optional. CircleCI validates the actual PR title.
+Choose one release impact below. If a mandatory update is intended, add Update-Required: true as a standalone line outside this comment. See docs/RELEASING.md. -->
+
+- [ ] Patch (fix or performance improvement)
+- [ ] Minor (new functionality)
+- [ ] Major (breaking change)
+- [ ] No release (internal or documentation change)
+
+<!-- Keep exactly one release impact checked. The commit title/footer, not these informational checkboxes, determines the release. -->
 
 ## Verification
 

@@ -15,6 +15,10 @@ Use a Conventional Commit on a branch or in the squash-merge title. A user-facin
 
 The release plan in artifacts/release-plan.json is the source of the published assembly version, installer version, registry DisplayVersion and asset filename. Branch CI artifacts are not production releases. Local builds default to 0.0.0 and automatic update checks are disabled for that version.
 
+## Pull request validation
+
+The validate-pr-title job checks the actual open PR title against the allowed Conventional Commit types and rejects invalid or conflicting mandatory-update markers. It queries the public GitHub API for the checked-out commit, without a publishing token. If a branch build starts before a PR exists, open the PR and rerun the failed job. Add the actual reported validate-pr-title status to required checks. Editing PR metadata does not change the commit SHA: rerun validation after title or body edits, and verify the final squash message before merging. A commit status alone cannot guarantee that a title edited after a successful run or a manually changed squash message remains valid. The PR checklist is informational.
+
 ## Update policy
 
 Version significance and update requirements are separate. Updates are optional by default. A maintainer can add this exact footer to a releasing conventional commit:
