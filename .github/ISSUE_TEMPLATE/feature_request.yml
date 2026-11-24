@@ -1,50 +1,36 @@
-name: Suggestion d'amelioration
-description: Proposer une nouvelle fonctionnalite ou une amelioreation
-title: "[Feature] "
-labels: ["enhancement"]
+name: Feature request
+description: Suggest a change to how PresetLauncher works.
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Merci de votre suggestion ! Decrivez votre idee en detail.
-
   - type: textarea
     id: problem
     attributes:
-      label: Probleme ou besion
-      description: Decrivez le probleme que cette fonctionnalite resoudrait.
-      placeholder: Je souhaite pouvoir...
+      label: What are you trying to do?
+      description: Describe the workflow or limitation you encounter.
     validations:
       required: true
-
   - type: textarea
-    id: solution
+    id: proposal
     attributes:
-      label: Solution souhaitee
-      description: Decrivez la solution que vous aimeriez voir.
+      label: Proposed change
     validations:
       required: true
-
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives envisagees
-      description: Decrivez d'autres solutions ou fonctionnalites similaires que vous avez envisagees.
-    validations:
-      required: false
-
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: Maquettes ou captures
-      description: Ajoutez des maquettes ou captures si applicable.
-    validations:
-      required: false
-
+      label: Alternatives or workarounds
   - type: textarea
     id: context
     attributes:
-      label: Informations complementaires
-      description: Ajoutez tout autre contexte, references ou captures d'ecran.
-    validations:
-      required: false
+      label: Additional context or mockups
+  - type: dropdown
+    id: area
+    attributes:
+      label: Related area
+      options:
+        - Preset management
+        - Launching or closing programs
+        - History or statistics
+        - Data import or backup
+        - Settings or appearance
+        - Installation or updates
+        - Other
