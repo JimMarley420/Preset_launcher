@@ -47,7 +47,7 @@ function Assert-CurrentPackage {
 
 function Assert-ApplicationStarts {
     $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
-    $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -WindowStyle Hidden -PassThru
+    $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -PassThru
     try {
         $timer = [Diagnostics.Stopwatch]::StartNew()
         do {
