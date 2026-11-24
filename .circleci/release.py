@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from policy import LEVELS, pr_decision
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -16,7 +17,8 @@ PLAN = Path("artifacts/release-plan.json")
 OUTPUT = Path("artifacts/verified-installer")
 VERSION = re.compile(r"v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\Z")
 POLICY = re.compile(r"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", re.M)
-CONVENTIONAL = re.compile(r"^([a-z]+)(?:\([^()\r\n]+\))?(!)?: .+")
+# Last main commit before mandatory PR metadata was introduced.
+ROLLOUT_BASE = "8535d8e943a6503d4982ff9a5164ef66392ba3ea"
 
 
 def version(value):
@@ -45,37 +47,12 @@ def minimum(release):
     return floor
 
 
-def classify(messages):
-    rank = 0
-    required = False
-    for message in messages:
-        lines = message.strip().splitlines()
-        if not lines:
-            continue
-        match = CONVENTIONAL.fullmatch(lines[0])
-        if not match:
-            continue
-        kind, breaking = match.groups()
-        if breaking or re.search(r"^BREAKING[ -]CHANGE: .+", message, re.M):
-            bump = 3
-        elif kind == "feat":
-            bump = 2
-        elif kind in ("fix", "perf"):
-            bump = 1
-        else:
-            bump = 0
-        if re.search(r"^Update-Required: true\s*$", message, re.M):
-            if bump == 0:
-                raise ValueError("Update-Required requires a releasing commit")
-            required = True
-        rank = max(rank, bump)
-    return rank, required
-
-
-def make_plan(previous, messages, sha):
+def make_plan(previous, decisions, sha):
     current = version(previous["tag_name"])
     floor = minimum(previous)
-    rank, required = classify(messages)
+    rank = max((item["rank"] for item in decisions), default=0)
+    policies = [item["policy"] for item in decisions if item["rank"]]
+    selected = max(policies, key=LEVELS.index) if policies else "optional"
     major, minor, patch = current
     next_version = {0: current, 1: (major, minor, patch + 1),
                     2: (major, minor + 1, 0), 3: (major + 1, 0, 0)}[rank]
@@ -83,7 +60,48 @@ def make_plan(previous, messages, sha):
     version(value)
     return {"previous": previous["tag_name"], "version": value,
             "tag": f"v{value}", "sha": sha, "release": rank != 0,
-            "minimum_supported_version": format_version(next_version if required else floor)}
+            "policy": selected, "decisions": decisions,
+            "minimum_supported_version": format_version(next_version if selected == "required" else floor)}
+
+
+def merged_decisions(start, end):
+    decisions = []
+    for sha in git("rev-list", "--first-parent", "--reverse", f"{start}..{end}").splitlines():
+        pulls = request(API + f"/commits/{sha}/pulls")
+        matches = [pr for pr in pulls if pr.get("merge_commit_sha") == sha
+                   and pr["base"]["ref"] == "main" and pr["base"]["repo"]["full_name"] == REPO
+                   and pr.get("merged_at")]
+        if len(matches) != 1:
+            raise ValueError(f"Expected one merged main PR for {sha}; direct or ambiguous commits cannot publish")
+        pr = request(API + f"/pulls/{matches[0]['number']}")
+        decisions.append(pr_decision(pr))
+    return decisions
+
+
+def collect_decisions(previous, sha, branch):
+    tag = previous["tag_name"]
+    tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
+    # Only grandfather commits before the new system went live.
+    start = ROLLOUT_BASE if tag == "1.2.6" else tag_sha
+    if branch == "main":
+        subprocess.run(["git", "merge-base", "--is-ancestor", start, sha], check=True)
+        return merged_decisions(start, sha)
+    git("fetch", f"https://github.com/{REPO}.git", "refs/heads/main")
+    base = git("merge-base", sha, "FETCH_HEAD")
+    subprocess.run(["git", "merge-base", "--is-ancestor", start, base], check=True)
+    decisions = merged_decisions(start, base)
+    query = urlencode({"state": "open", "base": "main", "per_page": 100})
+    page = 1
+    matches = []
+    while True:
+        pulls = request(API + "/pulls?" + query + f"&page={page}")
+        matches.extend(pr for pr in pulls if pr["head"]["sha"] == sha and pr["head"]["ref"] == branch)
+        if len(pulls) < 100:
+            break
+        page += 1
+    if len(matches) != 1:
+        raise ValueError("Expected one open PR targeting main for this commit")
+    return decisions + [pr_decision(matches[0])]
 
 
 def installer_asset(release):
@@ -137,8 +155,7 @@ def plan():
     sha = git("rev-parse", "HEAD")
     tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
     subprocess.run(["git", "merge-base", "--is-ancestor", tag_sha, sha], check=True)
-    messages = git("log", "--format=%B%x00", f"{tag_sha}..{sha}").split("\0")
-    result = make_plan(previous, messages, sha)
+    result = make_plan(previous, collect_decisions(previous, sha, os.environ.get("CIRCLE_BRANCH", "")), sha)
     if result["release"]:
         result["previous_installer"] = installer_asset(previous)
     PLAN.parent.mkdir(parents=True, exist_ok=True)
@@ -160,6 +177,9 @@ def publish():
     remote_head = request(API + "/git/ref/heads/main", token=token)["object"]["sha"]
     if remote_head != data["sha"]:
         raise ValueError("Main advanced; run the latest pipeline instead")
+    expected = make_plan(previous, collect_decisions(previous, data["sha"], "main"), data["sha"])
+    if any(data.get(key) != value for key, value in expected.items()):
+        raise ValueError("PR release metadata changed after validation; run a fresh main pipeline")
     value = data["version"]
     tag = data["tag"]
     if tag != f"v{format_version(version(value))}" or version(value) <= version(data["previous"]):
@@ -192,7 +212,8 @@ def publish():
     notes = request(API + "/releases/generate-notes", "POST",
                     {"tag_name": tag, "target_commitish": data["sha"],
                      "previous_tag_name": data["previous"]}, token)
-    body = f"<!-- presetlauncher:min-supported={format_version(floor)} -->\n\n" + notes["body"]
+    body = (f"<!-- presetlauncher:min-supported={format_version(floor)} -->\n"
+            f"<!-- presetlauncher:update-policy={data['policy']} -->\n\n" + notes["body"])
     release = request(API + "/releases", "POST",
                       {"tag_name": tag, "target_commitish": data["sha"], "name": f"PresetLauncher {tag}",
                        "body": body, "draft": True, "prerelease": False}, token)
@@ -210,6 +231,9 @@ def publish():
         raise ValueError("Main advanced during upload; draft left unpublished")
     if request(API + "/releases/latest", token=token)["tag_name"] != data["previous"]:
         raise ValueError("Latest release changed during upload; draft left unpublished")
+    final_plan = make_plan(previous, collect_decisions(previous, data["sha"], "main"), data["sha"])
+    if any(data.get(key) != value for key, value in final_plan.items()):
+        raise ValueError("PR metadata changed during upload; draft left unpublished")
     published = request(API + f"/releases/{release_id}", "PATCH",
                         {"draft": False, "make_latest": "true"}, token)
     if published["draft"] or published["tag_name"] != tag:

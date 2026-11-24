@@ -9,6 +9,14 @@ from urllib.error import HTTPError
 
 import release
 from release import make_plan, version
+from policy import pr_decision
+
+
+def decision(message, policy="optional", number=3):
+    title, _, body = message.partition("\n")
+    from policy import bump
+    labels = [{"name": f"update: {policy}"}] if bump(title, body) else []
+    return pr_decision({"number": number, "title": title, "body": body, "labels": labels})
 
 
 class ReleasePlanTests(unittest.TestCase):
@@ -16,7 +24,7 @@ class ReleasePlanTests(unittest.TestCase):
         self.previous = {"tag_name": "1.2.6", "body": "Legacy release"}
 
     def plan(self, *messages):
-        return make_plan(self.previous, messages, "abc")
+        return make_plan(self.previous, [decision(message, number=i) for i, message in enumerate(messages)], "abc")
 
     def test_patch_minor_major_and_no_release(self):
         for message, expected, release in [
@@ -37,7 +45,8 @@ class ReleasePlanTests(unittest.TestCase):
         self.assertEqual(self.plan("fix: a", "feat: b", "fix: c")["tag"], "v1.3.0")
 
     def test_required_policy_independent_of_version(self):
-        self.assertEqual(self.plan("fix: security\n\nUpdate-Required: true")["minimum_supported_version"], "1.2.7")
+        self.assertEqual(make_plan(self.previous, [decision("fix: security", "required")], "abc")["minimum_supported_version"], "1.2.7")
+        self.assertEqual(make_plan(self.previous, [decision("feat: a", "recommended"), decision("fix: b", "optional")], "abc")["policy"], "recommended")
         self.assertEqual(self.plan("feat!: redesign")["minimum_supported_version"], "0.0.0")
 
     def test_floor_survives_later_optional_release(self):
@@ -48,8 +57,6 @@ class ReleasePlanTests(unittest.TestCase):
         for value in ("v1.2", "1.02.3", "1.2.3-beta", "1.2.65535"):
             with self.assertRaises(ValueError):
                 version(value)
-        with self.assertRaises(ValueError):
-            self.plan("docs: typo\n\nUpdate-Required: true")
         self.previous = {"tag_name": "v1.3.0", "body": "missing policy"}
         with self.assertRaises(ValueError):
             self.plan("fix: a")
@@ -70,12 +77,13 @@ class PublishTests(unittest.TestCase):
         self.previous = {"tag_name": "1.2.6", "body": ""}
         self.sha = "a" * 40
         self.plan = root / "plan.json"
-        self.plan.write_text(json.dumps(make_plan(self.previous, ["fix: repair"], self.sha)), encoding="utf-8")
+        self.plan.write_text(json.dumps(make_plan(self.previous, [decision("fix: repair")], self.sha)), encoding="utf-8")
         self.calls = []
         for patcher in (
             patch.object(release, "PLAN", self.plan),
             patch.object(release, "OUTPUT", self.output),
             patch.object(release, "git", return_value=self.sha),
+            patch.object(release, "collect_decisions", return_value=[decision("fix: repair")]),
             patch.dict(os.environ, {"CIRCLE_BRANCH": "main", "GH_RELEASE_TOKEN": "test-token"}),
         ):
             patcher.start()
@@ -105,7 +113,7 @@ class PublishTests(unittest.TestCase):
         self.fail(f"Unexpected API request: {method} {url}")
 
     def test_no_release_never_contacts_api(self):
-        self.plan.write_text(json.dumps(make_plan(self.previous, ["docs: typo"], self.sha)), encoding="utf-8")
+        self.plan.write_text(json.dumps(make_plan(self.previous, [decision("docs: typo")], self.sha)), encoding="utf-8")
         with patch.object(release, "request") as request:
             release.publish()
             request.assert_not_called()
@@ -119,6 +127,12 @@ class PublishTests(unittest.TestCase):
     def test_stale_plan_fails_before_mutation(self):
         self.previous = {"tag_name": "v1.2.7", "body": "<!-- presetlauncher:min-supported=0.0.0 -->"}
         with patch.object(release, "request", side_effect=self.response):
+            with self.assertRaises(ValueError):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
+
+    def test_changed_labels_block_publication(self):
+        with patch.object(release, "collect_decisions", return_value=[decision("fix: repair", "required")]), patch.object(release, "request", side_effect=self.response):
             with self.assertRaises(ValueError):
                 release.publish()
         self.assertTrue(all(method == "GET" for method, _, _ in self.calls))

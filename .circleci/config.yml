@@ -55,7 +55,7 @@ jobs:
           name: Test PR metadata validator
           command: python -m unittest discover -s .circleci -p 'test_check_pr.py'
       - run:
-          name: Validate pull request title and release footer
+          name: Validate pull request title and update label
           command: python .circleci/check_pr.py
 
   plan-release:
@@ -234,7 +234,9 @@ workflows:
   ci:
     jobs:
       - validate-pr-title
-      - plan-release
+      - plan-release:
+          requires:
+            - validate-pr-title
       - dependency-audit
       - build-windows:
           requires:

@@ -1,21 +1,36 @@
 import unittest
-from check_pr import validate
+from policy import pr_decision
 
 
-class PullRequestTitleTests(unittest.TestCase):
-    def test_valid_titles(self):
-        for title in ("feat: add presets", "fix(updater): verify downloads", "feat!: change format", "docs: update README", "ci: optimize builds"):
-            with self.subTest(title=title):
-                validate(title, "")
+def pr(title, labels=(), body=""):
+    return {"number": 3, "title": title, "body": body,
+            "labels": [{"name": label} for label in labels]}
+
+
+class PullRequestPolicyTests(unittest.TestCase):
+    def test_valid_titles_and_labels(self):
+        for title, rank in (("feat: add presets", 2), ("fix(updater): verify downloads", 1),
+                            ("feat!: change format", 3), ("perf: faster startup", 1)):
+            for policy in ("optional", "recommended", "required"):
+                with self.subTest(title=title, policy=policy):
+                    self.assertEqual(pr_decision(pr(title, [f"update: {policy}"])),
+                                     {"number": 3, "rank": rank, "policy": policy})
 
     def test_invalid_titles(self):
         for title in ("Update stuff", "feature: add presets", "fix:", "Fix: repair", "fix:  ", "feat: a\nfix: b"):
             with self.subTest(title=title), self.assertRaises(ValueError):
-                validate(title, "")
+                pr_decision(pr(title, ["update: optional"]))
 
-    def test_required_footer(self):
-        validate("fix: repair", "Update-Required: true")
-        validate("docs: update", "<!-- Update-Required: true -->")
-        for title, body in (("docs: update", "Update-Required: true"), ("fix: repair", "Update-Required: yes"), ("fix: repair", "Update-Required: true\nUpdate-Required: true")):
-            with self.subTest(title=title, body=body), self.assertRaises(ValueError):
-                validate(title, body)
+    def test_missing_conflicting_and_unknown_labels(self):
+        for labels in ([], ["update: optional", "update: required"], ["update: typo"]):
+            with self.subTest(labels=labels), self.assertRaises(ValueError):
+                pr_decision(pr("fix: repair", labels))
+
+    def test_non_releasing_pr(self):
+        self.assertEqual(pr_decision(pr("docs: update"))["rank"], 0)
+        with self.assertRaises(ValueError):
+            pr_decision(pr("docs: update", ["update: optional"]))
+
+    def test_breaking_footer(self):
+        self.assertEqual(pr_decision(pr("fix: change format", ["update: recommended"],
+                                       "BREAKING CHANGE: incompatible"))["rank"], 3)
