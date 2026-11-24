@@ -1,148 +1,68 @@
-<div align="center">
-
 # PresetLauncher
 
-**Lanceur de presets pour Windows**
+Launch the Windows apps you use together, without opening each one by hand.
 
-Organisez vos programmes en groupes et lancez-les en un clic.
+**English** · [Français](README.fr.md)
 
-[![GitHub release](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square&logo=github)](https://github.com/JimMarley420/Preset_launcher/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![.NET 8](https://img.shields.io/badge/.NET-8.0-purple?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/download/dotnet/8.0)
-[![Windows](https://img.shields.io/badge/Windows-10%2B-blue?style=flat-square&logo=windows)](https://www.microsoft.com/windows/)
+[![Release](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)](LICENSE)
 
-</div>
+[Download for Windows](https://github.com/JimMarley420/Preset_launcher/releases/latest) · [Report a problem](https://github.com/JimMarley420/Preset_launcher/issues/new/choose) · [Build from source](#build-from-source)
 
----
+![PresetLauncher application window](https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71)
 
-## A propos
+## One preset, several apps
 
-**PresetLauncher** est une application Windows moderne construite avec WinUI 3 qui permet de grouper vos executables favoris en "presets" et de les lancer tous en une seule action. Fini de lancer une par une vos applications au demarrage !
+A preset is a saved list of programs. Create one for work, another for gaming, or one for the tools you open every morning. Launch the entire list or start only the programs that are not already running.
 
-## Capture d'ecran
+| | What you can do |
+| --- | --- |
+| Presets | Create, duplicate, import and export groups of programs as JSON. |
+| Launch options | Set arguments, delays and administrator privileges for individual programs. |
+| Running apps | Find existing processes, launch missing programs and request that running apps close. |
+| History | Review launch results, durations and usage statistics. |
+| Appearance | Choose light, dark or system theme; switch between English and French. |
 
-<img width="856" height="628" alt="image" src="https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71" />
+Presets can be password-locked in the interface. This does not encrypt the underlying JSON files or restrict access to Windows executables.
 
+## Install
 
-## Fonctionnalites
+Use a Windows 10 or 11 PC compatible with the x64 installer. Windows 10 version 2004 or later is the recommended baseline.
 
-### Gestion de presets
-- Creer, modifier, dupliquer et supprimer des presets
-- Ajouter des executables via le selecteur de fichier ou depuis les processus en cours
-- Definir des arguments de lancement, des delais entre les programmes, et l'execution en tant qu'admin
-- Importer et exporter des presets en JSON
-- Verrouiller un preset avec un mot de passe
+1. Open the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest).
+2. Download `PresetLauncher_Setup_<version>.exe` and run it.
+3. Open PresetLauncher, create a preset and add the executables you want to launch.
 
-### Lancement en masse
-- **Lancer tout** : demarrer tous les executables d'un preset
-- **Lancer les manquants** : ignorer les programmes deja en cours d'execution
-- Detection automatique des processus en cours via les API Windows (`EnumProcesses`, `QueryFullProcessImageName`)
-- Fermeture gracieuse des processus d'un preset
+The installer includes the application runtime. In-app updates are fetched from `version.multichat.cloud`, rather than directly from GitHub Releases.
 
-### Historique et statistiques
-- Historique complet de chaque lancement avec succes/echecs et duree
-- Filtres : Tous, Succes, Echecs, Aujourd'hui
-- Tableau de bord avec KPI et classement des programmes les plus utilises
+## Local data
 
-### Interface moderne
-- Design Windows 11 avec support Mica et Acrylic
-- Barre de titre personnalisee
-- Themes : Clair, Sombre, Systeme
-- Localisation Francais et Anglais
+By default, PresetLauncher stores its files in `%LocalAppData%\PresetLauncher\`:
 
-### Mise a jour automatique
-- Verification automatique des mises a jour au demarrage
-- Telechargement et installation directe depuis l'application
+- `data.json` — presets, launch history and usage statistics.
+- `settings.json` — application preferences.
 
-## Pre-requis
+The installer preserves user data on uninstall. Back up your files before moving to another PC. Review imported presets, particularly executable paths, arguments and administrator settings, before running them.
 
-- **Windows 10** version 2004 (build 19041) ou superieure
-- **.NET 8 Desktop Runtime** (inclus dans l'installation autonome)
+## Build from source
 
-## Installation
-
-### Via l'installeur (recommande)
-
-1. Telecharger la derniere version depuis la page [Releases](https://github.com/JimMarley420/Preset_launcher/releases/latest)
-2. Lancer l'installateur `PresetLauncher-x.x.x-setup.exe`
-3. Suivre les instructions d'installation
-
-### Compilation depuis les sources
-
-```bash
-# Cloner le depot
-git clone https://github.com/Wailroth/PresetLauncher.git
-cd PresetLauncher
-
-# Compiler
-dotnet build PresetLauncherWinUI3\PresetLauncherWinUI3.csproj --configuration Release
-
-# Publier (autonome, pret a executer)
-dotnet publish PresetLauncherWinUI3\PresetLauncherWinUI3.csproj `
-    --configuration Release `
-    --runtime win-x64 `
-    --self-contained true `
-    -p:WindowsPackageType=None `
-    -p:PublishReadyToRun=true `
-    --output publish/win-x64
-```
-
-### Creer l'installeur
+Use Windows with the .NET 8 SDK and Visual Studio 2022 with WinUI / Windows App SDK development tools. From PowerShell:
 
 ```powershell
-# Necessite Inno Setup 6 installe
-.\Installer\build.ps1 -Version "x.x.x"
+git clone https://github.com/JimMarley420/Preset_launcher.git
+cd Preset_launcher
+dotnet build .\PresetLauncherWinUI3\PresetLauncherWinUI3.csproj -c Release -p:Platform=x64
 ```
 
-## Structure du projet
+To produce the self-contained x64 installer, install Inno Setup 6 and run:
 
-```
-PresetLauncher/
-├── PresetLauncherWinUI3/          # Application principale (WinUI 3)
-│   ├── Models/                    # Modeles de donnees
-│   ├── Services/                  # Logique metier
-│   ├── Views/
-│   │   ├── Dialogs/               # Editeur de preset
-│   │   └── Pages/                 # Presets, Historique, Statistiques, Reglages
-│   └── App.xaml                   # Point d'entree et ressources globales
-├── Installer/                     # Scripts Inno Setup et build
-│   ├── PresetLauncher.iss
-│   └── build.ps1
-└── PresetLauncher.RealeaseMaker/  # Outil de gestion des releases
+```powershell
+.\Installer\build.ps1
 ```
 
-## Technologies
+The installer is written to `Installer/Output/`. See [the development notes](docs/DEVELOPMENT.md) for the source layout and manual checks.
 
-| Composant | Technologie |
-|-----------|-------------|
-| UI | WinUI 3 (Windows App SDK 1.8) |
-| Framework | .NET 8.0 |
-| Langage | C# 12 |
-| MVVM | CommunityToolkit.Mvvm 8.4 |
-| Serialisation | Newtonsoft.Json 13.0 |
-| Installeur | Inno Setup 6 |
-| Mode de deploiement | Autonome (sans MSIX) |
+## Contributing
 
-## Donnees utilisateur
+Found a reproducible bug or have a change in mind? Start with [CONTRIBUTING.md](CONTRIBUTING.md). For vulnerabilities, follow [SECURITY.md](SECURITY.md) instead of posting details publicly.
 
-Les donnees sont stockees dans `%LocalAppData%\PresetLauncher\` :
-- `settings.json` : preferences utilisateur
-- `data.json` : presets, historique, statistiques
-
-## Contribuer
-
-Les contributions sont bienvenues ! Veuillez ouvrir une [issue](https://github.com/JimMarley420/Preset_launcher/issues) pour signaler un bug ou suggerer une amelioration.
-
-1. Fork le depot
-2. Creer une branche (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. Commiter vos changements (`git commit -m 'Ajouter nouvelle fonctionnalite'`)
-4. Pusher (`git push origin feature/nouvelle-fonctionnalite`)
-5. Ouvrir une Pull Request
-
-## Bugs et suggestions
-
-Si vous rencontrez un bug ou avez une idee d'amelioreation, n'hesitez pas a ouvrir une issue sur le [depot GitHub](https://github.com/JimMarley420/Preset_launcher/issues).
-
-## Licence
-
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de details.
+PresetLauncher is distributed under the [MIT license](LICENSE).
