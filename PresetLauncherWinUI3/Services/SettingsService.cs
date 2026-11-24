@@ -118,7 +118,8 @@ public class SettingsService
             MinimizeToTray = false,
             ConfirmBeforeLaunch = true,
             ShowNotifications = true,
-            MaxHistoryEntries = 100
+            MaxHistoryEntries = 100,
+            MinimumSupportedVersion = CurrentSettings.MinimumSupportedVersion
         };
         Save();
     }

@@ -22,6 +22,7 @@ public sealed class UpdateCoordinator
         var required = _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
         try
         {
+            SetGate(required);
             if (installed == "0.0.0")
             {
                 if (manual) await MessageAsync(root, "settings.checkUpdate", T("update.sourceBuild"));
@@ -40,6 +41,7 @@ public sealed class UpdateCoordinator
                         App.Settings.Save();
                     }
                     required = _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
+                    SetGate(required);
                     if (required && (update is null || _service.IsUpdateAvailable(update.Version.ToString(3), settings.MinimumSupportedVersion)))
                         throw new InvalidDataException("No release satisfies the known minimum version.");
                 }
@@ -63,6 +65,7 @@ public sealed class UpdateCoordinator
                 }
 
                 required |= UpdateService.IsRequired(installed, update);
+                SetGate(required);
                 if (!required && !UpdateService.ShouldPrompt(installed, update, settings.SkippedUpdateVersion, manual))
                     return;
 
@@ -89,19 +92,21 @@ public sealed class UpdateCoordinator
                 }
 
                 string? installer = null;
+                bool launched = false;
                 try
                 {
                     installer = await DownloadAsync(root, update);
                     App.SaveAndExit();
                     using var process = Process.Start(new ProcessStartInfo { FileName = installer, UseShellExecute = true });
                     if (process is null) throw new InvalidOperationException("Installer did not start.");
+                    launched = true;
                     App.Current.MainWindow?.Close();
                     return;
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine(ex);
-                    if (installer is not null)
+                    if (installer is not null && !launched)
                     {
                         try { Directory.Delete(Path.GetDirectoryName(installer)!, recursive: true); }
                         catch (IOException cleanup) { Debug.WriteLine(cleanup); }
@@ -125,7 +130,16 @@ public sealed class UpdateCoordinator
             // A known mandatory update cannot be bypassed by a failed modal dialog.
             if (required) CloseApp();
         }
-        finally { _checking = false; }
+        finally
+        {
+            if (!required) SetGate(false);
+            _checking = false;
+        }
+    }
+
+    private static void SetGate(bool blocked)
+    {
+        if (App.Current.MainWindow is MainWindow window) window.SetUpdateGate(blocked);
     }
 
     private static void CloseApp()

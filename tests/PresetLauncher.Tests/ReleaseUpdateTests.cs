@@ -20,7 +20,7 @@ public sealed class ReleaseUpdateTests
         var asset = new { name = "PresetLauncher_Setup_1.3.0.exe", state = "uploaded",
             browser_download_url = url, size, digest = digest ?? $"sha256:{Digest}" };
         return JsonSerializer.Serialize(new { tag_name = tag, body = $"<!-- presetlauncher:min-supported={floor} -->",
-            draft, prerelease, assets = includeAsset ? new[] { asset } : [] });
+            draft, prerelease, assets = new[] { asset }.Where(_ => includeAsset).ToArray() });
     }
 
     [TestMethod]
