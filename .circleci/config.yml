@@ -1,0 +1,114 @@
+version: 2.1
+
+executors:
+  windows-x64:
+    machine:
+      image: windows-server-2022-gui:2026.05.1
+    resource_class: windows.medium
+    shell: powershell.exe -NoProfile -ExecutionPolicy Bypass
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      NuGetAudit: "true"
+      NuGetAuditMode: all
+      NuGetAuditLevel: low
+      WarningsAsErrors: "NU1900;NU1903;NU1904;NU1905"
+
+jobs:
+  validate-windows:
+    executor: windows-x64
+    steps:
+      - checkout
+      - run:
+          name: Select pinned .NET SDK
+          command: |
+            $ErrorActionPreference = 'Stop'
+            $version = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
+            if (-not (dotnet --list-sdks | Where-Object { $_ -match "^$([regex]::Escape($version)) " })) {
+              $script = Join-Path $env:TEMP 'dotnet-install.ps1'
+              Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -UseBasicParsing -OutFile $script
+              & $script -Version $version -Architecture x64 -InstallDir "$env:ProgramFiles\dotnet" -NoPath
+            }
+            $actual = dotnet --version
+            if ($LASTEXITCODE -ne 0 -or $actual -ne $version) { throw "Expected SDK $version, got $actual" }
+            dotnet --info
+      - restore_cache:
+          keys:
+            - v1-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+      - run:
+          name: Restore and audit dependencies
+          command: |
+            $ErrorActionPreference = 'Stop'
+            dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - save_cache:
+          key: v1-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+          paths:
+            - ~/.nuget/packages
+      - run:
+          name: Build Release and run regression tests
+          no_output_timeout: 15m
+          command: |
+            $ErrorActionPreference = 'Stop'
+            $results = Join-Path (Get-Location).Path 'artifacts\test-results'
+            New-Item -ItemType Directory -Force $results | Out-Null
+            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true --no-restore --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$results\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            [xml]$report = Get-Content (Join-Path $results 'junit.xml') -Raw
+            if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'No test cases reported' }
+      - store_test_results:
+          path: artifacts/test-results
+      - store_artifacts:
+          path: artifacts/test-results
+          destination: test-reports
+      - run:
+          name: Install pinned Inno Setup compiler
+          command: |
+            $ErrorActionPreference = 'Stop'
+            choco install innosetup --version=6.7.1 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+            if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
+            if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler missing' }
+            if ((Get-Item $iscc).VersionInfo.ProductVersion -notmatch '^6\.7\.1(?:\.|$)') { throw 'Unexpected Inno Setup version' }
+      - run:
+          name: Publish self-contained x64 installer
+          no_output_timeout: 20m
+          command: |
+            $ErrorActionPreference = 'Stop'
+            & .\Installer\build.ps1
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run:
+          name: Smoke test installation and uninstallation
+          no_output_timeout: 10m
+          command: |
+            $ErrorActionPreference = 'Stop'
+            & .\.circleci\smoke-installer.ps1
+      - store_artifacts:
+          path: artifacts/installer-logs
+          destination: installer-logs
+      - run:
+          name: Stage verified CI installer and checksum
+          command: |
+            $ErrorActionPreference = 'Stop'
+            $version = (Select-String -Path Installer/PresetLauncher.iss -Pattern '#define AppVersion "([^"]+)"').Matches[0].Groups[1].Value
+            $name = "PresetLauncher_Setup_$version.exe"
+            $file = Join-Path 'Installer/Output' $name
+            if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installer: $file" }
+            New-Item -ItemType Directory -Force artifacts/verified-installer | Out-Null
+            Copy-Item $file artifacts/verified-installer/
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $name" | Set-Content artifacts/verified-installer/SHA256SUMS.txt -Encoding ASCII
+      - store_artifacts:
+          path: artifacts/verified-installer
+          destination: verified-ci-installer
+
+workflows:
+  ci:
+    jobs:
+      - validate-windows:
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              ignore: /.*/

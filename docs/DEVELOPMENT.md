@@ -29,3 +29,21 @@ Record the Windows version, configuration and results in the pull request. Do no
 - DataService uses the default LocalAppData file at startup, regardless of the saved DataPath value. Settings Browse combines DataPath with data.json even though the default already includes the filename; it does not change storage. Cleanup removes entries marked invalid, not temporary files. Reset clears presets, history, usage counts and settings.
 - Preset.Clone, DataService.ExportPreset and PasswordService are helpers without current UI actions. ConfirmBeforeLaunch is persisted but the launch handler always asks for confirmation. Do not advertise these as working features.
 - UpdateService reads version.txt and downloads the corresponding setup executable from the configured HTTPS host. The app does not explicitly validate a signature or checksum before executing it.
+
+## Continuous integration
+
+CircleCI runs a Windows x64 validation workflow on branch pushes. It restores dependencies with NuGet auditing, compiles the application in Release, runs the MSTest suite, creates the existing self-contained Inno Setup package, and tests silent installation and removal on a disposable VM. Only a package that passes all checks is staged as a CircleCI artifact, with its SHA-256 digest. Nothing is uploaded to GitHub Releases or to the existing update server.
+
+The .NET SDK is pinned in global.json to 8.0.428, the final .NET 8 SDK. .NET 8 reached end of support on 2026-11-10; migrating to a supported LTS version is a separate priority. Inno Setup 6.7.1 and the Windows machine image are also pinned. Update these intentionally after validation.
+
+Run the non-UI tests locally on Windows:
+
+```powershell
+dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj -c Release -r win-x64 -p:Platform=x64 --settings tests/ci.runsettings
+```
+
+Tests exercise real application classes with temporary files, not mocked copies. They do not launch or kill external applications, contact the update server, or automate WinUI controls. The installer smoke test intentionally does not start the application. It refuses to run outside CircleCI or against an existing installation. UI interactions, actual application launching, update download/install, upgrade compatibility and older Windows versions still require separate validation.
+
+CircleCI setup: connect this GitHub repository and select .circleci/config.yml. Enable branch-push triggers (including main), avoid duplicate push/PR triggers, and enable auto-cancel of redundant non-default-branch workflows. Once the first Windows run succeeds, add its observed status check as a required GitHub branch protection check. Keep secrets unavailable to fork builds. Use the Tests and Artifacts tabs to review results, coverage and installer logs. The Linux open-source credit allowance does not cover Windows builds; monitor Windows credits and artifact storage.
+
+References: [Windows execution](https://circleci.com/docs/guides/execute/using-windows/), [dependency caching](https://circleci.com/docs/guides/optimize/caching/), [test results](https://circleci.com/docs/guides/test/collect-test-data/), [auto-cancel](https://circleci.com/docs/guides/orchestrate/skip-build/), [WinUI testing](https://learn.microsoft.com/en-us/windows/apps/develop/testing/).
