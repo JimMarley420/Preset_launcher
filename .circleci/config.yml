@@ -126,7 +126,7 @@ jobs:
           command: |
             $ErrorActionPreference = 'Stop'
             $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishTrimmed=false -p:PublishReadyToRun=true '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905' -p:Version=$version --output publish/win-x64
+            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishTrimmed=false -p:PublishReadyToRun=false '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905' -p:Version=$version --output publish/win-x64
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published executable missing' }
       - run:

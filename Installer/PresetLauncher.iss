@@ -37,7 +37,7 @@ SetupIconFile=..\PresetLauncherWinUI3\favicon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
 
-Compression=lzma2/ultra64
+Compression=lzma2/fast
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 
