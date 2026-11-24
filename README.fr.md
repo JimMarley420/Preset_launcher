@@ -12,27 +12,39 @@ Lancez ensemble les applications Windows que vous utilisez régulièrement, sans
 
 ## Un preset, plusieurs applications
 
-Un preset est une liste de programmes enregistrée. Créez-en un pour le travail, un autre pour jouer, ou pour les outils que vous ouvrez chaque matin. Lancez toute la liste ou uniquement les programmes qui ne sont pas déjà ouverts.
+Un preset est une liste de programmes nommée. Créez-en un pour le travail, un autre pour jouer ou pour les outils que vous ouvrez chaque matin.
 
-| | Fonctionnalités |
+- Ajoutez des programmes via le sélecteur de fichiers ou en choisissant un processus Windows existant. Le sélecteur accepte les exécutables, scripts et raccourcis ; Windows détermine comment ouvrir le fichier.
+- Recherchez les presets par nom ou description, modifiez leur contenu, importez un preset JSON ou supprimez-le.
+- Choisissez un délai et une demande éventuelle de droits administrateur pour chaque entrée.
+
+### Options de lancement
+
+| Action | Comportement |
 | --- | --- |
-| Presets | Créer, dupliquer, importer et exporter des groupes de programmes au format JSON. |
-| Options de lancement | Définir les arguments, délais et droits administrateur de chaque programme. |
-| Applications ouvertes | Détecter les processus, lancer les programmes manquants et demander leur fermeture. |
-| Historique | Consulter les résultats, durées et statistiques d'utilisation. |
-| Apparence | Choisir un thème clair, sombre ou système et passer du français à l'anglais. |
+| Lancer tout | Lance les entrées dans leur ordre enregistré, applique chaque délai avant le lancement et enregistre le résultat. |
+| Lancer les manquants | Ignore les programmes détectés par leur chemin ou nom de fichier. Ce mode n'applique pas les délais et ne crée pas d'entrée dans l'historique. |
+| Fermer les processus | Après confirmation, tente de fermer les processus correspondants, puis peut les arrêter de force. Enregistrez votre travail : cela peut aussi fermer des programmes ouverts hors de PresetLauncher. |
 
-Un preset peut être verrouillé par mot de passe dans l'interface. Ce verrouillage ne chiffre pas les fichiers JSON et ne restreint pas l'accès aux exécutables Windows.
+### Historique et réglages
+
+L'historique affiche les dates, durées et nombres de démarrages réussis des lancements complets. Il peut être effacé. Un démarrage réussi signifie que Windows a accepté la demande, pas que l'application a fini de charger.
+
+Les statistiques indiquent le nombre de presets, les lancements complets enregistrés et les dix chemins de programmes les plus utilisés. Les réglages proposent le français et l'anglais, les thèmes clair/sombre/système, Mica ou Acrylique selon la compatibilité, le nettoyage des entrées invalides, la réinitialisation et la recherche de mises à jour.
+
+### Limitations actuelles
+
+Les filtres d'historique et la préférence de confirmation de lancement sont présents mais ne modifient pas encore le comportement. La duplication, l'export individuel, la modification des arguments et le verrouillage par mot de passe ne sont pas accessibles via des commandes fonctionnelles dans cette version. Un preset JSON importé peut contenir des arguments transmis à Windows lors du lancement.
 
 ## Installation
 
-Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. Windows 10 version 2004 ou ultérieure est recommandé.
+Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. L'installeur déclare Windows 10 build 17763 comme minimum ; le projet cible le build 19041. La compatibilité avec les anciens builds n'a pas été vérifiée.
 
 1. Ouvrez la page de la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 2. Téléchargez `PresetLauncher_Setup_<version>.exe` et exécutez-le.
 3. Ouvrez PresetLauncher, créez un preset et ajoutez les exécutables souhaités.
 
-L'installeur inclut l'environnement d'exécution. Les mises à jour intégrées proviennent de `version.multichat.cloud`, et non directement de GitHub Releases.
+L'installeur inclut l'environnement d'exécution. L'application recherche les mises à jour au démarrage et dans les réglages ; leur installation nécessite une confirmation. Elles proviennent de `version.multichat.cloud`, et non directement de GitHub Releases.
 
 ## Données locales
 
@@ -41,7 +53,7 @@ Par défaut, les fichiers se trouvent dans `%LocalAppData%\PresetLauncher\` :
 - `data.json` — presets, historique et statistiques.
 - `settings.json` — préférences de l'application.
 
-La désinstallation conserve ces données. Sauvegardez-les avant de changer de PC. Avant de lancer un preset importé, vérifiez les chemins, arguments et demandes de droits administrateur.
+La désinstallation conserve ces données. Sauvegardez manuellement les deux fichiers, application fermée, avant de changer de PC ou de réinitialiser les données. Le bouton Parcourir tente de copier les données mais ne déplace pas le stockage actif ; ne comptez pas dessus pour une sauvegarde. Avant de lancer un preset importé, vérifiez les chemins, arguments et demandes de droits administrateur.
 
 ## Compiler le projet
 

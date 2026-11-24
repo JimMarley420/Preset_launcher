@@ -12,27 +12,39 @@ Launch the Windows apps you use together, without opening each one by hand.
 
 ## One preset, several apps
 
-A preset is a saved list of programs. Create one for work, another for gaming, or one for the tools you open every morning. Launch the entire list or start only the programs that are not already running.
+A preset is a named list of programs. Create one for work, another for gaming, or one for the tools you open every morning.
 
-| | What you can do |
+- Add programs using the file picker or by selecting an existing Windows process. The picker accepts executables, scripts and shortcuts; Windows decides how to open the selected file.
+- Search presets by name or description, edit their contents, import a preset from JSON or delete it.
+- Choose a delay and whether to request administrator privileges for each entry.
+
+### Launch options
+
+| Action | Behavior |
 | --- | --- |
-| Presets | Create, duplicate, import and export groups of programs as JSON. |
-| Launch options | Set arguments, delays and administrator privileges for individual programs. |
-| Running apps | Find existing processes, launch missing programs and request that running apps close. |
-| History | Review launch results, durations and usage statistics. |
-| Appearance | Choose light, dark or system theme; switch between English and French. |
+| Launch All | Starts entries in their stored order, applies each delay before launch and records the outcome. |
+| Launch Missing Only | Skips programs detected by executable path or filename. This mode does not apply delays or create a history entry. |
+| Close processes | After confirmation, attempts to close matching processes, then may forcibly terminate them. Save your work first; this can also close programs you started outside PresetLauncher. |
 
-Presets can be password-locked in the interface. This does not encrypt the underlying JSON files or restrict access to Windows executables.
+### History and settings
+
+The History page shows full-launch timestamps, durations and successful start counts. It can be cleared. A successful start means Windows accepted the launch request, not that the application finished loading.
+
+Statistics show preset counts, recorded full launches and the ten most-used program paths. Settings include English and French, light/dark/system themes, Mica or Acrylic where supported, cleanup of invalid executable entries, data reset and update checks.
+
+### Current limitations
+
+The history filter controls and the launch-confirmation preference are present but do not currently change behavior. Duplication, individual preset export, argument editing and password locking are not exposed as working controls in this version. Presets imported from JSON can contain launch arguments, which the launcher passes to Windows.
 
 ## Install
 
-Use a Windows 10 or 11 PC compatible with the x64 installer. Windows 10 version 2004 or later is the recommended baseline.
+Use a Windows 10 or 11 PC compatible with the x64 installer. The installer declares Windows 10 build 17763 as its minimum; the project targets build 19041. Compatibility with older builds has not been verified.
 
 1. Open the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 2. Download `PresetLauncher_Setup_<version>.exe` and run it.
 3. Open PresetLauncher, create a preset and add the executables you want to launch.
 
-The installer includes the application runtime. In-app updates are fetched from `version.multichat.cloud`, rather than directly from GitHub Releases.
+The installer includes the application runtime. The app checks for updates at startup and from Settings; installation requires confirmation. Updates are fetched from `version.multichat.cloud`, rather than directly from GitHub Releases.
 
 ## Local data
 
@@ -41,7 +53,7 @@ By default, PresetLauncher stores its files in `%LocalAppData%\PresetLauncher\`:
 - `data.json` — presets, launch history and usage statistics.
 - `settings.json` — application preferences.
 
-The installer preserves user data on uninstall. Back up your files before moving to another PC. Review imported presets, particularly executable paths, arguments and administrator settings, before running them.
+The installer preserves user data on uninstall. Back up both files manually with the application closed before moving to another PC or using the reset action. The current Settings browse control attempts to copy data but does not relocate the active storage; do not rely on it as a backup. Review imported presets, particularly executable paths, arguments and administrator settings, before running them.
 
 ## Build from source
 

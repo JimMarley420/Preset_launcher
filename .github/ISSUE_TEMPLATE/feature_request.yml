@@ -22,3 +22,15 @@ body:
     id: context
     attributes:
       label: Additional context or mockups
+  - type: dropdown
+    id: area
+    attributes:
+      label: Related area
+      options:
+        - Preset management
+        - Launching or closing programs
+        - History or statistics
+        - Data import or backup
+        - Settings or appearance
+        - Installation or updates
+        - Other

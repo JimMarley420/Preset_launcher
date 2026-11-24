@@ -3,11 +3,12 @@ description: Report a reproducible problem in PresetLauncher.
 body:
   - type: markdown
     attributes:
-      value: Search existing issues first. Do not include passwords, private paths or sensitive preset data. Report vulnerabilities using SECURITY.md.
+      value: Search existing issues first. Do not include passwords, personal paths, or full data files. For security issues, follow SECURITY.md.
   - type: input
     id: version
     attributes:
       label: PresetLauncher version
+      description: See Settings > About. For a source build, provide the commit if known.
       placeholder: e.g. 1.2.6
     validations:
       required: true
@@ -15,14 +16,42 @@ body:
     id: windows
     attributes:
       label: Windows version and build
-      description: Run winver to find this information.
+      description: Run winver; include CPU architecture if known.
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - GitHub release installer
+        - In-app update
+        - Local source build
+        - Other or unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Creating or editing presets
+        - Adding files or running processes
+        - Launch All
+        - Launch Missing Only
+        - Closing processes
+        - JSON import or local data
+        - History or statistics
+        - Settings or appearance
+        - Installation or updates
+        - Other
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Include the relevant preset settings, with private information removed.
+      description: For launch issues, include file type, whether the program was already running, delay and administrator setting. Use anonymized examples.
     validations:
       required: true
   - type: textarea
@@ -40,4 +69,5 @@ body:
   - type: textarea
     id: evidence
     attributes:
-      label: Screenshots or error messages
+      label: Error messages or screenshots
+      description: Remove private paths and other personal information.
