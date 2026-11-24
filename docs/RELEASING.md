@@ -2,7 +2,7 @@
 
 ## Versioning
 
-GitHub's latest published stable release is the baseline. The existing 1.2.6 tag has no v prefix; new tags use vMAJOR.MINOR.PATCH. CircleCI reads commits after the baseline tag and selects the highest required bump.
+GitHub's latest published stable release is the baseline. The existing 1.2.6 tag has no v prefix; new tags use vMAJOR.MINOR.PATCH. CircleCI reads merged PR titles and labels after the baseline tag and selects the highest required bump. On the initial migration from 1.2.6, commits through 8535d8e943a6503d4982ff9a5164ef66392ba3ea are grandfathered; later commits must map to a merged PR.
 
 | Commit | Bump | Example from 1.2.6 |
 | --- | --- | --- |
@@ -11,31 +11,31 @@ GitHub's latest published stable release is the baseline. The existing 1.2.6 tag
 | feat!:, fix!: or BREAKING CHANGE: footer | Major | 2.0.0 |
 | docs:, ci:, test:, refactor:, chore: only | None | No publication |
 
-Use a Conventional Commit on a branch or in the squash-merge title. A user-facing behavior fix is a fix, even if implemented by refactoring. Non-conventional commits do not trigger a release. Multiple changes between releases produce one highest bump.
+Use a Conventional Commit PR title and preserve it when squash-merging. A user-facing behavior fix is a fix, even if implemented by refactoring. Invalid PR titles and direct or ambiguous main commits block release planning. Multiple changes between releases produce one highest bump.
 
 The release plan in artifacts/release-plan.json is the source of the published assembly version, installer version, registry DisplayVersion and asset filename. Branch CI artifacts are not production releases. Local builds default to 0.0.0 and automatic update checks are disabled for that version.
 
 ## Pull request validation
 
-The validate-pr-title job checks the actual open PR title against the allowed Conventional Commit types and rejects invalid or conflicting mandatory-update markers. It queries the public GitHub API for the checked-out commit, without a publishing token. If a branch build starts before a PR exists, open the PR and rerun the failed job. Add the actual reported validate-pr-title status to required checks. Editing PR metadata does not change the commit SHA: rerun validation after title or body edits, and verify the final squash message before merging. A commit status alone cannot guarantee that a title edited after a successful run or a manually changed squash message remains valid. The PR checklist is informational.
+The required validate-pr-title job checks the actual open PR title and labels via the public GitHub API. Open a PR before running it. A releasing PR must have exactly one of the three update labels below; non-releasing PRs must have none. Only the maintainer selects labels.
+
+After changing a title or label, rerun the workflow: metadata changes do not change the commit SHA and may not trigger CircleCI automatically. A successful commit status cannot guarantee that subsequently edited metadata remains valid at merge time. Release planning on main resolves merged PRs by their squash commit; publication recomputes the plan before creating a draft and again before publishing. A changed decision blocks publication until a fresh pipeline validates it. Do not change labels on merged PRs pending publication unless intentionally correcting a release decision.
 
 ## Update policy
 
-Version significance and update requirements are separate. Updates are optional by default. A maintainer can add this exact footer to a releasing conventional commit:
+| GitHub label | Behavior |
+| --- | --- |
+| update: optional | Install, later, or skip this version. |
+| update: recommended | Install or remind in 24 hours; no permanent skip. |
+| update: required | Install or exit. |
 
-    fix: prevent data loss during import
+There are no policy footers in commits. The generated release notes include two machine-readable comments: presetlauncher:min-supported and presetlauncher:update-policy. The strongest selected policy wins if multiple PRs are included in one release. Required releases advance the minimum supported version; later optional or recommended releases preserve that floor. Users below it must still update.
 
-    Update-Required: true
+Recommended reminders are version-specific and stored in settings. Automatic checks at startup respect the 24-hour delay; manual checks and mandatory updates bypass it. A newer release is not suppressed by an old reminder. There is no background reminder while the application stays open.
 
-The generated release notes contain an HTML comment:
+Known mandatory floors survive settings reset and remain enforced when GitHub cannot be reached. If no mandatory floor is known and GitHub is unavailable, the offline app remains usable. This is application policy, not a tamper-resistant security boundary.
 
-    <!-- presetlauncher:min-supported=1.2.7 -->
-
-The minimum supported version advances to the new release when this footer is present. Otherwise the previous minimum is retained. Later optional releases still require users below that floor to update. Major changes are not automatically mandatory. The 1.2.6 legacy release has an implicit floor of 0.0.0.
-
-The app checks GitHub at startup and in Settings. Optional updates offer Install, Later or Skip this version; manual checks ignore skipped-version preferences. Required updates block navigation once known, with retry or exit rather than skip. A known floor is cached and survives settings reset. If GitHub is unreachable before a mandatory floor is known, the offline app remains usable. If a required update is already known, the app offers retry or exit. This is application policy, not tamper-resistant DRM.
-
-Reserve required releases for security, data integrity, compatibility or a deliberately necessary migration, not routine cosmetic changes.
+Reserve required updates for security, data integrity, compatibility or a deliberately necessary migration, not routine cosmetic changes.
 
 ## CircleCI publication
 

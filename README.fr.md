@@ -46,7 +46,7 @@ Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. L'installeur d
 2. Téléchargez `PresetLauncher_Setup_<version>.exe` et exécutez-le.
 3. Ouvrez PresetLauncher, créez un preset et ajoutez les exécutables souhaités.
 
-L'installeur inclut l'environnement d'exécution. Le nouvel updater recherche les mises à jour sur GitHub Releases au démarrage et dans les réglages, vérifie la taille et l'empreinte SHA-256 de l'installeur avant de l'ouvrir et permet de reporter ou d'ignorer les mises à jour facultatives. Une mise à jour peut être obligatoire si la version installée est inférieure à la version minimale prise en charge.
+L'installeur inclut l'environnement d'exécution. Le nouvel updater recherche les mises à jour sur GitHub Releases au démarrage et dans les réglages, vérifie la taille et l'empreinte SHA-256 de l'installeur avant de l'ouvrir et permet de reporter ou d'ignorer les mises à jour facultatives. Les mises à jour recommandées peuvent être reportées de 24 heures, mais pas ignorées définitivement. Une mise à jour peut être obligatoire si la version installée est inférieure à la version minimale prise en charge.
 
 Si vous utilisez la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien updater ne la propose pas. L'installeur conserve les presets et préférences.
 

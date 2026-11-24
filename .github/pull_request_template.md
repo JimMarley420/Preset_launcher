@@ -6,18 +6,11 @@
 
 <!-- Link an issue if applicable. -->
 
-## Release impact
+## Release policy
 
-<!-- REQUIRED TITLE: feat(scope): description | fix(scope): description | perf: description | feat!: breaking change | docs: description | ci: description | test: description | refactor: description | chore: description | build: description | style: description | revert: description
-The scope is optional. CircleCI validates the actual PR title.
-Choose one release impact below. If a mandatory update is intended, add Update-Required: true as a standalone line outside this comment. See docs/RELEASING.md. -->
-
-- [ ] Patch (fix or performance improvement)
-- [ ] Minor (new functionality)
-- [ ] Major (breaking change)
-- [ ] No release (internal or documentation change)
-
-<!-- Keep exactly one release impact checked. The commit title/footer, not these informational checkboxes, determines the release. -->
+<!-- Use a Conventional Commit title: feat(scope): description, fix(scope): description, perf: description, feat!: breaking change, or an appropriate non-releasing type (docs, ci, test, refactor, chore, build, style, revert).
+CircleCI calculates the version; do not choose a version number.
+The maintainer must select exactly one GitHub label for a releasing PR: update: optional, update: recommended, or update: required. No update label for non-releasing PRs. Do not put policy footers in this description. -->
 
 ## Verification
 

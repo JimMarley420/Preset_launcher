@@ -32,10 +32,11 @@ Record the Windows version, configuration and results in the pull request. Do no
 
 ## Continuous integration
 
-CircleCI runs five Windows x64 jobs and a Linux planning job on branch pushes. A Linux publication job runs only on main:
+CircleCI runs five Windows x64 jobs and a Linux planning job on branch pushes. A Linux PR validation job checks titles and labels, and a Linux publication job runs only on main:
 
 | Job | Responsibility |
 | --- | --- |
+| validate-pr-title | Validate the Conventional Commit PR title and required maintainer update label. |
 | plan-release | Run release planning tests and calculate the version and minimum supported version. |
 | dependency-audit | Restore and audit application, publish and test dependencies; populate the NuGet cache. |
 | build-windows | Publish the self-contained Release application to the workflow workspace. |

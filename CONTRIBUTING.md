@@ -12,7 +12,7 @@ When changing user-facing text, update both English and French localization entr
 
 ## Commit messages
 
-Use Conventional Commits. `fix:` and `perf:` produce patch releases, `feat:` produces a minor release, and `!` or a `BREAKING CHANGE:` footer produces a major release. Documentation, tests, CI and internal refactoring alone do not produce a release. Use a conventional title when squash-merging. See [release operations](docs/RELEASING.md) for the independent mandatory-update policy.
+Use Conventional Commits. `fix:` and `perf:` produce patch releases, `feat:` produces a minor release, and `!` or a `BREAKING CHANGE:` footer produces a major release. Documentation, tests, CI and internal refactoring alone do not produce a release. Use a conventional title when squash-merging. The PR title determines the release bump automatically. The maintainer selects the update label; contributors must not select it on the maintainer's behalf. See [release operations](docs/RELEASING.md).
 
 ## Submitting a pull request
 

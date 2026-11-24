@@ -46,7 +46,7 @@ Use a Windows 10 or 11 PC compatible with the x64 installer. The installer decla
 2. Download `PresetLauncher_Setup_<version>.exe` and run it.
 3. Open PresetLauncher, create a preset and add the executables you want to launch.
 
-The installer includes the application runtime. The new updater checks GitHub Releases at startup and from Settings, verifies the installer size and SHA-256 digest before opening it, and allows optional updates to be postponed or skipped. A release may require an update if the installed version is below its minimum supported version.
+The installer includes the application runtime. The new updater checks GitHub Releases at startup and from Settings, verifies the installer size and SHA-256 digest before opening it, and allows optional updates to be postponed or skipped. Recommended updates can be postponed for 24 hours, but not permanently skipped. A release may require an update if the installed version is below its minimum supported version.
 
 If you are using 1.2.6 or earlier, install the latest release manually if the old updater does not offer it. The installer preserves presets and preferences.
 
