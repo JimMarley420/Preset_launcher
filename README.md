@@ -46,7 +46,9 @@ Use a Windows 10 or 11 PC compatible with the x64 installer. The installer decla
 2. Download `PresetLauncher_Setup_<version>.exe` and run it.
 3. Open PresetLauncher, create a preset and add the executables you want to launch.
 
-The installer includes the application runtime. The app checks for updates at startup and from Settings; installation requires confirmation. Updates are fetched from `version.multichat.cloud`, rather than directly from GitHub Releases.
+The installer includes the application runtime. The new updater checks GitHub Releases at startup and from Settings, verifies the installer size and SHA-256 digest before opening it, and allows optional updates to be postponed or skipped. A release may require an update if the installed version is below its minimum supported version.
+
+If you are using 1.2.6 or earlier, install the latest release manually if the old updater does not offer it. The installer preserves presets and preferences.
 
 ## Local data
 
@@ -73,7 +75,7 @@ To produce the self-contained x64 installer, install Inno Setup 6 and run:
 .\Installer\build.ps1
 ```
 
-The installer is written to `Installer/Output/`. See [the development notes](docs/DEVELOPMENT.md) for the source layout and manual checks.
+The installer is written to `Installer/Output/`. Local builds default to version `0.0.0` and do not check for production updates. CircleCI calculates published versions automatically. See [release operations](docs/RELEASING.md). See [the development notes](docs/DEVELOPMENT.md) for the source layout and manual checks.
 
 ## Contributing
 

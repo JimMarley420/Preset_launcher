@@ -10,6 +10,10 @@ Fork the repository, clone your fork and create a branch from `main`. Follow the
 
 When changing user-facing text, update both English and French localization entries. Keep both README files in sync when changing installation or usage instructions.
 
+## Commit messages
+
+Use Conventional Commits. `fix:` and `perf:` produce patch releases, `feat:` produces a minor release, and `!` or a `BREAKING CHANGE:` footer produces a major release. Documentation, tests, CI and internal refactoring alone do not produce a release. Use a conventional title when squash-merging. See [release operations](docs/RELEASING.md) for the independent mandatory-update policy.
+
 ## Submitting a pull request
 
 Explain what changed, why it changed and how you verified it. Include screenshots for visual changes, and describe any checks you could not run. Avoid unrelated formatting changes, generated build output, credentials, private keys and personal preset data.

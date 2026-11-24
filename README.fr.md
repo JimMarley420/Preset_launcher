@@ -46,7 +46,9 @@ Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. L'installeur d
 2. Téléchargez `PresetLauncher_Setup_<version>.exe` et exécutez-le.
 3. Ouvrez PresetLauncher, créez un preset et ajoutez les exécutables souhaités.
 
-L'installeur inclut l'environnement d'exécution. L'application recherche les mises à jour au démarrage et dans les réglages ; leur installation nécessite une confirmation. Elles proviennent de `version.multichat.cloud`, et non directement de GitHub Releases.
+L'installeur inclut l'environnement d'exécution. Le nouvel updater recherche les mises à jour sur GitHub Releases au démarrage et dans les réglages, vérifie la taille et l'empreinte SHA-256 de l'installeur avant de l'ouvrir et permet de reporter ou d'ignorer les mises à jour facultatives. Une mise à jour peut être obligatoire si la version installée est inférieure à la version minimale prise en charge.
+
+Si vous utilisez la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien updater ne la propose pas. L'installeur conserve les presets et préférences.
 
 ## Données locales
 
@@ -73,7 +75,7 @@ Pour créer l'installeur autonome x64, installez Inno Setup 6 puis lancez :
 .\Installer\build.ps1
 ```
 
-L'installeur est généré dans `Installer/Output/`. Les [notes de développement](docs/DEVELOPMENT.md) décrivent l'organisation du code et les vérifications manuelles.
+L'installeur est généré dans `Installer/Output/`. Les builds locaux utilisent par défaut la version `0.0.0` et ne recherchent pas les mises à jour de production. CircleCI calcule automatiquement les versions publiées. Voir la [documentation des releases](docs/RELEASING.md). Les [notes de développement](docs/DEVELOPMENT.md) décrivent l'organisation du code et les vérifications manuelles.
 
 ## Contribuer
 

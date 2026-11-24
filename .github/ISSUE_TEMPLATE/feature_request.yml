@@ -1,5 +1,6 @@
 name: Feature request
 description: Suggest a change to how PresetLauncher works.
+labels: ["type: feature", "status: needs triage"]
 body:
   - type: textarea
     id: problem

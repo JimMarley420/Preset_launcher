@@ -6,6 +6,10 @@
 
 <!-- Link an issue if applicable. -->
 
+## Release impact
+
+<!-- Patch, minor, major or non-releasing change. Use a Conventional Commit title for squash merges. Update-Required: true is reserved for deliberate minimum-version changes. See docs/RELEASING.md. -->
+
 ## Verification
 
 <!-- List the checks you actually ran, Windows version and results. Explain anything not tested. -->
