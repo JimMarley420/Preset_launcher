@@ -30,7 +30,7 @@ try {
         -p:Platform=x64 `
         -p:WindowsPackageType=None `
         -p:PublishTrimmed=false `
-        -p:PublishReadyToRun=true `
+        -p:PublishReadyToRun=false `
         -p:Version=$Version `
         --output $publishDir
 

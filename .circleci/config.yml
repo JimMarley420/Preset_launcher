@@ -19,20 +19,19 @@ executors:
 commands:
   prepare-dotnet:
     steps:
+      - restore_cache:
+          keys:
+            - v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+            - v1-sdk-archive-windows-x64-main-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
       - run:
           name: Select pinned .NET SDK
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $ProgressPreference = 'SilentlyContinue'
-            $version = (Get-Content global.json -Raw | ConvertFrom-Json).sdk.version
-            if (-not (dotnet --list-sdks | Where-Object { $_ -match "^$([regex]::Escape($version)) " })) {
-              $script = Join-Path $env:TEMP 'dotnet-install.ps1'
-              Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -UseBasicParsing -OutFile $script
-              & $script -Version $version -Architecture x64 -InstallDir "$env:ProgramFiles\dotnet" -NoPath
-            }
-            $actual = dotnet --version
-            if ($LASTEXITCODE -ne 0 -or $actual -ne $version) { throw "Expected SDK $version, got $actual" }
-            dotnet --info
+          command: '& .circleci/prepare-dotnet.ps1'
+  save-sdk-cache:
+    steps:
+      - save_cache:
+          key: v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+          paths:
+            - artifacts/sdk-cache
   require-installer-plan:
     steps:
       - run:
@@ -49,14 +48,17 @@ commands:
             }
   restore-nuget-cache:
     steps:
+      - run:
+          name: Fingerprint tracked NuGet inputs
+          command: python .circleci/nuget_inputs.py
       - restore_cache:
           keys:
-            - v2-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
-            - v2-nuget-windows-x64-main-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+            - v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
+            - v3-nuget-windows-x64-main-{{ checksum "artifacts/nuget-inputs.json" }}
   save-nuget-cache:
     steps:
       - save_cache:
-          key: v2-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+          key: v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
           paths:
             - ~/.nuget/packages
 
@@ -106,7 +108,8 @@ jobs:
             $ErrorActionPreference = 'Stop'
             dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
+      - save-nuget-cache
+      - save-sdk-cache
 
   build-windows:
     executor: windows-x64
@@ -123,7 +126,7 @@ jobs:
           command: |
             $ErrorActionPreference = 'Stop'
             $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishTrimmed=false -p:PublishReadyToRun=true '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905' -p:Version=$version --output publish/win-x64
+            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishTrimmed=false -p:PublishReadyToRun=false '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905' -p:Version=$version --output publish/win-x64
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published executable missing' }
       - run:
@@ -300,7 +303,8 @@ workflows:
       - plan-release:
           requires:
             - validate-pr-title
-      - dependency-audit
+      - dependency-audit:
+          serial-group: << pipeline.project.slug >>/nuget/<< pipeline.git.branch >>
       - build-windows:
           requires:
             - plan-release
