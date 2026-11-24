@@ -53,6 +53,11 @@ Only publish-release receives the token. PRs and tags cannot publish. Do not req
 
 If publication fails after creating a draft, inspect the draft and its target commit and assets. Existing tags and drafts are deliberately rejected. Delete only an identified abandoned draft and its unpublished tag if present and no published release references it. Then trigger a fresh main pipeline. If main or the latest release advanced, trigger a fresh pipeline rather than rerunning only the stale publication job.
 
+
+### PROD ruleset
+
+Keep the existing individual required CircleCI checks for PR metadata, release planning, dependency audit, Windows build and tests, packaging, and smoke validation. Every PR runs these named jobs. In the fast lane, the installer jobs report success after checking the plan and log that installer work was unnecessary. Windows application compilation still runs in the required test job. Keep `publish-release` outside the required PR checks because it runs only on main. The main workflow requires real publish, package integrity verification and smoke testing before publication.
+
 ## Migration from the legacy update server
 
 Installed versions through 1.2.6 cannot discover GitHub updates on their own. After the first verified release is published:
@@ -66,6 +71,6 @@ CI does not change the old host. Do not shut it down prematurely. Older clients 
 
 ## Verification and security
 
-The smoke test installs and removes the new package. On PR branches and for a planned release on main it also verifies the previous public installer digest, installs it, upgrades in place, and checks application version, registry and preservation of disposable user data. It verifies the bundled .NET 10 runtime and the executable and assembly file versions. The smoke test also waits for the installed WinUI main window to initialize after each installation. Before the first release, manually test both languages, optional skip, the 24-hour recommended reminder, mandatory update, offline retry, download errors, canceled installation and the legacy bridge in a disposable Windows VM.
+The smoke test installs and removes the new package. On full-lane PR branches and for a planned release on main it also verifies the previous public installer digest, installs it, upgrades in place, and checks application version, registry and preservation of disposable user data. It verifies the bundled .NET 10 runtime and the executable and assembly file versions. The smoke test also waits for the installed WinUI main window to initialize after each installation. Before the first release, manually test both languages, optional skip, the 24-hour recommended reminder, mandatory update, offline retry, download errors, canceled installation and the legacy bridge in a disposable Windows VM.
 
 The new updater checks GitHub's HTTPS metadata and verifies downloaded bytes. A checksum is not independent code signing: configure Authenticode signing before claiming publisher verification or SmartScreen trust. Limit repository and publication access.

@@ -78,7 +78,7 @@ def merged_decisions(start, end):
     return decisions
 
 
-def collect_decisions(previous, sha, branch):
+def collect_decisions(previous, sha, branch, pr=None):
     tag = previous["tag_name"]
     tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
     # Only grandfather commits before the new system went live.
@@ -90,10 +90,7 @@ def collect_decisions(previous, sha, branch):
     base = git("merge-base", sha, "FETCH_HEAD")
     subprocess.run(["git", "merge-base", "--is-ancestor", start, base], check=True)
     decisions = merged_decisions(start, base)
-    matches = open_prs(sha, branch)
-    if len(matches) != 1:
-        raise ValueError("Expected one eligible open PR for this commit")
-    return decisions + [branch_decision(matches[0])]
+    return decisions + [branch_decision(pr or branch_pr(sha, branch))]
 
 
 def open_prs(sha, branch):
@@ -108,6 +105,40 @@ def open_prs(sha, branch):
         if len(pulls) < 100:
             return matches
         page += 1
+
+
+def branch_pr(sha, branch):
+    matches = open_prs(sha, branch)
+    if len(matches) != 1:
+        raise ValueError("Expected one eligible open PR for this commit")
+    return matches[0]
+
+
+def needs_installer(paths):
+    for path in paths:
+        path = path.casefold()
+        name = path.rsplit("/", 1)[-1]
+        if (path.startswith((".circleci/", "installer/"))
+                or "/publishprofiles/" in path
+                or name.endswith((".csproj", ".props", ".targets", ".iss", ".pubxml", ".sln",
+                                  ".slnx", ".vcxproj", ".manifest", ".ps1", ".pfx"))
+                or name in ("global.json", "nuget.config", "packages.lock.json", "packages.config")
+                or (name.endswith(".cs") and ("update" in name or name in ("app.xaml.cs", "appsettings.cs",
+                                                                          "settingsservice.cs")))
+                or name == "app.xaml"):
+            return True
+    return False
+
+
+def validate_installer(branch, pr, sha):
+    if branch == "main":
+        return True
+    base = pr["base"]["ref"]
+    git("fetch", "--no-tags", f"https://github.com/{REPO}.git", f"refs/heads/{base}")
+    comparison = git("merge-base", "FETCH_HEAD", sha)
+    # Report both sides of a rename as changed paths.
+    changed = git("diff", "--name-only", "--no-renames", "-z", comparison, sha, "--")
+    return needs_installer(changed.split("\0"))
 
 
 def branch_decision(pr):
@@ -170,8 +201,11 @@ def plan():
     sha = git("rev-parse", "HEAD")
     tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
     subprocess.run(["git", "merge-base", "--is-ancestor", tag_sha, sha], check=True)
-    result = make_plan(previous, collect_decisions(previous, sha, os.environ.get("CIRCLE_BRANCH", "")), sha)
-    if result["release"] or os.environ.get("CIRCLE_BRANCH") != "main":
+    branch = os.environ.get("CIRCLE_BRANCH", "")
+    pr = None if branch == "main" else branch_pr(sha, branch)
+    result = make_plan(previous, collect_decisions(previous, sha, branch, pr), sha)
+    result["validate_installer"] = validate_installer(branch, pr, sha)
+    if result["validate_installer"] and (result["release"] or branch != "main"):
         result["previous_installer"] = installer_asset(previous)
     PLAN.parent.mkdir(parents=True, exist_ok=True)
     PLAN.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
