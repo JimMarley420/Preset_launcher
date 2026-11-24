@@ -49,14 +49,17 @@ commands:
             }
   restore-nuget-cache:
     steps:
+      - run:
+          name: Fingerprint tracked NuGet inputs
+          command: python .circleci/nuget_inputs.py
       - restore_cache:
           keys:
-            - v2-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
-            - v2-nuget-windows-x64-main-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+            - v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
+            - v3-nuget-windows-x64-main-{{ checksum "artifacts/nuget-inputs.json" }}
   save-nuget-cache:
     steps:
       - save_cache:
-          key: v2-nuget-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj" }}-{{ checksum "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj" }}
+          key: v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
           paths:
             - ~/.nuget/packages
 
@@ -106,7 +109,7 @@ jobs:
             $ErrorActionPreference = 'Stop'
             dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
+      - save-nuget-cache
 
   build-windows:
     executor: windows-x64
@@ -278,6 +281,53 @@ jobs:
           paths:
             - artifacts/verified-installer/SHA256SUMS.txt
 
+  review-benchmark:
+    executor: windows-x64
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - prepare-dotnet
+      - run:
+          name: Benchmark verified SDK archive download
+          command: |
+            $ErrorActionPreference = 'Stop'
+            New-Item -ItemType Directory -Force artifacts/sdk-benchmark | Out-Null
+            $watch = [Diagnostics.Stopwatch]::StartNew()
+            curl.exe -fsSL --retry 2 https://dotnetcli.blob.core.windows.net/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-x64.zip -o artifacts/sdk-benchmark/sdk.zip
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            Write-Host "Direct SDK transfer seconds: $($watch.Elapsed.TotalSeconds)"
+            & .circleci/review-benchmark.ps1 -SdkOnly
+      - save_cache:
+          key: review-sdk-archive-10.0.404-win-x64-{{ .Revision }}
+          paths:
+            - artifacts/sdk-benchmark/sdk.zip
+      - run:
+          name: Remove local archive before cache restore
+          command: Remove-Item -LiteralPath artifacts/sdk-benchmark/sdk.zip
+      - restore_cache:
+          keys:
+            - review-sdk-archive-10.0.404-win-x64-{{ .Revision }}
+      - run:
+          name: Verify and extract the restored SDK archive
+          command: '& .circleci/review-benchmark.ps1 -SdkOnly'
+      - restore-nuget-cache
+      - run:
+          name: Install pinned Inno Setup compiler
+          command: |
+            $ErrorActionPreference = 'Stop'
+            choco install innosetup --version=6.7.1 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+            if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
+            if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler missing' }
+      - run:
+          name: Benchmark publication and installer variants
+          no_output_timeout: 15m
+          command: '& .circleci/review-benchmark.ps1'
+      - store_artifacts:
+          path: artifacts/installer-benchmark
+
   publish-release:
     docker:
       - image: cimg/python:3.13.16
@@ -300,7 +350,8 @@ workflows:
       - plan-release:
           requires:
             - validate-pr-title
-      - dependency-audit
+      - dependency-audit:
+          serial-group: << pipeline.project.slug >>/nuget/<< pipeline.git.branch >>
       - build-windows:
           requires:
             - plan-release
@@ -317,6 +368,12 @@ workflows:
       - smoke-installer:
           requires:
             - package-installer
+      - review-benchmark:
+          requires:
+            - plan-release
+          filters:
+            branches:
+              only: feat/dotnet-10-migration
       - publish-release:
           requires:
             - smoke-installer

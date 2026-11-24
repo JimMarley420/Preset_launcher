@@ -124,8 +124,9 @@ def needs_installer(paths):
                                   ".slnx", ".vcxproj", ".manifest", ".ps1", ".pfx"))
                 or name in ("global.json", "nuget.config", "packages.lock.json", "packages.config")
                 or (name.endswith(".cs") and ("update" in name or name in ("app.xaml.cs", "appsettings.cs",
-                                                                          "settingsservice.cs")))
-                or name in ("app.xaml", "favicon.ico")):
+                                                                          "settingsservice.cs", "mainwindow.xaml.cs", "settingspage.xaml.cs",
+                                                                          "localizationservice.cs")))
+                or name in ("app.xaml", "mainwindow.xaml", "settingspage.xaml", "favicon.ico")):
             return True
     return False
 
