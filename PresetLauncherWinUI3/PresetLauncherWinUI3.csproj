@@ -18,8 +18,8 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
-    <Version>1.2.6</Version>
+  <PropertyGroup>
+    <Version>0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260101001" />

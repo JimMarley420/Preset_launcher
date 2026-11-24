@@ -45,6 +45,25 @@ commands:
             - ~/.nuget/packages
 
 jobs:
+  plan-release:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Test release planning
+          command: python -m unittest discover -s .circleci -p 'test_release.py'
+      - run:
+          name: Calculate version and update policy
+          command: python .circleci/release.py plan
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artifacts/release-plan.json
+      - store_artifacts:
+          path: artifacts/release-plan.json
+
   dependency-audit:
     executor: windows-x64
     steps:
@@ -66,6 +85,8 @@ jobs:
     executor: windows-x64
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - prepare-dotnet
       - restore-nuget-cache
       - run:
@@ -73,7 +94,7 @@ jobs:
           no_output_timeout: 20m
           command: |
             $ErrorActionPreference = 'Stop'
-            $version = (Select-String -Path Installer/PresetLauncher.iss -Pattern '#define AppVersion "([^"]+)"').Matches[0].Groups[1].Value
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
             dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishReadyToRun=true -p:Version=$version --output publish/win-x64
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published executable missing' }
@@ -130,7 +151,7 @@ jobs:
           no_output_timeout: 20m
           command: |
             $ErrorActionPreference = 'Stop'
-            $version = (Select-String -Path Installer/PresetLauncher.iss -Pattern '#define AppVersion "([^"]+)"').Matches[0].Groups[1].Value
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
             if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Build workspace missing' }
             $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
             if (-not (Test-Path $iscc)) { $iscc = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe' }
@@ -155,7 +176,8 @@ jobs:
           no_output_timeout: 10m
           command: |
             $ErrorActionPreference = 'Stop'
-            & .\.circleci\smoke-installer.ps1
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
+            & .\.circleci\smoke-installer.ps1 -Version $version
       - store_artifacts:
           path: artifacts/installer-logs
           destination: installer-logs
@@ -163,7 +185,7 @@ jobs:
           name: Stage verified CI installer and checksum
           command: |
             $ErrorActionPreference = 'Stop'
-            $version = (Select-String -Path Installer/PresetLauncher.iss -Pattern '#define AppVersion "([^"]+)"').Matches[0].Groups[1].Value
+            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
             $name = "PresetLauncher_Setup_$version.exe"
             $file = Join-Path 'Installer/Output' $name
             if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installer: $file" }
@@ -175,13 +197,33 @@ jobs:
           path: artifacts/verified-installer
           destination: verified-ci-installer
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artifacts/verified-installer
+
+  publish-release:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Publish verified GitHub release
+          no_output_timeout: 15m
+          command: python .circleci/release.py publish
+
 workflows:
   ci:
     jobs:
+      - plan-release
       - dependency-audit
       - build-windows:
           requires:
             - dependency-audit
+            - plan-release
       - test-windows:
           requires:
             - dependency-audit
@@ -192,3 +234,13 @@ workflows:
       - smoke-installer:
           requires:
             - package-installer
+      - publish-release:
+          requires:
+            - smoke-installer
+          context: presetlauncher-release
+          serial-group: << pipeline.project.slug >>/github-release
+          filters:
+            branches:
+              only: main
+            tags:
+              ignore: /.*/

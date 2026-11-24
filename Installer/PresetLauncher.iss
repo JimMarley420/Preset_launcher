@@ -4,11 +4,11 @@
 
 #define AppName "PresetLauncher"
 #ifndef AppVersion
-  #define AppVersion "1.2.6"
+  #define AppVersion "0.0.0"
 #endif
 #define AppPublisher "JimmyMarley"
 #define AppExeName "PresetLauncherWinUI3.exe"
-#define AppURL "https://version.multichat.cloud/PresetLauncher"
+#define AppURL "https://github.com/JimMarley420/Preset_launcher"
 
 [Setup]
 AppId={{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}
@@ -17,8 +17,8 @@ AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
-AppSupportURL={#AppURL}
-AppUpdatesURL={#AppURL}
+AppSupportURL={#AppURL}/issues
+AppUpdatesURL={#AppURL}/releases/latest
 
 DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
