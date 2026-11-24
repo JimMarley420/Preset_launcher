@@ -14,7 +14,7 @@ public partial class App : Application
 
     public Window? MainWindow { get; private set; }
 
-    private readonly UpdateService _updateService = new();
+    public UpdateCoordinator Updates { get; } = new();
 
     public App()
     {
@@ -42,35 +42,19 @@ public partial class App : Application
         Theme.ApplyTheme(Settings.CurrentSettings.Theme);
         Theme.ApplyBackdrop(Settings.CurrentSettings.Backdrop);
 
-        _ = CheckForUpdateAsync();
-    }
-
-    private async System.Threading.Tasks.Task CheckForUpdateAsync()
-    {
-        try
+        if (MainWindow.Content is FrameworkElement root)
         {
-            await System.Threading.Tasks.Task.Delay(2000);
-
-            var latest = await _updateService.GetLatestVersionAsync();
-            var installed = _updateService.GetInstalledVersion();
-
-            if (!_updateService.IsUpdateAvailable(installed, latest)) return;
-
-            if (MainWindow?.Content?.XamlRoot is not { } xamlRoot) return;
-
-            var dialog = new ContentDialog
+            if (root.IsLoaded) _ = Updates.CheckAsync(manual: false);
+            else
             {
-                Title = Localization.Get("settings.updateAvailable") ?? "Mise à jour disponible",
-                Content = $"La version v{latest} est disponible.\n\nVoulez-vous la télécharger et l'installer ?",
-                PrimaryButtonText = Localization.Get("dialog.yes") ?? "Installer",
-                CloseButtonText = Localization.Get("dialog.no") ?? "Plus tard",
-                XamlRoot = xamlRoot
-            };
-
-            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-                await _updateService.DownloadAndInstallAsync(latest, null);
+                root.Loaded += OnRootLoaded;
+                async void OnRootLoaded(object sender, RoutedEventArgs e)
+                {
+                    root.Loaded -= OnRootLoaded;
+                    await Updates.CheckAsync(manual: false);
+                }
+            }
         }
-        catch { }
     }
 
     public static void SaveAndExit()
