@@ -81,3 +81,24 @@ Tests exercise real application classes with temporary files, not mocked copies.
 CircleCI setup: connect this GitHub repository and select .circleci/config.yml. Enable branch-push triggers (including main), avoid duplicate push/PR triggers, and enable auto-cancel of redundant non-default-branch workflows. Once the first Windows run succeeds, add the observed job status checks (or the complete workflow check) to GitHub branch protection. Keep commit status updates enabled for individual job status on pull requests. The CircleCI Checks app reports the workflow status separately. Keep secrets unavailable to fork builds. Use the Tests and Artifacts tabs to review results, coverage and installer logs. The Linux open-source credit allowance does not cover Windows builds. Monitor Windows credits and artifact storage.
 
 References: [Windows execution](https://circleci.com/docs/guides/execute/using-windows/), [dependency caching](https://circleci.com/docs/guides/optimize/caching/), [test results](https://circleci.com/docs/guides/test/collect-test-data/), [auto-cancel](https://circleci.com/docs/guides/orchestrate/skip-build/), [WinUI testing](https://learn.microsoft.com/en-us/windows/apps/develop/testing/).
+
+## GitHub label automation
+
+The Cloudflare Worker in `tools/auto-labeler/` refreshes open PRs on `opened`, `reopened` and `synchronize` deliveries. The repository maintainer can also comment `/label-this` on an open issue or PR. Each refresh reads the current GitHub labels and, for a PR, its changed files. Refreshes add missing labels and leave all existing labels in place, including labels for paths later removed from a PR. Priority and update policy remain maintainer decisions.
+
+Create these labels in the repository before enabling the updated Worker. All four can use the existing area color `7057FF`.
+
+| Label | Description |
+| --- | --- |
+| `area: ci` | CircleCI, release automation and repository automation |
+| `area: documentation` | Documentation affected alongside other changes |
+| `area: platform` | CPU architectures, runtime compatibility and platform-specific code |
+| `area: tests` | Automated tests, fixtures and smoke checks |
+
+The existing `type: documentation` covers documentation PRs with a `docs` title, and `type: security` flags changes to password verification, update verification, protected update state or release signing. An update security change can carry both `area: updates` and `type: security` alongside its Conventional Commit type.
+
+After deployment is approved, deploy the Worker and edit the existing repository webhook under **Settings → Webhooks**. Keep the HTTPS `/github` payload URL, `application/json`, SSL verification and the shared `WEBHOOK_SECRET`. Select **Pull requests** and keep **Issue comments** enabled. Keep `GITHUB_TOKEN` and `WEBHOOK_SECRET` in Worker secrets. The token needs pull request file read and issue label write access for this repository. [GitHub webhook configuration](https://docs.github.com/en/webhooks/using-webhooks/creating-webhooks)
+
+A refresh with one file page makes up to four GitHub API requests. Deliveries with no missing labels skip the catalog read and label write. GitHub expects a response within 10 seconds. If a large PR or slow API causes a delivery to fail, redeliver it or use `/label-this`. [GitHub webhook delivery guidance](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks) · [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
+
+Run the Worker regression tests with `node --test tools/auto-labeler/worker.test.mjs` from the repository root.
