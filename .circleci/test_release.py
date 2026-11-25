@@ -162,6 +162,17 @@ class PublishTests(unittest.TestCase):
             return {"draft": False, "tag_name": "v1.2.7", "html_url": "https://github.com/example"}
         self.fail(f"Unexpected API request: {method} {url}")
 
+    def test_unsigned_previous_after_migration_is_rejected(self):
+        with self.assertRaises(ValueError):
+            release.verify_previous({"tag_name": "v1.3.1", "body": "<!-- presetlauncher:min-supported=1.3.0 -->"})
+
+    def test_signed_previous_floor_is_verified(self):
+        previous = {"tag_name": "v1.3.1", "body": "<!-- presetlauncher:min-supported=1.3.0 -->\n"
+                    "<!-- presetlauncher:update-policy=optional -->\n<!-- presetlauncher:signature-v1=dGVzdA== -->"}
+        with patch.object(release, "installer_asset", return_value={"size": 4, "sha256": "ab" * 32}), patch.object(release, "verify") as verify:
+            release.verify_previous(previous)
+            verify.assert_called_once_with({"version": "1.3.1", "minimum_supported_version": "1.3.0", "policy": "optional"}, 4, "ab" * 32, "dGVzdA==")
+
     def test_no_release_never_contacts_api(self):
         self.plan.write_text(json.dumps(make_plan(self.previous, [decision("docs: typo")], self.sha)), encoding="utf-8")
         with patch.object(release, "request") as request:

@@ -73,6 +73,31 @@ public sealed class SignedPolicyTests
     }
 
     [TestMethod]
+    public void OpenSslSignatureInteroperatesWithDotNet()
+    {
+        // Test-only public key and signature generated with openssl dgst -sha256.
+        const string key = """
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2Xb12sIuiRlWa05xgwm/jzoD4Xtk
+            towmNTY/WSvikJ97SbnJo6UgeL/ZqrbTG3OeitIBEKEGSTJkDZ2lBQegCg==
+            -----END PUBLIC KEY-----
+            """;
+        const string marker = "<!-- presetlauncher:signature-v1=MEUCIHnVMdH/hTmCKLTGAfhh2BQ3MTB6K1eDL6fyhvcb8XDHAiEAtwHFNqVcVkfCyHH/J/yO9pNvRA7iiUGz+HVcbO3X8xg= -->";
+        UpdatePolicySignature.Verify(Update(), marker, key);
+    }
+
+    [TestMethod]
+    public void DeletingPolicyAloneDoesNotReinitializeFromSettings()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new UpdatePolicyStore(directory.Path);
+        store.Load("0.0.0");
+        store.Observe(Update());
+        File.Delete(System.IO.Path.Combine(directory.Path, "update-policy.dat"));
+        Assert.ThrowsExactly<InvalidDataException>(() => new UpdatePolicyStore(directory.Path).Load("0.0.0"));
+    }
+
+    [TestMethod]
     public void CorruptedProtectedStateIsNotReplacedWithDefaults()
     {
         using var directory = new TemporaryDirectory();

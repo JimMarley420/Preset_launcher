@@ -26,6 +26,14 @@ class SigningTests(unittest.TestCase):
                 command = ["openssl", "dgst", "-sha256", "-verify", str(public), "-signature", str(sig)]
                 self.assertEqual(subprocess.run(command, input=sign_update.payload(data, 4, "ab" * 32)).returncode, 0)
                 self.assertNotEqual(subprocess.run(command, input=sign_update.payload({**data, "policy": "optional"}, 4, "ab" * 32)).returncode, 0)
-                public.write_text("invalid")
+                other = Path(directory) / "other.pem"
+                subprocess.run(["openssl", "genpkey", "-algorithm", "EC", "-pkeyopt",
+                                "ec_paramgen_curve:P-256", "-out", str(other)], check=True)
+                subprocess.run(["openssl", "pkey", "-in", str(other), "-pubout", "-out", str(public)], check=True)
                 with self.assertRaises(ValueError):
                     sign_update.sign(data, 4, "ab" * 32)
+
+    def test_canonical_payload(self):
+        data = {"version": "1.4.0", "minimum_supported_version": "1.4.0", "policy": "required"}
+        expected = b"presetlauncher-update-v1\n1.4.0\n1.4.0\nrequired\n4\n" + b"a" * 64 + b"\n"
+        self.assertEqual(sign_update.payload(data, 4, "a" * 64), expected)

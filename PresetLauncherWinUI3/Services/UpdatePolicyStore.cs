@@ -24,10 +24,18 @@ public sealed class UpdatePolicyStore
     public KnownUpdatePolicy Load(string legacyMinimum)
     {
         using var guard = Lock();
-        if (File.Exists(_path)) return Read();
+        if (File.Exists(_path))
+        {
+            var existing = Read();
+            MarkInitialized(guard);
+            return existing;
+        }
+        if (guard.Length != 0)
+            throw new InvalidDataException("Protected update policy was removed.");
         var floor = UpdateService.TryVersion(legacyMinimum, out var parsed) ? parsed : new Version(0, 0, 0);
         var state = new KnownUpdatePolicy(floor, floor);
         Write(state);
+        MarkInitialized(guard);
         return state;
     }
 
@@ -41,6 +49,13 @@ public sealed class UpdatePolicyStore
         var next = new KnownUpdatePolicy(update.MinimumSupportedVersion, update.Version);
         if (next != state) Write(next);
         return next;
+    }
+
+    private static void MarkInitialized(FileStream guard)
+    {
+        if (guard.Length != 0) return;
+        guard.WriteByte(1);
+        guard.Flush(flushToDisk: true);
     }
 
     private KnownUpdatePolicy Read()

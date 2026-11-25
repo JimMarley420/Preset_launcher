@@ -98,6 +98,9 @@ jobs:
             python -m unittest discover -s .circleci -p 'test_release.py'
             python -m unittest discover -s .circleci -p 'test_sign_update.py'
       - run:
+          name: Validate pinned update signing public key
+          command: python .circleci/sign_update.py check-key
+      - run:
           name: Calculate version and update policy
           command: python .circleci/release.py plan
       - persist_to_workspace:

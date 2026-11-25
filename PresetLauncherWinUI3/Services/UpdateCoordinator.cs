@@ -39,7 +39,7 @@ public sealed class UpdateCoordinator
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
-                await MessageAsync(root, "update.requiredTitle", T("settings.updateCheckFailed"));
+                await MessageAsync(root, "update.policyErrorTitle", T("update.policyErrorMessage"));
                 CloseApp();
                 return;
             }
