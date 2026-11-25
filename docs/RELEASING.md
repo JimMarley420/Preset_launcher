@@ -66,6 +66,14 @@ The active PROD ruleset for the default branch requires these CircleCI checks. T
 
 CircleCI also reports `validate-pr-title` and `smoke-installer` individually. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
 
+### Storage and cache policy
+
+The dependency-audit job saves SDK and NuGet caches only on main, with seven-day retention for new objects. PR jobs can restore matching main caches (or existing branch caches until they expire). A new SDK or dependency fingerprint on a PR can require a cold download; cache misses do not bypass the pinned SDK digest or dependency audit. Cache keys remain branch-scoped, with main fallback and exact input checksums. Existing objects keep their original retention.
+
+Full-lane PRs still expose the verified installer in CircleCI artifacts. Main keeps the installer and smoke-tested checksum in the workflow workspace for publication, but does not upload a second copy as a CircleCI artifact. Published installers remain on GitHub Releases; non-releasing main builds do not retain a downloadable installer artifact. Test reports, coverage and smoke logs remain available.
+
+Compare storage credits, cache hit rates and Windows job duration in Insights after rollout. Reconsider the seven-day retention if frequent cache misses outweigh the storage savings.
+
 ## Migration from the legacy update server
 
 Installed versions through 1.2.6 cannot discover GitHub updates on their own. After the first verified release is published:
