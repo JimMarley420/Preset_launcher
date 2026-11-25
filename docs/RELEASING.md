@@ -49,7 +49,7 @@ Reserve required updates for security, data integrity, compatibility or a delibe
 4. Merge only after every branch CI job succeeds. A main pipeline calculates the version, builds, tests, packages and checks fresh install and upgrade. Publication is serialized and rejects stale plans or an advanced main branch. Documentation-only changes do not publish.
 5. CircleCI creates a draft, uploads the exact smoke-tested installer and SHA256SUMS.txt, verifies the GitHub asset digests, then publishes it as latest. GitHub generates release notes. Never overwrite published assets or reuse a version.
 
-GitHub API reads retry transient HTTP and network errors up to three times with exponential backoff and jitter. Rate-limit responses are retried only when the requested wait fits within 30 seconds. Release creation, asset uploads and publication are not retried automatically because the outcome of a failed write may be ambiguous.
+GitHub API reads retry transient HTTP and network errors up to three times with exponential backoff and jitter. The cumulative sleep budget is 30 seconds per request, including actual sleep time. Requests with rate-limit responses require valid server timing within the remaining budget. Without it, GitHub's minimum 60-second secondary-limit wait exceeds the budget and the request fails. The 30-second socket timeout is not an end-to-end deadline. Release creation, asset uploads and publication are not retried automatically because the outcome of a failed write may be ambiguous. The final main ref check follows release decision collection immediately before publication. The check and PATCH are not atomic.
 
 Only publish-release receives the token. PRs and tags cannot publish. Do not require the main-only publication job on PRs.
 
