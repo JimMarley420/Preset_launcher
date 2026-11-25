@@ -260,8 +260,8 @@ def retry_delay(error, attempt):
         delay = max(delay, requested)
     if primary:
         try:
-            reset = headers["X-RateLimit-Reset"]
-            if not reset.isascii() or not reset.isdecimal():
+            reset = headers.get("X-RateLimit-Reset")
+            if not reset or not reset.isascii() or not reset.isdecimal():
                 return None
             delay = max(delay, int(reset) - now.timestamp())
         except (KeyError, ValueError, TypeError, OverflowError):
