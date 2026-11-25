@@ -13,6 +13,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<NavigationViewItemBase, DesktopPage> _pages = [];
     private NavigationViewItemBase? _destination;
     private bool _navigating;
+    private bool _updatingPaneMode;
     private bool _busy = true;
     private bool _updateBlocked;
     private bool _closing;
@@ -23,11 +24,17 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        NativeWindow.ResizeClient(this, 850, 600);
+        NativeWindow.ResizeClient(this, 960, 680);
         App.Theme.Attach(this, Root, OpaqueBackground);
         ApplyPreferences();
         AppWindow.Closing += HandleClosing;
-        Closed += (_, _) => _closed = true;
+        var paneCallback = NavView.RegisterPropertyChangedCallback(NavigationView.IsPaneOpenProperty,
+            (_, _) => UpdatePaneMode(NavView.ActualWidth));
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            NavView.UnregisterPropertyChangedCallback(NavigationView.IsPaneOpenProperty, paneCallback);
+        };
     }
 
     private void NavView_Loaded(object sender, RoutedEventArgs e)
@@ -41,14 +48,27 @@ public sealed partial class MainWindow : Window
         UpdateInput();
     }
 
-    private void NavView_SizeChanged(object sender, SizeChangedEventArgs e)
+    private void NavView_SizeChanged(object sender, SizeChangedEventArgs args) => UpdatePaneMode(args.NewSize.Width);
+
+    private void UpdatePaneMode(double width)
     {
-        var mode = e.NewSize.Width < 560 ? NavigationViewPaneDisplayMode.LeftMinimal : NavigationViewPaneDisplayMode.LeftCompact;
-        if (NavView.PaneDisplayMode != mode)
+        if (_updatingPaneMode || width <= 0)
+            return;
+
+        var open = NavView.IsPaneOpen;
+        // An inline pane shares the window material. At very narrow widths the native overlay keeps the page usable.
+        var mode = width < 560 ? NavigationViewPaneDisplayMode.LeftMinimal :
+            open ? NavigationViewPaneDisplayMode.Left : NavigationViewPaneDisplayMode.LeftCompact;
+        if (mode == NavView.PaneDisplayMode)
+            return;
+
+        _updatingPaneMode = true;
+        try
         {
             NavView.PaneDisplayMode = mode;
-            NavView.IsPaneOpen = false;
+            NavView.IsPaneOpen = open;
         }
+        finally { _updatingPaneMode = false; }
     }
 
     private async void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
