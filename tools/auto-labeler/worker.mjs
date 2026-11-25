@@ -1,17 +1,22 @@
 const REPO = "JimMarley420/Preset_launcher";
 const API = "https://api.github.com/repos/" + REPO;
 const encoder = new TextEncoder();
-const updateSigning = /^\.circleci\/(?:release\.py|sign_update\.py|update-policy-public\.pem)$/i;
+const releaseSecurity = /^\.circleci\/(?:policy\.py|release\.py|sign_update\.py|update-policy-public\.pem)$/i;
 const updateVerification = /^PresetLauncherWinUI3\/Services\/Update(?:Service|Coordinator|PolicySignature|PolicyStore)\.cs$/i;
 const documentation = /(?:^docs\/|\.md$)/i;
 const passwordService = /^PresetLauncherWinUI3\/Services\/PasswordService\.cs$/i;
+const sdkChecksum = /^\.circleci\/dotnet-sdk\.sha512$/i;
+const webhookImplementation = /^tools\/auto-labeler\/worker\.mjs$/i;
+const dependencyManifest = /(?:\.(?:csproj|fsproj|vbproj)$|(?:^|\/)(?:global\.json|nuget\.config|packages\.(?:config|lock\.json)|directory\.(?:packages\.props|build\.(?:props|targets))|(?:package|package-lock|npm-shrinkwrap)\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?)$)/i;
 
 const areas = [
   ["ui", /(?:\/views\/|\.xaml$|mainwindow)/i, /\b(interface|appearance|theme|dark mode|window|xaml|apparence|thème)\b/i],
-  ["updates", p => updateVerification.test(p) || updateSigning.test(p), /\b(update|updater|mise à jour|upgrade)\b/i],
+  ["updates", p => updateVerification.test(p) || releaseSecurity.test(p), /\b(update|updater|mise à jour|upgrade)\b/i],
   ["installer", /^installer\//i, /\b(installer|installation|uninstall|désinstallation)\b/i],
   ["presets", /preseteditor|presetspage|\/preset\.cs$/i, /\b(presets?|préréglages?)\b/i],
-  ["launcher", /launcherservice|executableitem/i, /\b(launch|processes?|executables?|lancement|processus)\b/i],
+  ["launcher", /launcherservice|executableitem/i, /\b(launch(?:ing)?|executables?|running processes|lancement)\b/i],
+  ["processes", /^PresetLauncherWinUI3\/(?:Services\/LauncherService|Views\/ProcessSelector)\.cs$/i, /\b(?:(?:clos(?:e|ing)|detect(?:ing)?|terminat(?:e|ing)|kill(?:ing)?)\s+(?:processes|process|programs?)|process (?:detection|termination)|processus)\b/i],
+  ["dependencies", p => sdkChecksum.test(p) || dependencyManifest.test(p), /\b(dependenc(?:y|ies)|nuget|sdk version|lockfile)\b/i],
   ["data", /^PresetLauncherWinUI3\/(?:Models\/(?:AppData|AppSettings)|Services\/(?:AtomicJson|DataBackup|DataService|ExportPath|SettingsService|UpdatePolicyStore))\.cs$/i, /\b(import|export|backup|json|sauvegarde|data loss)\b/i],
   ["settings", /settings(?:page|service)|appsettings/i, /\b(settings|preferences|paramètres)\b/i],
   ["localization", /localizationservice/i, /\b(translation|localization|language|traduction|langue)\b/i],
@@ -22,8 +27,8 @@ const areas = [
   ["tests", /^(?:tests\/|\.circleci\/(?:test_[^/]+\.py$|smoke-[^/]+\.ps1$|fixtures\/))|\.test\.mjs$/i, /\b(unit tests?|regression tests?|coverage)\b/i],
   ["platform", /^(?:Installer\/(?:architectures\.json|assert-payload\.ps1|build\.ps1|PresetLauncher\.iss)|PresetLauncherWinUI3\/(?:PresetLauncherWinUI3\.csproj|app\.manifest|Properties\/PublishProfiles\/[^/]+\.pubxml|Services\/WindowsSystemDispatcherQueueHelper\.cs|Views\/NativeWindow\.cs)|tests\/PresetLauncher\.Tests\/ArchitectureUpdateTests\.cs)$/i, /\b(arm64|x64|x86|architecture|runtime compatibility)\b/i]
 ];
-const aliases = {ui:["ux","ui/ux","interface"], updates:["updater","update"], installer:["installation"], presets:["preset"], launcher:["launching","launch","processes"], data:["storage","import/export"], settings:["configuration"], localization:["i18n","translations"], statistics:["stats"], ci:["ci/cd","build"], documentation:["docs"], tests:["testing"]};
-const types = {fix:["bug","fix"],feat:["feature","enhancement"],perf:["performance","enhancement"],docs:["documentation","docs"],ci:["ci","maintenance"],build:["build","maintenance"],test:["test","tests"],refactor:["refactor"],chore:["maintenance","chore"],style:["style"],revert:["revert"]};
+const aliases = {ui:["ux","ui/ux","interface"], updates:["updater","update"], installer:["installation"], presets:["preset"], launcher:["launching","launch"], data:["storage","import/export"], settings:["configuration"], localization:["i18n","translations"], statistics:["stats"], ci:["ci/cd","build"], documentation:["docs"], tests:["testing"]};
+const types = {fix:["bug","fix"],feat:["feature","enhancement"],perf:["performance","enhancement"],docs:["documentation","docs"],ci:["ci","maintenance"],build:["build","maintenance"],test:["test","tests","maintenance"],refactor:["refactor"],chore:["maintenance","chore"],style:["style","maintenance"],revert:["revert","maintenance"]};
 
 function labelCandidates(issue, paths) {
   const existing = new Set(issue.labels.map(l => l.name.toLowerCase()));
@@ -42,7 +47,8 @@ function labelCandidates(issue, paths) {
     const matched = paths.some(p => typeof pathRule === "function" ? pathRule(p) : pathRule.test(p));
     if (matched || (!issue.pull_request && textRule.test(title + " " + formArea))) add("area: ", [area, ...(aliases[area] || [])]);
   }
-  const securityPath = p => updateVerification.test(p) || updateSigning.test(p) || passwordService.test(p);
+  const securityPath = p => updateVerification.test(p) || releaseSecurity.test(p) || passwordService.test(p) ||
+    sdkChecksum.test(p) || webhookImplementation.test(p);
   if (paths.some(securityPath)) add("type: ", ["security"]);
   if (!hasType) {
     let inferred = Object.hasOwn(types, kind) ? types[kind] : [];

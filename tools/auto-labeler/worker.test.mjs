@@ -37,20 +37,28 @@ test("signed maintainer request rejects redirects without forwarding credentials
 
 const repo = "JimMarley420/Preset_launcher";
 const env = {GITHUB_TOKEN:"dummy", WEBHOOK_SECRET:"secret"};
-const catalog = ["area: ci", "area: data", "area: documentation", "area: installer", "area: launcher",
-  "area: localization", "area: platform", "area: tests", "area: ui", "area: updates", "type: bug",
-  "type: documentation", "type: feature", "type: maintenance", "type: security", "priority: high", "update: required"];
+const catalog = [
+  "area: ci", "area: data", "area: dependencies", "area: documentation", "area: history", "area: installer",
+  "area: launcher", "area: localization", "area: platform", "area: presets", "area: processes", "area: settings",
+  "area: statistics", "area: tests", "area: ui", "area: updates", "good first issue", "help wanted",
+  "priority: critical", "priority: high", "priority: low", "priority: medium", "resolution: cannot reproduce",
+  "resolution: duplicate", "resolution: fixed", "resolution: invalid", "resolution: wontfix", "status: blocked",
+  "status: confirmed", "status: in progress", "status: needs information", "status: needs review", "status: needs triage",
+  "status: planned", "type: bug", "type: documentation", "type: enhancement", "type: feature", "type: maintenance",
+  "type: question", "type: refactor", "type: security", "update: optional", "update: recommended", "update: required"
+];
 
 test("PR #16 classifies all its changed files even with existing manually assigned labels", () => {
   // GitHub pulls/16/files at head 49502a44a5c06fc8aba62da4b2ab28fa5da80098.
   const files = readFileSync(new URL("./pr-16-files.txt", import.meta.url), "utf8").trim().split(/\r?\n/);
   assert.equal(files.length, 32);
   const pr = {...issue, title:"feat(platform): add multi-architecture support and optimize build efficiency"};
-  assert.deepEqual(classify(pr, files, catalog), ["area: ci", "area: data", "area: documentation", "area: installer",
-    "area: launcher", "area: localization", "area: platform", "area: tests", "area: updates", "type: feature", "type: security"]);
+  assert.deepEqual(classify(pr, files, catalog), ["area: ci", "area: data", "area: dependencies", "area: documentation", "area: installer",
+    "area: launcher", "area: localization", "area: platform", "area: processes", "area: tests", "area: updates", "type: feature", "type: security"]);
   pr.labels = ["type: feature", "area: launcher", "area: localization", "area: data", "area: installer",
     "area: updates", "update: recommended"].map(name => ({name}));
-  assert.deepEqual(classify(pr, files, catalog), ["area: ci", "area: documentation", "area: platform", "area: tests", "type: security"]);
+  assert.deepEqual(classify(pr, files, catalog), ["area: ci", "area: dependencies", "area: documentation", "area: platform",
+    "area: processes", "area: tests", "type: security"]);
 });
 
 test("classifies architecture, runtime and platform paths", () => {
@@ -82,6 +90,52 @@ test("recognizes persistence beyond DataService and avoids duplicate update alia
   assert.deepEqual(classify({...issue, labels:[{name:"AREA: UPDATER"}]}, ["PresetLauncherWinUI3/Services/AtomicJson.cs",
     "PresetLauncherWinUI3/Services/DataBackup.cs", "PresetLauncherWinUI3/Services/ExportPath.cs",
     "PresetLauncherWinUI3/Services/UpdatePolicyStore.cs"], catalog), ["area: data", "type: bug", "type: security"]);
+});
+
+test("marks exact release policy, SDK integrity and webhook implementation paths as security-sensitive", () => {
+  const cases = [
+    [".circleci/policy.py", ["area: ci", "area: updates", "type: bug", "type: security"]],
+    [".circleci/dotnet-sdk.sha512", ["area: ci", "area: dependencies", "type: bug", "type: security"]],
+    ["tools/auto-labeler/worker.mjs", ["area: ci", "type: bug", "type: security"]],
+    [".circleci/config.yml", ["area: ci", "type: bug"]],
+    ["tools/auto-labeler/worker.test.mjs", ["area: ci", "area: tests", "type: bug"]],
+    ["docs/policy.py", ["area: documentation", "type: bug"]]
+  ];
+  for (const [path, expected] of cases) assert.deepEqual(classify(issue, [path], catalog), expected, path);
+});
+
+test("distinguishes launching from process detection and termination", () => {
+  assert.deepEqual(classify(issue, ["PresetLauncherWinUI3/Models/ExecutableItem.cs"], catalog), ["area: launcher", "type: bug"]);
+  assert.deepEqual(classify(issue, ["PresetLauncherWinUI3/Views/ProcessSelector.cs"], catalog), ["area: processes", "area: ui", "type: bug"]);
+  assert.deepEqual(classify({...issue, labels:[{name:"area: launcher"}]}, ["PresetLauncherWinUI3/Services/LauncherService.cs"], catalog),
+    ["area: processes", "type: bug"]);
+  for (const [option, expected] of [
+    ["Launch Missing Only", ["area: launcher"]],
+    ["Closing processes", ["area: processes"]],
+    ["Launching or closing programs", ["area: launcher", "area: processes"]]
+  ]) {
+    assert.deepEqual(classify({title:"Problem", body:`### Affected area\n\n${option}`, labels:[]}, [], catalog), expected);
+  }
+});
+
+test("identifies dependency inputs by file name or extension", () => {
+  for (const path of ["global.json", "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj", "tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj",
+    "Directory.Packages.props", "Directory.Build.targets", "nested/NuGet.Config", "packages.config", "packages.lock.json",
+    "tools/auto-labeler/package.json", "tools/auto-labeler/package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"]) {
+    assert.ok(classify(issue, [path], catalog).includes("area: dependencies"), path);
+  }
+  assert.deepEqual(classify(issue, ["docs/dependencies.md", ".circleci/nuget_inputs.py"], catalog),
+    ["area: ci", "area: documentation", "type: bug"]);
+});
+
+test("maps all Conventional Commit types to the repository catalog", () => {
+  for (const [kind, expected] of Object.entries({fix:"bug", feat:"feature", perf:"enhancement", docs:"documentation",
+    ci:"maintenance", build:"maintenance", test:"maintenance", refactor:"refactor", chore:"maintenance", style:"maintenance", revert:"maintenance"})) {
+    assert.deepEqual(classify({...issue, title:`${kind}(scope)!: change`}, [], catalog), [`type: ${expected}`]);
+  }
+  assert.deepEqual(classify({...issue, title:"feat: renamed PR", labels:[{name:"type: bug"}]}, [], catalog), []);
+  assert.deepEqual(classify({...issue, title:"feat: renamed PR", labels:[{name:"type: security"}]}, [], catalog), ["type: feature"]);
+  assert.deepEqual(classify({title:"urgent duplicate fixed required update needs triage", labels:[]}, [], catalog), ["area: updates"]);
 });
 
 const manual = {

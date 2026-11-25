@@ -84,21 +84,14 @@ References: [Windows execution](https://circleci.com/docs/guides/execute/using-w
 
 ## GitHub label automation
 
-The Cloudflare Worker in `tools/auto-labeler/` refreshes open PRs on `opened`, `reopened` and `synchronize` deliveries. The repository maintainer can also comment `/label-this` on an open issue or PR. Each refresh reads the current GitHub labels and, for a PR, its changed files. Refreshes add missing labels and leave all existing labels in place, including labels for paths later removed from a PR. Priority and update policy remain maintainer decisions.
+The Cloudflare Worker in `tools/auto-labeler/` refreshes open PRs on `opened`, `reopened` and `synchronize` deliveries. The repository maintainer can also comment `/label-this` on an open issue or PR. Each refresh reads the current GitHub labels and, for a PR, its changed files. Refreshes add missing labels and preserve all existing labels, including manually assigned labels and labels for paths later removed from a PR. Priority, status, resolution and update policy remain under manual control.
 
-Create these labels in the repository before enabling the updated Worker. All four can use the existing area color `7057FF`.
+A title edit leaves the existing type label in place. On the next refresh, the current Conventional Commit title supplies the type if the PR has no existing type other than `type: security`. To reclassify a renamed PR, remove its old type label in GitHub and comment `/label-this`. In the current catalog, `perf` maps to `type: enhancement`, and `ci`, `build`, `test`, `chore`, `style` and `revert` map to `type: maintenance`.
 
-| Label | Description |
-| --- | --- |
-| `area: ci` | CircleCI, release automation and repository automation |
-| `area: documentation` | Documentation affected alongside other changes |
-| `area: platform` | CPU architectures, runtime compatibility and platform-specific code |
-| `area: tests` | Automated tests, fixtures and smoke checks |
-
-The existing `type: documentation` covers documentation PRs with a `docs` title, and `type: security` flags changes to password verification, update verification, protected update state or release signing. An update security change can carry both `area: updates` and `type: security` alongside its Conventional Commit type.
+The existing catalog includes `area: ci`, `area: documentation`, `area: platform` and `area: tests`. `area: launcher` covers application execution, and `area: processes` covers process detection and termination. A file that handles both can receive both labels. `area: dependencies` covers package manifests, lockfiles, NuGet configuration and SDK pins. `type: security` flags implementation paths for password and update verification, release signing and update policy, SDK integrity and webhook authentication. It can appear alongside the Conventional Commit type.
 
 After deployment is approved, deploy the Worker and edit the existing repository webhook under **Settings → Webhooks**. Keep the HTTPS `/github` payload URL, `application/json`, SSL verification and the shared `WEBHOOK_SECRET`. Select **Pull requests** and keep **Issue comments** enabled. Keep `GITHUB_TOKEN` and `WEBHOOK_SECRET` in Worker secrets. The token needs pull request file read and issue label write access for this repository. [GitHub webhook configuration](https://docs.github.com/en/webhooks/using-webhooks/creating-webhooks)
 
 A refresh with one file page makes up to four GitHub API requests. Deliveries with no missing labels skip the catalog read and label write. GitHub expects a response within 10 seconds. If a large PR or slow API causes a delivery to fail, redeliver it or use `/label-this`. [GitHub webhook delivery guidance](https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks) · [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
 
-Run the Worker regression tests with `node --test tools/auto-labeler/worker.test.mjs` from the repository root.
+The CircleCI `plan-release` job checks Worker syntax and runs the regression suite. Run `node --check tools/auto-labeler/worker.mjs` and `node --test tools/auto-labeler/worker.test.mjs` from the repository root to verify locally.
