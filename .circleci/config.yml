@@ -103,6 +103,9 @@ jobs:
             node --version
             node --check tools/auto-labeler/worker.mjs
             node --test tools/auto-labeler/worker.test.mjs
+      - run:
+          name: Validate website JavaScript
+          command: node --check website/assets/site.js
       - persist_to_workspace:
           root: .
           paths:
@@ -255,8 +258,21 @@ jobs:
           command: |
             python .circleci/release.py publish
 
+  deploy-website:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Publish GitHub Pages website
+          command: python .circleci/deploy_website.py
+
 workflows:
   ci:
+    when:
+      not:
+        equal: [gh-pages, << pipeline.git.branch >>]
     jobs:
       - validate-pr-title
       - validate-update-label
@@ -301,6 +317,16 @@ workflows:
             - smoke-installer
           context: presetlauncher-release
           serial-group: << pipeline.project.slug >>/github-release
+          filters:
+            branches:
+              only: main
+            tags:
+              ignore: /.*/
+      - deploy-website:
+          requires:
+            - publish-release
+          context: presetlauncher-website
+          serial-group: << pipeline.project.slug >>/github-pages
           filters:
             branches:
               only: main
