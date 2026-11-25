@@ -24,18 +24,23 @@ $policyLock = Join-Path $dataDir 'Security/update-policy.lock'
 $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'PresetLauncher/PresetLauncher.lnk'
 $uninstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1'
 $registryPath = "HKCU:\$uninstallKey"
+$installationKey = 'Software\PresetLauncher\Installation'
+$architectureRegistryPath = "HKCU:\$installationKey"
 
 if ($env:CIRCLECI -ne 'true') { throw 'Smoke test requires an isolated CircleCI VM' }
 $machineKeys = [Microsoft.Win32.RegistryView]::Registry32, [Microsoft.Win32.RegistryView]::Registry64 |
     ForEach-Object {
         $hive = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $_)
         try {
-            $key = $hive.OpenSubKey($uninstallKey)
-            if ($key) { $key.Dispose(); $true }
+            foreach ($subkey in $uninstallKey, $installationKey) {
+                $key = $hive.OpenSubKey($subkey)
+                if ($key) { $key.Dispose(); $true }
+            }
         }
         finally { $hive.Dispose() }
     }
-if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or $machineKeys -or (Test-Path $shortcut) -or
+if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path $architectureRegistryPath) -or
+    $machineKeys -or (Test-Path $shortcut) -or
     (Test-Path "$env:LOCALAPPDATA\Programs\PresetLauncher")) {
     throw 'Existing PresetLauncher installation or data; refusing to run smoke test'
 }
@@ -52,7 +57,7 @@ if ($Architecture -eq 'arm64' -and [Runtime.InteropServices.RuntimeInformation]:
     $code = Invoke-Package $setup 'incompatible.log'
     $log = Get-Content (Join-Path $logs 'incompatible.log') -Raw
     if ($code -ne 1 -or $log -notmatch 'This program does not support the version of Windows your computer is running\.' -or
-        (Test-Path $installDir) -or (Test-Path $registryPath)) {
+        (Test-Path $installDir) -or (Test-Path $registryPath) -or (Test-Path $architectureRegistryPath)) {
         throw 'ARM64 setup failed to reject an incompatible Windows host at initialization'
     }
     Write-Host 'ARM64 setup rejected this host. Native execution requires Windows ARM64.'
@@ -72,8 +77,12 @@ function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogNa
 
 function Assert-CurrentPackage {
     & "$root/Installer/assert-payload.ps1" -Directory $installDir -Machine $entry.machine
-    if ((Get-ItemProperty -Path $registryPath).PresetLauncherArchitecture -cne $Architecture) {
-        throw 'Incorrect architecture registration'
+    if (-not (Test-Path -LiteralPath $architectureRegistryPath)) {
+        throw "Missing installation architecture registration: $Architecture"
+    }
+    $registered = Get-ItemPropertyValue -LiteralPath $architectureRegistryPath -Name PresetLauncherArchitecture
+    if ($registered -cne $Architecture) {
+        throw "Incorrect architecture registration: expected $Architecture, found $registered"
     }
     $dll = Join-Path $installDir 'PresetLauncherWinUI3.dll'
     foreach ($file in @($dll, (Join-Path $installDir 'coreclr.dll'), (Join-Path $installDir 'Microsoft.UI.Xaml.dll'))) {
@@ -152,7 +161,8 @@ function Remove-Package([string]$LogName) {
     $process = Start-Process -FilePath $uninstaller -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="{0}"' -f $log) -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
     if ((Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe')) -or
-        (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.dll')) -or (Test-Path $registryPath) -or (Test-Path $shortcut)) {
+        (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.dll')) -or (Test-Path $registryPath) -or
+        (Test-Path $architectureRegistryPath) -or (Test-Path $shortcut)) {
         throw 'Uninstall left application files or registry entry'
     }
     Assert-UserData
@@ -176,8 +186,9 @@ try {
     Assert-ApplicationStarts fresh
     $policyHash = (Get-FileHash $policyFile -Algorithm SHA256).Hash
     $policyLockHash = (Get-FileHash $policyLock -Algorithm SHA256).Hash
-    if ($Architecture -eq 'x64') {
-        $conflict = Join-Path $root "Installer/Output/PresetLauncher_Setup_${version}$($mapping.x86.suffix).exe"
+    if ($Architecture -in 'x64', 'x86') {
+        $other = if ($Architecture -eq 'x64') { 'x86' } else { 'x64' }
+        $conflict = Join-Path $root "Installer/Output/PresetLauncher_Setup_${version}$($mapping.$other.suffix).exe"
         if ((Invoke-Package $conflict 'migration-conflict.log') -ne 7) {
             throw 'Expected setup to reject an in-place architecture switch'
         }

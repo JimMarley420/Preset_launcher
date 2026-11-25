@@ -75,7 +75,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\publish\{#PayloadRid}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Registry]
-Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Uninstall\{{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1"; ValueType: string; ValueName: "PresetLauncherArchitecture"; ValueData: "{#TargetArchitecture}"
+; Inno Setup recreates its uninstall key after processing [Registry].
+Root: HKA; Subkey: "Software\PresetLauncher\Installation"; ValueType: string; ValueName: "PresetLauncherArchitecture"; ValueData: "{#TargetArchitecture}"; Flags: uninsdeletevalue uninsdeletekeyifempty
 
 [Icons]
 Name: "{group}\{#AppName}";                          Filename: "{app}\{#AppExeName}"
@@ -93,6 +94,7 @@ Filename: "{app}\{#AppExeName}"; \
 [Code]
 const
   UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1';
+  InstallationKey = 'Software\PresetLauncher\Installation';
 
 function Conflicts(RootKey: Integer; SameScopeAndView: Boolean): Boolean;
 var
@@ -100,7 +102,7 @@ var
 begin
   Result := False;
   if RegKeyExists(RootKey, UninstallKey) then begin
-    if not RegQueryStringValue(RootKey, UninstallKey, 'PresetLauncherArchitecture', Existing) then
+    if not RegQueryStringValue(RootKey, InstallationKey, 'PresetLauncherArchitecture', Existing) then
       Existing := 'x64';
     Result := not SameScopeAndView or (Existing <> '{#TargetArchitecture}');
   end;
