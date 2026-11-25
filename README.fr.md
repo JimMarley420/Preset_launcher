@@ -48,3 +48,4 @@ Consultez **Paramètres → Système → Informations système → Type du syst�
 [Guide d'utilisation](docs/USAGE.fr.md) · [Compiler le projet](docs/DEVELOPMENT.md#build-from-source) · [Contribuer](CONTRIBUTING.md) · [Sécurité](SECURITY.md)
 
 Développé en C# avec .NET et WinUI 3. Distribué sous [licence MIT](LICENSE).
+Par Jimmy Marley
