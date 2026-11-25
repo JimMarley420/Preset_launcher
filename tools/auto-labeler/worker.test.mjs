@@ -19,3 +19,16 @@ test("reject unsigned webhook",async()=>{
  const r=await handle(new Request("https://example.org/github",{method:"POST",body:"{}"}),{GITHUB_TOKEN:"dummy",WEBHOOK_SECRET:"secret"});
  assert.equal(r.status,401);
 });
+
+test("signed maintainer request rejects redirects without forwarding credentials", async (ctx) => {
+ const payload = JSON.stringify({repository:{full_name:"JimMarley420/Preset_launcher"},action:"created",sender:{login:"JimMarley420",type:"User"},comment:{body:"/label-this",user:{login:"JimMarley420"},author_association:"OWNER"},issue:{number:6}});
+ const key = await crypto.subtle.importKey("raw",new TextEncoder().encode("secret"),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+ const signature = "sha256="+Buffer.from(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(payload))).toString("hex");
+ const mock = ctx.mock.method(globalThis,"fetch",async (url,options)=>{
+   assert.equal(url,"https://api.github.com/repos/JimMarley420/Preset_launcher/issues/6");
+   assert.equal(options.redirect,"manual");
+   return new Response(null,{status:302,headers:{Location:"https://example.org/"}});
+ });
+ await assert.rejects(handle(new Request("https://example.org/github",{method:"POST",body:payload,headers:{"X-Hub-Signature-256":signature,"X-GitHub-Event":"issue_comment"}}),{GITHUB_TOKEN:"dummy",WEBHOOK_SECRET:"secret"}),/GitHub API failed: GET \/issues\/6 \(302\)/);
+ assert.equal(mock.mock.callCount(),1);
+});

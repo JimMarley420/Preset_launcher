@@ -48,11 +48,11 @@ export async function validSignature(body, secret, signature) {
   return crypto.subtle.verify("HMAC", key, bytes, body);
 }
 async function github(env, path, method="GET", body) {
-  const response = await fetch(API + path, {method, redirect:"error", headers:{
+  const response = await fetch(API + path, {method, redirect:"manual", headers:{
     Authorization:"Bearer " + env.GITHUB_TOKEN, Accept:"application/vnd.github+json",
     "User-Agent":"PresetLauncher-labeler", "X-GitHub-Api-Version":"2022-11-28", "Content-Type":"application/json"
   }, ...(body ? {body:JSON.stringify(body)} : {})});
-  if (!response.ok) throw new Error("GitHub API failed: " + response.status);
+  if (!response.ok) throw new Error("GitHub API failed: " + method + " " + path + " (" + response.status + ")");
   return response.json();
 }
 async function pages(env,path,limit=30) {
