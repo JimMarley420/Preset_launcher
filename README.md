@@ -35,13 +35,13 @@ PresetLauncher groups programs into presets. Create a preset for work, gaming or
 
 Download the installer for your processor from the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 
-| Windows processor | Installer |
-| --- | --- |
-| x64 | `PresetLauncher_Setup_<version>.exe` |
-| 32-bit x86 | `PresetLauncher_Setup_<version>_x86.exe` |
-| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` |
+| Windows processor | Installer | Runtime validation |
+| --- | --- | --- |
+| x64 | `PresetLauncher_Setup_<version>.exe` | ✅ Tested natively |
+| 32-bit x86 | `PresetLauncher_Setup_<version>_x86.exe` | ✅ Tested under WOW64 |
+| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` | ⚠️ Native testing pending |
 
-Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version. ARM64 packages are cross-compiled and inspected on x64 CI. Native ARM64 installation and startup still require validation on ARM64 hardware. 
+Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version.
 
 ## Documentation
 
