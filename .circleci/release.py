@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from policy import LEVELS, pr_decision
+from sign_update import sign, verify
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -189,6 +190,25 @@ def git(*args):
     return subprocess.check_output(["git", *args], text=True).strip()
 
 
+def verify_previous(release):
+    tag = release["tag_name"]
+    body = release.get("body") or ""
+    signatures = re.findall(r"^<!-- presetlauncher:signature-v1=([A-Za-z0-9+/=]+) -->\r?$", body, re.M)
+    # Only the two historical public releases predate signing.
+    if not signatures and tag in ("1.2.6", "v1.3.0"):
+        return
+    levels = re.findall(r"^<!-- presetlauncher:update-policy=(optional|recommended|required) -->\r?$", body, re.M)
+    if len(signatures) != 1 or len(levels) != 1:
+        raise ValueError("Missing or ambiguous previous release signature or policy")
+    floor = minimum(release)
+    if levels[0] == "required" and floor != version(tag):
+        raise ValueError("Invalid previous required release policy")
+    asset = installer_asset(release)
+    data = {"version": format_version(version(tag)),
+            "minimum_supported_version": format_version(floor), "policy": levels[0]}
+    verify(data, asset["size"], asset["sha256"], signatures[0])
+
+
 def plan():
     previous = request(API + "/releases/latest")
     if previous["draft"] or previous["prerelease"]:
@@ -198,6 +218,7 @@ def plan():
     # Use the upstream release tag even when validating a contribution from a fork.
     tag = previous["tag_name"]
     version(tag)
+    verify_previous(previous)
     git("fetch", f"https://github.com/{REPO}.git", f"refs/tags/{tag}:refs/tags/{tag}")
     sha = git("rev-parse", "HEAD")
     tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
@@ -224,6 +245,7 @@ def publish():
     previous = request(API + "/releases/latest", token=token)
     if previous["tag_name"] != data["previous"]:
         raise ValueError("Release plan is stale; run a fresh main pipeline")
+    verify_previous(previous)
     remote_head = request(API + "/git/ref/heads/main", token=token)["object"]["sha"]
     if remote_head != data["sha"]:
         raise ValueError("Main advanced; run the latest pipeline instead")
@@ -243,6 +265,7 @@ def publish():
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if sums.read_text(encoding="ascii").strip() != f"{digest}  {installer.name}":
         raise ValueError("Validated installer checksum mismatch")
+    signature = sign(data, installer.stat().st_size, digest)
     # Do not reuse an existing tag or silently overwrite a partial release.
     try:
         request(API + "/git/ref/tags/" + quote(tag, safe=""), token=token)
@@ -262,8 +285,11 @@ def publish():
     notes = request(API + "/releases/generate-notes", "POST",
                     {"tag_name": tag, "target_commitish": data["sha"],
                      "previous_tag_name": data["previous"]}, token)
+    if re.search(r"(?m)^<!-- presetlauncher:", notes["body"]):
+        raise ValueError("Generated notes contain reserved update metadata")
     body = (f"<!-- presetlauncher:min-supported={format_version(floor)} -->\n"
-            f"<!-- presetlauncher:update-policy={data['policy']} -->\n\n" + notes["body"])
+            f"<!-- presetlauncher:update-policy={data['policy']} -->\n"
+            f"<!-- presetlauncher:signature-v1={signature} -->\n\n" + notes["body"])
     release = request(API + "/releases", "POST",
                       {"tag_name": tag, "target_commitish": data["sha"], "name": f"PresetLauncher {tag}",
                        "body": body, "draft": True, "prerelease": False}, token)

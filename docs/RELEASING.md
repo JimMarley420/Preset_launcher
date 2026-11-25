@@ -93,3 +93,22 @@ CI does not change the old host. Do not shut it down prematurely. Older clients 
 The smoke test installs and removes the new package. On full-lane PR branches and for a planned release on main it also verifies the previous public installer digest, installs it, upgrades in place, and checks application version, registry and preservation of disposable user data. It verifies the bundled .NET 10 runtime and the executable and assembly file versions. The smoke test also waits for the installed WinUI main window to initialize after each installation. For changes to the updater, manually test both languages, optional skip, the 24-hour recommended reminder, mandatory update, offline retry, download errors, canceled installation and the legacy bridge in a disposable Windows VM.
 
 The new updater checks GitHub's HTTPS metadata and verifies downloaded bytes. A checksum is not independent code signing: configure Authenticode signing before claiming publisher verification or SmartScreen trust. Limit repository and publication access.
+
+## Update signing key
+
+Before merging the signed-updater change, generate the production P-256 key outside the repository on a trusted machine. Keep a secure offline backup. Never commit the private key or paste it into an issue, PR or chat.
+
+```bash
+umask 077
+keydir="$(mktemp -d)"
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$keydir/update-private.pem"
+openssl pkey -in "$keydir/update-private.pem" -pubout -out .circleci/update-policy-public.pem
+```
+
+Commit only `.circleci/update-policy-public.pem` to the updater branch. Store the base64 encoding of the private PEM as `UPDATE_SIGNING_KEY_B64` in the existing restricted `presetlauncher-release` context. Use a trusted local environment to encode and transfer it directly to the CircleCI secret field. Do not print it in CI logs. Remove the temporary private file after securely backing it up.
+
+Publication signs the version, minimum supported version, policy, installer size and SHA-256 using ECDSA P-256 with SHA-256 and a DER signature. The signature is stored in a `presetlauncher:signature-v1` HTML comment. The original two markers remain for older clients. The public key is checked in PR validation. A missing private key or mismatch blocks publication before a draft is created. Signed predecessor releases are verified before carrying forward their minimum version. Only the historical releases 1.2.6 and v1.3.0 may lack a signature. The client pins the public key in its assembly and rejects unsigned newer releases.
+
+The signing key is pinned. A replacement key requires a compatible client migration and transition plan before switching the signer. Clients that miss the transition may require a manual installer. Do not replace the CircleCI secret alone.
+
+The protected local policy is stored under `%LocalAppData%\\PresetLauncher\\Security\\update-policy.dat` using Windows DPAPI for the current user. The old minimum in settings is imported only on first initialization. The lock file also records initialization, so deleting the policy file alone blocks startup. A corrupted protected file blocks startup. See the recovery instructions in [SECURITY.md](../SECURITY.md). DPAPI does not prevent a user who controls the machine from deleting, replaying or recreating their own local state or modifying the executable.

@@ -125,6 +125,9 @@ class PublishTests(unittest.TestCase):
         self.plan = root / "plan.json"
         self.plan.write_text(json.dumps(make_plan(self.previous, [decision("fix: repair")], self.sha)), encoding="utf-8")
         self.calls = []
+        self.signer = patch.object(release, "sign", return_value="test-signature")
+        self.signer.start()
+        self.addCleanup(self.signer.stop)
         for patcher in (
             patch.object(release, "PLAN", self.plan),
             patch.object(release, "OUTPUT", self.output),
@@ -149,6 +152,7 @@ class PublishTests(unittest.TestCase):
             return {"body": "Changes"}
         if url.endswith("/releases") and method == "POST":
             self.assertTrue(payload["draft"])
+            self.assertIn("<!-- presetlauncher:signature-v1=test-signature -->", payload["body"])
             self.assertEqual(payload["target_commitish"], self.sha)
             return {"id": 42}
         if "/assets?" in url:
@@ -157,6 +161,17 @@ class PublishTests(unittest.TestCase):
         if url.endswith("/releases/42") and method == "PATCH":
             return {"draft": False, "tag_name": "v1.2.7", "html_url": "https://github.com/example"}
         self.fail(f"Unexpected API request: {method} {url}")
+
+    def test_unsigned_previous_after_migration_is_rejected(self):
+        with self.assertRaises(ValueError):
+            release.verify_previous({"tag_name": "v1.3.1", "body": "<!-- presetlauncher:min-supported=1.3.0 -->"})
+
+    def test_signed_previous_floor_is_verified(self):
+        previous = {"tag_name": "v1.3.1", "body": "<!-- presetlauncher:min-supported=1.3.0 -->\n"
+                    "<!-- presetlauncher:update-policy=optional -->\n<!-- presetlauncher:signature-v1=dGVzdA== -->"}
+        with patch.object(release, "installer_asset", return_value={"size": 4, "sha256": "ab" * 32}), patch.object(release, "verify") as verify:
+            release.verify_previous(previous)
+            verify.assert_called_once_with({"version": "1.3.1", "minimum_supported_version": "1.3.0", "policy": "optional"}, 4, "ab" * 32, "dGVzdA==")
 
     def test_no_release_never_contacts_api(self):
         self.plan.write_text(json.dumps(make_plan(self.previous, [decision("docs: typo")], self.sha)), encoding="utf-8")
@@ -200,6 +215,12 @@ class PublishTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release.publish()
         self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
+
+    def test_signing_failure_prevents_release_mutation(self):
+        with patch.object(release, "sign", side_effect=ValueError("key mismatch")), patch.object(release, "request", side_effect=self.response):
+            with self.assertRaises(ValueError):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
 
     def test_publish_occurs_after_both_uploads(self):
         with patch.object(release, "request", side_effect=self.response):

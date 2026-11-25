@@ -94,7 +94,12 @@ jobs:
           command: python -m unittest discover -s .circleci -p 'test_check_pr.py'
       - run:
           name: Test release planning
-          command: python -m unittest discover -s .circleci -p 'test_release.py'
+          command: |
+            python -m unittest discover -s .circleci -p 'test_release.py'
+            python -m unittest discover -s .circleci -p 'test_sign_update.py'
+      - run:
+          name: Validate pinned update signing public key
+          command: python .circleci/sign_update.py check-key
       - run:
           name: Calculate version and update policy
           command: python .circleci/release.py plan

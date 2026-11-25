@@ -17,9 +17,7 @@ public sealed class UpdateCoordinator
         _checking = true;
         var installed = _service.GetInstalledVersion();
         var settings = App.Settings.CurrentSettings;
-        if (!UpdateService.TryVersion(settings.MinimumSupportedVersion, out _))
-            settings.MinimumSupportedVersion = "0.0.0";
-        var required = installed != "0.0.0" && _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
+        var required = false;
         try
         {
             if (installed == "0.0.0")
@@ -28,6 +26,24 @@ public sealed class UpdateCoordinator
                 return;
             }
 
+            // Fail closed if the protected state cannot be read or persisted.
+            required = true;
+            SetGate(true);
+            UpdatePolicyStore store;
+            KnownUpdatePolicy known;
+            try
+            {
+                store = new UpdatePolicyStore();
+                known = store.Load(settings.MinimumSupportedVersion);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+                await MessageAsync(root, "update.policyErrorTitle", T("update.policyErrorMessage"));
+                CloseApp();
+                return;
+            }
+            required = _service.IsUpdateAvailable(installed, known.Minimum.ToString(3));
             SetGate(required);
             while (true)
             {
@@ -35,14 +51,16 @@ public sealed class UpdateCoordinator
                 try
                 {
                     update = await _service.GetLatestUpdateAsync(installed);
-                    if (update is not null && _service.IsUpdateAvailable(settings.MinimumSupportedVersion, update.MinimumSupportedVersion.ToString(3)))
+                    if (update is not null)
                     {
-                        settings.MinimumSupportedVersion = update.MinimumSupportedVersion.ToString(3);
-                        App.Settings.Save();
+                        // Enforce the received minimum even if persistence fails.
+                        required |= UpdateService.IsRequired(installed, update);
+                        SetGate(required);
+                        known = store.Observe(update);
                     }
-                    required = _service.IsUpdateAvailable(installed, settings.MinimumSupportedVersion);
+                    required = _service.IsUpdateAvailable(installed, known.Minimum.ToString(3));
                     SetGate(required);
-                    if (required && (update is null || _service.IsUpdateAvailable(update.Version.ToString(3), settings.MinimumSupportedVersion)))
+                    if (required && (update is null || _service.IsUpdateAvailable(update.Version.ToString(3), known.Minimum.ToString(3))))
                         throw new InvalidDataException("No release satisfies the known minimum version.");
                 }
                 catch (Exception ex)
