@@ -28,12 +28,17 @@ public static class UpdatePolicySignature
         var matches = Marker.Matches(body);
         if (matches.Count != 1)
             throw new InvalidDataException("Missing or ambiguous update signature.");
+        VerifyMessage(Payload(update), matches[0].Groups[1].Value, publicKey);
+    }
+
+    internal static void VerifyMessage(byte[] payload, string signature, string publicKey)
+    {
         try
         {
             using var key = ECDsa.Create();
             key.ImportFromPem(publicKey);
             if (key.ExportParameters(false).Curve.Oid.Value != "1.2.840.10045.3.1.7" ||
-                !key.VerifyData(Payload(update), Convert.FromBase64String(matches[0].Groups[1].Value),
+                !key.VerifyData(payload, Convert.FromBase64String(signature),
                     HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence))
                 throw new InvalidDataException("Invalid update signature.");
         }

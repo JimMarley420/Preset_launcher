@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -8,6 +9,8 @@ namespace PresetLauncher.Services;
 public enum UpdatePolicy { Optional, Recommended, Required }
 
 public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVersion, Uri DownloadUri, long Size, string Sha256, UpdatePolicy Policy = UpdatePolicy.Optional);
+
+public sealed class UpdateAssetException : IOException;
 
 public sealed class UpdateService
 {
@@ -63,7 +66,7 @@ public sealed class UpdateService
         return deferredVersion != version || deferredUntil is null || deferredUntil <= (now ?? DateTimeOffset.UtcNow);
     }
 
-    public async Task<ReleaseUpdate?> GetLatestUpdateAsync(string installed, CancellationToken ct = default)
+    public async Task<ReleaseUpdate?> GetLatestUpdateAsync(string installed, Action<Version, Version> observePolicy, CancellationToken ct = default)
     {
         if (!TryVersion(installed, out var current) || current == new Version(0, 0, 0))
             return null; // Unversioned source build; never install a production release over it.
@@ -72,7 +75,75 @@ public sealed class UpdateService
         using var response = await _client.GetAsync(LatestUrl, timeout.Token);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(timeout.Token);
-        return ParseSignedRelease(json, current, UpdatePolicySignature.PublicKey());
+        return ParseArchitectureRelease(json, current, UpdatePolicySignature.PublicKey(),
+            RuntimeInformation.ProcessArchitecture, observePolicy);
+    }
+
+    public static ReleaseUpdate? ParseArchitectureRelease(string json, Version installed, string publicKey,
+        Architecture architecture, Action<Version, Version> observePolicy)
+    {
+        using var document = JsonDocument.Parse(json);
+        var release = document.RootElement;
+        if (release.GetProperty("draft").GetBoolean() || release.GetProperty("prerelease").GetBoolean())
+            throw new InvalidDataException("Expected a stable published release.");
+        var tag = release.GetProperty("tag_name").GetString();
+        if (!TryVersion(tag, out var latest))
+            throw new InvalidDataException("Invalid release tag.");
+        if (latest <= installed) return null;
+
+        var body = release.GetProperty("body").GetString() ?? "";
+        var markers = Regex.Matches(body, @"^<!-- presetlauncher:manifest-v2=([A-Za-z0-9+/=]+)\.([A-Za-z0-9+/=]+) -->\r?$",
+            RegexOptions.Multiline | RegexOptions.CultureInvariant);
+        if (markers.Count != 1)
+            throw new InvalidDataException("Missing or ambiguous architecture manifest.");
+        var message = Convert.FromBase64String(markers[0].Groups[1].Value);
+        var domain = "presetlauncher-update-v2\n"u8;
+        if (!message.AsSpan().StartsWith(domain))
+            throw new InvalidDataException("Invalid architecture manifest protocol.");
+        UpdatePolicySignature.VerifyMessage(message, markers[0].Groups[2].Value, publicKey);
+        using var manifest = JsonDocument.Parse(message.AsMemory(domain.Length));
+        var data = manifest.RootElement;
+        if (data.GetProperty("version").GetString() != latest.ToString(3) ||
+            !TryVersion(data.GetProperty("minimum_supported_version").GetString(), out var minimum) ||
+            minimum > latest)
+            throw new InvalidDataException("Invalid signed release versions.");
+        var policy = data.GetProperty("policy").GetString() switch
+        {
+            "optional" => UpdatePolicy.Optional,
+            "recommended" => UpdatePolicy.Recommended,
+            "required" when minimum == latest => UpdatePolicy.Required,
+            _ => throw new InvalidDataException("Invalid signed update policy.")
+        };
+        observePolicy(latest, minimum);
+
+        using var mappingStream = typeof(UpdateService).Assembly.GetManifestResourceStream("PresetLauncher.Architectures")
+            ?? throw new InvalidDataException("Missing architecture mapping.");
+        using var mapping = JsonDocument.Parse(mappingStream);
+        var target = architecture.ToString().ToLowerInvariant();
+        if (!mapping.RootElement.TryGetProperty(target, out var entry))
+            throw new UpdateAssetException();
+        var name = $"PresetLauncher_Setup_{latest.ToString(3)}{entry.GetProperty("suffix").GetString()}.exe";
+        if (!release.TryGetProperty("assets", out var releaseAssets) || releaseAssets.ValueKind != JsonValueKind.Array)
+            throw new UpdateAssetException();
+        var signedAssets = data.GetProperty("installers").EnumerateArray()
+            .Where(asset => asset.GetProperty("architecture").GetString() == target).ToArray();
+        var assets = releaseAssets.EnumerateArray()
+            .Where(asset => asset.GetProperty("name").GetString() == name).ToArray();
+        if (signedAssets.Length != 1 || assets.Length != 1)
+            throw new UpdateAssetException();
+
+        var metadata = signedAssets[0];
+        var size = metadata.GetProperty("size").GetInt64();
+        var digest = metadata.GetProperty("sha256").GetString();
+        var item = assets[0];
+        var expectedUrl = $"https://github.com/{Repository}/releases/download/{tag}/{name}";
+        if (metadata.GetProperty("name").GetString() != name ||
+            size <= 0 || size > MaxInstallerSize || digest is null || !Regex.IsMatch(digest, @"^[0-9a-f]{64}\z") ||
+            item.GetProperty("state").GetString() != "uploaded" || item.GetProperty("size").GetInt64() != size ||
+            item.GetProperty("browser_download_url").GetString() != expectedUrl ||
+            !string.Equals(item.GetProperty("digest").GetString(), $"sha256:{digest}", StringComparison.OrdinalIgnoreCase))
+            throw new UpdateAssetException();
+        return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest, policy);
     }
 
     public static ReleaseUpdate? ParseSignedRelease(string json, Version installed, string publicKey)

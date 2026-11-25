@@ -51,14 +51,12 @@ public sealed class UpdateCoordinator
                 ReleaseUpdate? update;
                 try
                 {
-                    update = await _service.GetLatestUpdateAsync(installed);
-                    if (update is not null)
+                    update = await _service.GetLatestUpdateAsync(installed, (version, minimum) =>
                     {
-                        // Enforce the received minimum even if persistence fails.
-                        required |= UpdateService.IsRequired(installed, update);
+                        required |= _service.IsUpdateAvailable(installed, minimum.ToString(3));
                         SetGate(required);
-                        known = store.Observe(update);
-                    }
+                        known = store.Observe(version, minimum);
+                    });
                     required = _service.IsUpdateAvailable(installed, known.Minimum.ToString(3));
                     SetGate(required);
                     if (required && (update is null || _service.IsUpdateAvailable(update.Version.ToString(3), known.Minimum.ToString(3))))
@@ -67,13 +65,14 @@ public sealed class UpdateCoordinator
                 catch (Exception ex)
                 {
                     Debug.WriteLine(ex);
+                    var message = T(ex is UpdateAssetException ? "update.architectureAssetUnavailable" : "settings.updateCheckFailed");
                     if (required)
                     {
-                        if (await RetryRequiredAsync(root, T("settings.updateCheckFailed"))) continue;
+                        if (await RetryRequiredAsync(root, message)) continue;
                         CloseApp();
                     }
                     else if (manual)
-                        await MessageAsync(root, "dialog.error", T("settings.updateCheckFailed"));
+                        await MessageAsync(root, "dialog.error", message);
                     return;
                 }
 

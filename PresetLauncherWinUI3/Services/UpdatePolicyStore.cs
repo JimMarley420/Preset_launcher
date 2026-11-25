@@ -39,14 +39,16 @@ public sealed class UpdatePolicyStore
         return state;
     }
 
-    public KnownUpdatePolicy Observe(ReleaseUpdate update)
+    public KnownUpdatePolicy Observe(ReleaseUpdate update) => Observe(update.Version, update.MinimumSupportedVersion);
+
+    public KnownUpdatePolicy Observe(Version version, Version minimum)
     {
         using var guard = Lock();
         // A missing file after initialization is not silently accepted.
         var state = Read();
-        if (update.Version < state.Latest || update.MinimumSupportedVersion < state.Minimum)
+        if (version < state.Latest || minimum < state.Minimum)
             throw new InvalidDataException("Update policy rollback detected.");
-        var next = new KnownUpdatePolicy(update.MinimumSupportedVersion, update.Version);
+        var next = new KnownUpdatePolicy(minimum, version);
         if (next != state) Write(next);
         return next;
     }

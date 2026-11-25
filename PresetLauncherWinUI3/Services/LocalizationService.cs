@@ -152,6 +152,7 @@ public class LocalizationService
         ("settings.theme.system", "System", "Système"),
         ("settings.title", "Settings", "Paramètres"),
         ("settings.updateAvailable", "Update available", "Mise à jour disponible"),
+        ("update.architectureAssetUnavailable", "The installer for this application architecture is missing or invalid.", "Le programme d’installation pour cette architecture est manquant ou invalide."),
         ("settings.updateCheckFailed", "Unable to check for updates", "Impossible de vérifier les mises à jour"),
         ("settings.updateDownloadError", "Unable to download the update. Please try again later.", "Impossible de télécharger la mise à jour. Veuillez rééssayer plus tard."),
         ("settings.updateDownloadingInstalling", "Update", "Mise à jour"),
