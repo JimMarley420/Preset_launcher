@@ -102,20 +102,46 @@ class InstallerLaneTests(unittest.TestCase):
 
     def test_stacked_pr_uses_its_actual_base(self):
         metadata = {"base": {"ref": "feat/github-release-updater", "sha": "a" * 40}, "head": {"sha": "head"}}
-        with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", "README.md\0"]) as git:
+        with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", "M\0README.md\0"]) as git:
             self.assertFalse(release.validate_installer("feat/dotnet-10-migration", metadata, "head"))
         self.assertEqual(git.call_args_list[0].args[-1], "refs/heads/feat/github-release-updater")
         self.assertEqual(git.call_args_list[-1].args, (
-            "diff", "--name-only", "--no-renames", "-z", "merge-base", "head", "--",
+            "diff", "--name-status", "--no-renames", "-z", "merge-base", "head", "--",
         ))
 
 
     def test_renamed_sensitive_file_still_requires_full_lane(self):
         metadata = {"base": {"ref": "main", "sha": "a" * 40}, "head": {"sha": "head"}}
-        paths = "docs/archive.txt\0PresetLauncherWinUI3/Services/LocalizationService.cs\0"
+        paths = "A\0docs/archive.txt\0D\0PresetLauncherWinUI3/Services/LocalizationService.cs\0"
         with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", paths]) as git:
             self.assertTrue(release.validate_installer("feature", metadata, "head"))
         self.assertIn("--no-renames", git.call_args.args)
+
+    def test_source_change_status_controls_validation_lane(self):
+        source = "PresetLauncherWinUI3/Services/DataService.cs"
+        metadata = {"base": {"ref": "main", "sha": "a" * 40}, "head": {"sha": "head"}}
+        for diff, full in [
+            (f"M\0{source}\0", False),
+            ("A\0docs/new.md\0", False),
+            ("A\0PresetLauncherWinUI3/Views/Pages/Tool.xaml\0", True),
+            ("A\0PresetLauncherWinUI3/Services/Tool.cs\0", True),
+            (f"D\0{source}\0A\0PresetLauncherWinUI3/Services/MovedService.cs\0", True),
+            (f"T\0{source}\0", True),
+            ("M\0unrecognized.dat\0", True),
+            ("M\0", True),
+        ]:
+            with self.subTest(diff=diff), patch.object(
+                release, "git", side_effect=["", "a" * 40, "merge-base", diff, ""]
+            ):
+                self.assertEqual(full, release.validate_installer("feature", metadata, "head"))
+
+    def test_native_api_edit_requires_full_lane_in_ordinary_source(self):
+        source = "PresetLauncherWinUI3/Services/DataService.cs"
+        metadata = {"base": {"ref": "main", "sha": "a" * 40}, "head": {"sha": "head"}}
+        with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", f"M\0{source}\0", source]) as git:
+            self.assertTrue(release.validate_installer("feature", metadata, "head"))
+        self.assertIn("-G", git.call_args.args)
+        self.assertIn("DllImport", git.call_args.args[4])
 
 
 class ArchitectureContractTests(unittest.TestCase):

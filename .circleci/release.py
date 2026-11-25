@@ -126,18 +126,23 @@ def branch_pr(sha, branch):
     return matches[0]
 
 
+def is_source(path):
+    return path.casefold().endswith((".cs", ".xaml"))
+
+
 def needs_installer(paths):
     for path in filter(None, paths):
         path = path.casefold()
         name = path.rsplit("/", 1)[-1]
+        if name.endswith(".cs") and any(part in name for part in ("update", "interop", "native")):
+            return True
         if (path.startswith((".circleci/", "installer/"))
                 or "/publishprofiles/" in path
                 or name.endswith((".csproj", ".props", ".targets", ".iss", ".pubxml", ".sln",
                                   ".slnx", ".vcxproj", ".manifest", ".ps1", ".pfx"))
                 or name in ("global.json", "nuget.config", "packages.lock.json", "packages.config")
-                or (name.endswith(".cs") and ("update" in name or name in ("app.xaml.cs", "appsettings.cs",
-                                                                          "settingsservice.cs", "mainwindow.xaml.cs", "settingspage.xaml.cs",
-                                                                          "localizationservice.cs")))
+                or name in ("app.xaml.cs", "appsettings.cs", "settingsservice.cs", "mainwindow.xaml.cs",
+                            "settingspage.xaml.cs", "localizationservice.cs")
                 or name in ("app.xaml", "mainwindow.xaml", "settingspage.xaml", "favicon.ico",
                             "nativewindow.cs", "processselector.cs", "launcherservice.cs", "exportpath.cs",
                             "windowssystemdispatcherqueuehelper.cs", "themeservice.cs")):
@@ -145,7 +150,7 @@ def needs_installer(paths):
         if path in ("readme.md", "readme.fr.md", "security.md", "contributing.md", "code_of_conduct.md") or (
                 path.startswith("docs/") and path.endswith(".md")):
             continue
-        if path.startswith(("presetlauncherwinui3/", "tests/presetlauncher.tests/")) and path.endswith((".cs", ".xaml")):
+        if path.startswith(("presetlauncherwinui3/", "tests/presetlauncher.tests/")) and is_source(path):
             continue
         return True
     return False
@@ -162,9 +167,29 @@ def validate_installer(branch, pr, sha):
     if pr["head"]["sha"] != sha or git("rev-parse", "FETCH_HEAD") != base_sha:
         return True
     comparison = git("merge-base", base_sha, sha)
-    # Report both sides of a rename as changed paths.
-    changed = git("diff", "--name-only", "--no-renames", "-z", comparison, sha, "--")
-    return needs_installer(changed.split("\0"))
+    # Report renames as deletion plus addition. A new source path has no
+    # established classification, even if it resembles ordinary application code.
+    changed = git("diff", "--name-status", "--no-renames", "-z", comparison, sha, "--")
+    if not changed:
+        return False
+    fields = changed.removesuffix("\0").split("\0")
+    if len(fields) % 2 or not changed.endswith("\0"):
+        return True
+    paths = []
+    for status, path in zip(fields[::2], fields[1::2]):
+        if not path or status not in ("A", "M", "D") or (status == "A" and is_source(path)):
+            return True
+        paths.append(path)
+    if needs_installer(paths):
+        return True
+    app_sources = [path for path in paths if path.casefold().startswith("presetlauncherwinui3/") and is_source(path)]
+    if not app_sources:
+        return False
+    # Also catch native API or architecture selection introduced in an
+    # otherwise ordinary source file.
+    platform_api = (r"\b(DllImport|LibraryImport|NativeLibrary|Marshal|IntPtr|UIntPtr|nint|nuint|"
+                    r"RuntimeInformation|ProcessArchitecture|OSArchitecture|RegistryView|Microsoft\.Win32)\b")
+    return bool(git("diff", "--name-only", "--no-renames", "-G", platform_api, comparison, sha, "--", *app_sources))
 
 
 def branch_decision(pr):
@@ -340,6 +365,17 @@ def manifest_message(data, installers):
     return b"presetlauncher-update-v2\n" + json.dumps(manifest, separators=(",", ":")).encode("ascii")
 
 
+def signed_update_markers(data, installers):
+    x64 = installers["x64"]
+    signature = sign(data, x64["size"], x64["sha256"])
+    message = manifest_message(data, installers)
+    manifest = base64.b64encode(message).decode("ascii") + "." + sign_message(message)
+    return (f"<!-- presetlauncher:min-supported={data['minimum_supported_version']} -->\n"
+            f"<!-- presetlauncher:update-policy={data['policy']} -->\n"
+            f"<!-- presetlauncher:signature-v1={signature} -->\n"
+            f"<!-- presetlauncher:manifest-v2={manifest} -->")
+
+
 def validated_installers(data, required_gate=None):
     evidence = json.loads(EVIDENCE.read_text(encoding="utf-8-sig"))
     full = data["validate_installer"]
@@ -428,10 +464,7 @@ def publish():
     installers = validated_installers(data)
     paths = [OUTPUT / installer_name(value, arch) for arch in ARCHITECTURES]
     paths.append(OUTPUT / "SHA256SUMS.txt")
-    x64 = installers["x64"]
-    signature = sign(data, x64["size"], x64["sha256"])
-    message = manifest_message(data, installers)
-    manifest = base64.b64encode(message).decode("ascii") + "." + sign_message(message)
+    markers = signed_update_markers(data, installers)
     # Do not reuse an existing tag or silently overwrite a partial release.
     try:
         request(API + "/git/ref/tags/" + quote(tag, safe=""), token=token)
@@ -453,10 +486,7 @@ def publish():
                      "previous_tag_name": data["previous"]}, token)
     if re.search(r"(?m)^<!-- presetlauncher:", notes["body"]):
         raise ValueError("Generated notes contain reserved update metadata")
-    body = (f"<!-- presetlauncher:min-supported={format_version(floor)} -->\n"
-            f"<!-- presetlauncher:update-policy={data['policy']} -->\n"
-            f"<!-- presetlauncher:signature-v1={signature} -->\n"
-            f"<!-- presetlauncher:manifest-v2={manifest} -->\n\n" + notes["body"])
+    body = markers + "\n\n" + notes["body"]
     release = request(API + "/releases", "POST",
                       {"tag_name": tag, "target_commitish": data["sha"], "name": f"PresetLauncher {tag}",
                        "body": body, "draft": True, "prerelease": False}, token)

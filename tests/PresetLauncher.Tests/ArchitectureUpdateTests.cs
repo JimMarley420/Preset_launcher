@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PresetLauncher.Services;
 
@@ -18,6 +19,70 @@ public sealed class ArchitectureUpdateTests
     private static (string Name, string Architecture)[] Installers =>
         [("PresetLauncher_Setup_2.0.0.exe", "x64"), ("PresetLauncher_Setup_2.0.0_x86.exe", "x86"),
             ("PresetLauncher_Setup_2.0.0_arm64.exe", "arm64")];
+
+    private static JsonObject ReadPythonFixture() =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "signed-update.json")))!.AsObject();
+
+    [TestMethod]
+    [DataRow(Architecture.X64, "", 101, '1')]
+    [DataRow(Architecture.X86, "_x86", 102, '2')]
+    [DataRow(Architecture.Arm64, "_arm64", 103, '3')]
+    public void VerifiesPythonSignedRelease(Architecture architecture, string suffix, int size, char digestDigit)
+    {
+        var fixture = ReadPythonFixture();
+        var json = fixture["release"]!.ToJsonString();
+        var publicKey = fixture["public_key"]!.GetValue<string>();
+        var legacy = UpdateService.ParseSignedRelease(json, Installed, publicKey)!;
+        Assert.AreEqual("PresetLauncher_Setup_2.1.0.exe", Path.GetFileName(legacy.DownloadUri.AbsolutePath));
+        Assert.AreEqual(101L, legacy.Size);
+        Assert.AreEqual(new string('1', 64), legacy.Sha256);
+
+        var latest = new Version(2, 1, 0);
+        var update = UpdateService.ParseArchitectureRelease(json, Installed, publicKey, architecture,
+            (version, floor) => { Assert.AreEqual(latest, version); Assert.AreEqual(latest, floor); })!;
+        Assert.AreEqual($"PresetLauncher_Setup_2.1.0{suffix}.exe", Path.GetFileName(update.DownloadUri.AbsolutePath));
+        Assert.AreEqual((long)size, update.Size);
+        Assert.AreEqual(new string(digestDigit, 64), update.Sha256);
+    }
+
+    [TestMethod]
+    [DataRow("substitute")]
+    [DataRow("duplicate GitHub")]
+    [DataRow("duplicate signed")]
+    [DataRow("mismatched size")]
+    [DataRow("mismatched digest")]
+    public void RejectsInvalidPythonSignedReleaseAssets(string change)
+    {
+        var fixture = ReadPythonFixture();
+        var release = fixture["release"]!.AsObject();
+        var assets = release["assets"]!.AsArray();
+        var x86 = assets[1]!.AsObject();
+        switch (change)
+        {
+            case "substitute":
+                x86["size"] = assets[2]!["size"]!.DeepClone();
+                x86["digest"] = assets[2]!["digest"]!.DeepClone();
+                break;
+            case "duplicate GitHub":
+                assets.Add(x86.DeepClone());
+                break;
+            case "duplicate signed":
+                release["body"] = fixture["signed_duplicate"]!.DeepClone();
+                break;
+            case "mismatched size":
+                x86["size"] = 444;
+                break;
+            case "mismatched digest":
+                x86["digest"] = "sha256:" + new string('a', 64);
+                break;
+        }
+
+        Version? authenticatedFloor = null;
+        Assert.ThrowsExactly<UpdateAssetException>(() => UpdateService.ParseArchitectureRelease(
+            release.ToJsonString(), Installed, fixture["public_key"]!.GetValue<string>(), Architecture.X86,
+            (_, floor) => authenticatedFloor = floor));
+        Assert.AreEqual(new Version(2, 1, 0), authenticatedFloor);
+    }
 
     private static string Release(ECDsa key, Func<string, string>? changeMessage = null,
         Func<string[], IEnumerable<string>>? selectAssets = null, bool legacyOnly = false)

@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -9,8 +10,55 @@ from unittest.mock import patch
 import release
 import sign_update
 
+FIXTURE = Path(__file__).with_name("fixtures") / "signed-update.json"
+
+
+def write_cross_language_fixture():
+    # Regenerate explicitly. OpenSSL ECDSA uses random nonces, so freeze the
+    # resulting signatures for deterministic verification in both test suites.
+    data = {"version": "2.1.0", "minimum_supported_version": "2.1.0", "policy": "required"}
+    tag = "v" + data["version"]
+    assets = []
+    for index, arch in enumerate(release.ARCHITECTURES, 1):
+        name = release.installer_name(data["version"], arch)
+        assets.append({"name": name, "state": "uploaded", "size": 100 + index,
+                       "browser_download_url": f"https://github.com/{release.REPO}/releases/download/{tag}/{name}",
+                       "digest": f"sha256:{str(index) * 64}"})
+    predecessor = {"tag_name": tag, "draft": False, "prerelease": False, "assets": assets}
+    installers = {arch: release.installer_asset(predecessor, arch) for arch in release.ARCHITECTURES}
+    with tempfile.TemporaryDirectory() as directory:
+        private = Path(directory) / "cross-language-test-private.pem"
+        public = Path(directory) / "cross-language-test-public.pem"
+        subprocess.run(["openssl", "genpkey", "-algorithm", "EC", "-pkeyopt",
+                        "ec_paramgen_curve:P-256", "-out", str(private)], check=True)
+        subprocess.run(["openssl", "pkey", "-in", str(private), "-pubout", "-out", str(public)], check=True)
+        with patch.object(sign_update, "PUBLIC_KEY", public), patch.dict(os.environ, {
+            "UPDATE_SIGNING_KEY_B64": base64.b64encode(private.read_bytes()).decode("ascii")
+        }):
+            predecessor["body"] = release.signed_update_markers(data, installers)
+            prefix, message = release.manifest_message(data, installers).split(b"\n", 1)
+            duplicate = json.loads(message)
+            duplicate["installers"].append(duplicate["installers"][1])
+            duplicate_message = prefix + b"\n" + json.dumps(duplicate, separators=(",", ":")).encode("ascii")
+            encoded = base64.b64encode(duplicate_message).decode("ascii")
+            signed_duplicate = f"<!-- presetlauncher:manifest-v2={encoded}.{sign_update.sign_message(duplicate_message)} -->"
+        fixture = {"public_key": public.read_text(encoding="ascii"), "release": predecessor,
+                   "signed_duplicate": signed_duplicate}
+    FIXTURE.write_text(json.dumps(fixture, indent=2) + "\n", encoding="ascii", newline="\n")
+
 
 class SigningTests(unittest.TestCase):
+    def test_cross_language_fixture_matches_publisher_serialization(self):
+        fixture = json.loads(FIXTURE.read_text(encoding="ascii"))
+        with tempfile.TemporaryDirectory() as directory:
+            public = Path(directory) / "fixture.pem"
+            public.write_text(fixture["public_key"], encoding="ascii")
+            with patch.object(sign_update, "PUBLIC_KEY", public):
+                installers = release.verify_previous(fixture["release"])
+                self.assertEqual([installers[arch]["size"] for arch in release.ARCHITECTURES], [101, 102, 103])
+                self.assertEqual([installers[arch]["sha256"] for arch in release.ARCHITECTURES],
+                                 [digit * 64 for digit in "123"])
+
     def test_signature_verifies_and_changed_payload_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             private = Path(directory) / "private.pem"
@@ -70,3 +118,7 @@ class SigningTests(unittest.TestCase):
                 assets[2]["size"] = 43
                 with self.assertRaisesRegex(ValueError, "does not match"):
                     release.verify_previous(predecessor)
+
+
+if __name__ == "__main__":
+    write_cross_language_fixture()
