@@ -45,6 +45,21 @@ commands:
           key: v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
           paths:
             - ~/.nuget/packages
+  validate-architecture:
+    parameters:
+      step-name:
+        type: string
+      architecture:
+        type: enum
+        enum: [x64, x86, arm64]
+      phase:
+        type: enum
+        enum: [Publish, Compile, Smoke]
+    steps:
+      - run:
+          name: << parameters.step-name >>
+          no_output_timeout: 20m
+          command: '& .circleci/validate-windows.ps1 -Phase << parameters.phase >> -Architecture << parameters.architecture >>'
 
 jobs:
   validate-pr-title:
@@ -147,9 +162,47 @@ jobs:
           destination: test-reports
 
       - run:
-          name: Publish, package and smoke test the planned architectures
-          no_output_timeout: 20m
-          command: '& .circleci/validate-windows.ps1'
+          name: Prepare pinned Inno Setup compiler
+          command: '& .circleci/validate-windows.ps1 -Phase PrepareCompiler'
+      - validate-architecture:
+          step-name: Publish and verify x64 payload
+          architecture: x64
+          phase: Publish
+      - validate-architecture:
+          step-name: Publish and verify x86 payload
+          architecture: x86
+          phase: Publish
+      - validate-architecture:
+          step-name: Publish and verify ARM64 payload
+          architecture: arm64
+          phase: Publish
+      - validate-architecture:
+          step-name: Compile x64 installer
+          architecture: x64
+          phase: Compile
+      - validate-architecture:
+          step-name: Compile x86 installer
+          architecture: x86
+          phase: Compile
+      - validate-architecture:
+          step-name: Compile ARM64 installer
+          architecture: arm64
+          phase: Compile
+      - validate-architecture:
+          step-name: Smoke test x64 installer and native app
+          architecture: x64
+          phase: Smoke
+      - validate-architecture:
+          step-name: Smoke test x86 installer and app under WOW64
+          architecture: x86
+          phase: Smoke
+      - validate-architecture:
+          step-name: Verify ARM64 installer rejects the x64 host
+          architecture: arm64
+          phase: Smoke
+      - run:
+          name: Write Windows validation evidence
+          command: '& .circleci/validate-windows.ps1 -Phase Evidence'
       - store_artifacts:
           path: artifacts/installer-logs
           destination: installer-logs

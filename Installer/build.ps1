@@ -2,20 +2,29 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.0.0',
     [ValidateSet('x64', 'x86', 'arm64', 'all')][string]$Architecture = 'x64',
     [switch]$PublishOnly,
-    [switch]$UsePinnedCompiler
+    [switch]$UsePinnedCompiler,
+    [ValidateSet('Build', 'PrepareCompiler', 'Compile')][string]$Phase = 'Build',
+    [string]$CompilerDirectory
 )
 $ErrorActionPreference = 'Stop'
+if ($Phase -ne 'Build' -and (-not $UsePinnedCompiler -or -not $CompilerDirectory -or $PublishOnly)) {
+    throw 'Compiler phases require -UsePinnedCompiler and -CompilerDirectory.'
+}
+if ($Phase -eq 'Build' -and $CompilerDirectory) { throw '-CompilerDirectory is only for compiler phases.' }
 $root = Split-Path $PSScriptRoot -Parent
 $mapping = Get-Content (Join-Path $PSScriptRoot architectures.json) -Raw | ConvertFrom-Json
 $targets = if ($Architecture -eq 'all') { $mapping.PSObject.Properties.Name } else { $Architecture.ToLowerInvariant() }
 $temp = $null
+$preparePinned = $UsePinnedCompiler -and -not $PublishOnly -and $Phase -ne 'Compile'
 
 if (-not $PublishOnly) {
     if ($UsePinnedCompiler) {
-        $temp = Join-Path $env:TEMP "presetlauncher-inno-$([guid]::NewGuid())"
-        New-Item -ItemType Directory $temp | Out-Null
-        $download = Join-Path $temp 'innosetup-6.7.1.exe'
-        $targetCompiler = Join-Path $temp 'compiler'
+        if ($preparePinned) {
+            $temp = Join-Path $env:TEMP "presetlauncher-inno-$([guid]::NewGuid())"
+            New-Item -ItemType Directory $temp | Out-Null
+            $download = Join-Path $temp 'innosetup-6.7.1.exe'
+        }
+        $targetCompiler = if ($CompilerDirectory) { $CompilerDirectory } else { Join-Path $temp 'compiler' }
         $compiler = Join-Path $targetCompiler 'ISCC.exe'
     } else {
         $found = Get-Command ISCC.exe -ErrorAction SilentlyContinue
@@ -29,7 +38,7 @@ if (-not $PublishOnly) {
 
 Push-Location $root
 try {
-    if ($UsePinnedCompiler -and -not $PublishOnly) {
+    if ($preparePinned) {
         $timer = [Diagnostics.Stopwatch]::StartNew()
         curl.exe -fsSL --connect-timeout 20 --max-time 90 --retry 2 --retry-max-time 120 https://github.com/jrsoftware/issrc/releases/download/is-6_7_1/innosetup-6.7.1.exe -o $download
         if ($LASTEXITCODE -ne 0 -or (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash -ine
@@ -38,32 +47,38 @@ try {
         if ($process.ExitCode -ne 0 -or -not (Test-Path $compiler -PathType Leaf)) { throw 'Pinned Inno Setup installation failed' }
         Write-Host "Inno Setup preparation: $($timer.Elapsed)"
     }
+    if ($Phase -eq 'PrepareCompiler') { return }
+    if ($Phase -eq 'Compile' -and -not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+        throw 'The pinned Inno Setup compiler must be prepared before compilation.'
+    }
     $output = Join-Path $PSScriptRoot Output
     $project = 'PresetLauncherWinUI3/PresetLauncherWinUI3.csproj'
     foreach ($target in $targets) {
         $entry = $mapping.$target
         $publishRoot = Join-Path $root publish
         $publish = Join-Path $publishRoot $entry.rid
-        if (Test-Path -LiteralPath $publish) {
-            $resolved = (Resolve-Path -LiteralPath $publish).Path
-            if ($resolved -ne $publish -or (Get-Item -LiteralPath $publishRoot).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint) -or
-                (Get-Item -LiteralPath $publish).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) { throw "Unsafe publish directory: $publish" }
-            Remove-Item -LiteralPath $resolved -Recurse -Force
-        }
-        $properties = @("-p:Platform=$($entry.platform)", "-p:RuntimeIdentifiers=$($entry.rid)", "-p:Version=$Version",
-            '-p:WindowsPackageType=None', '-p:PublishTrimmed=false', '-p:PublishReadyToRun=false',
-            '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905')
-        # Artifacts layout isolates the restore graph as well as intermediate binaries.
-        $work = Join-Path $root "artifacts/publish-$target"
         $timer = [Diagnostics.Stopwatch]::StartNew()
-        dotnet restore $project --runtime $entry.rid -p:Configuration=Release "-p:ArtifactsPath=$work" -p:SelfContained=true @properties
-        if ($LASTEXITCODE -ne 0) { throw "Restore failed: $target" }
-        Write-Host "$target restore: $($timer.Elapsed)"
-        $timer.Restart()
-        dotnet publish $project -c Release -r $entry.rid --self-contained true --no-restore --artifacts-path $work --output $publish @properties
-        if ($LASTEXITCODE -ne 0) { throw "Publish failed: $target" }
-        & "$PSScriptRoot/assert-payload.ps1" -Directory $publish -Machine $entry.machine
-        Write-Host "$target publish and PE verification: $($timer.Elapsed)"
+        if ($Phase -ne 'Compile') {
+            if (Test-Path -LiteralPath $publish) {
+                $resolved = (Resolve-Path -LiteralPath $publish).Path
+                if ($resolved -ne $publish -or (Get-Item -LiteralPath $publishRoot).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint) -or
+                    (Get-Item -LiteralPath $publish).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) { throw "Unsafe publish directory: $publish" }
+                Remove-Item -LiteralPath $resolved -Recurse -Force
+            }
+            $properties = @("-p:Platform=$($entry.platform)", "-p:RuntimeIdentifiers=$($entry.rid)", "-p:Version=$Version",
+                '-p:WindowsPackageType=None', '-p:PublishTrimmed=false', '-p:PublishReadyToRun=false',
+                '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905')
+            # Artifacts layout isolates the restore graph as well as intermediate binaries.
+            $work = Join-Path $root "artifacts/publish-$target"
+            dotnet restore $project --runtime $entry.rid -p:Configuration=Release "-p:ArtifactsPath=$work" -p:SelfContained=true @properties
+            if ($LASTEXITCODE -ne 0) { throw "Restore failed: $target" }
+            Write-Host "$target restore: $($timer.Elapsed)"
+            $timer.Restart()
+            dotnet publish $project -c Release -r $entry.rid --self-contained true --no-restore --artifacts-path $work --output $publish @properties
+            if ($LASTEXITCODE -ne 0) { throw "Publish failed: $target" }
+            & "$PSScriptRoot/assert-payload.ps1" -Directory $publish -Machine $entry.machine
+            Write-Host "$target publish and PE verification: $($timer.Elapsed)"
+        }
         if ($PublishOnly) { continue }
 
         $timer.Restart()
