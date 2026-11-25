@@ -28,7 +28,7 @@ PresetLauncher groups programs into presets. Create a preset for work, gaming or
 
 * Start every program in a preset or just the ones that aren't running.
 * Add apps, shortcuts and scripts, with individual launch delays and optional administrator privileges.
-* Import presets from JSON and view your launch history.
+* Import presets from JSON, filter launch history and back up application data.
 * Choose between light and dark themes, in English or French.
 
 ## Installation

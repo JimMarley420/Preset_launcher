@@ -26,8 +26,7 @@ The installer is written to `Installer/Output/`. Local builds default to version
 | --- | --- |
 | `PresetLauncherWinUI3/Models/` | Presets, executable entries, settings and launch history. |
 | `PresetLauncherWinUI3/Services/` | Process launching, persistence, localization, themes, password verification and updates. |
-| `PresetLauncherWinUI3/Views/Pages/` | Presets, history, statistics and settings. |
-| `PresetLauncherWinUI3/Views/Dialogs/` | Preset editor. |
+| `PresetLauncherWinUI3/Views/` | Desktop pages, preset editor and native dialogs. |
 | `Installer/` | Publishing and installer packaging. |
 
 Open `PresetLauncherWinUI3/PresetLauncherWinUI3.sln` in Visual Studio 2026 with the WinUI workload and select x64. Build and run the application locally. For packaging, see [Build from source](#build-from-source).
@@ -43,9 +42,10 @@ Record the Windows version, configuration and results in the pull request. Do no
 - App.xaml.cs initializes settings, localization, theme and default DataService storage, then opens the main window and checks for updates.
 - LauncherService sorts entries by Order. Full launch applies delays and records history. Missing-only launch takes one process snapshot and matches paths or filenames, ignores delays and does not record history or increment the preset launch counter. Both modes update per-program usage on successful start requests.
 - ClosePresetProcessesAsync requests window closure, waits 500 ms and may kill the process. Processes without a main window can be killed immediately. Use disposable programs for testing.
-- History retains up to 100 entries by default. Its filter handler only refreshes the unfiltered list. Statistics rank up to ten executable paths. Percentages are relative to the most-used path, not shares of all launches.
-- DataService uses the default LocalAppData file at startup, regardless of the saved DataPath value. Settings Browse combines DataPath with data.json even though the default already includes the filename. It does not change storage. Cleanup removes entries marked invalid, not temporary files. Reset clears presets, history, usage counts and settings.
-- Preset.Clone, DataService.ExportPreset and PasswordService are helpers without current UI actions. ConfirmBeforeLaunch is persisted but the launch handler always asks for confirmation. Do not advertise these as working features.
+- History retains up to 100 entries by default. Full launches record success and failure counts, and clearing history keeps program usage. Statistics rank up to ten executable paths by accepted start requests.
+- Settings shows the actual DataService path. Saved legacy DataPath values remain readable and have never pointed the startup service to another file.
+- Restore accepts an object with `Format: "PresetLauncher.AppData"`, `Version: 1` and `Data` containing `Presets`, `History` and `UsageStats`. Older raw AppData files with the same collections are accepted. The active store retains the raw format. Restore keeps a copy of the previous file and uses a same-directory temporary file and replacement. A failed load keeps the original file available for recovery.
+- The editor saves editable fields onto an isolated copy based on the current preset. Cleanup rechecks the reviewed paths. Reset uses AppSettings defaults and preserves the legacy minimum version and the separate protected Security directory.
 - UpdateService reads the latest stable GitHub release and validates the policy, asset size and SHA-256 digest. UpdateCoordinator owns startup and manual update dialogs. Known mandatory updates remain enforced offline via the stored minimum version. See [release operations](RELEASING.md).
 
 ## Continuous integration
