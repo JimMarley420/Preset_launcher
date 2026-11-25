@@ -4,12 +4,18 @@ import json
 import os
 from pathlib import Path
 import re
+import random
+import time
+import errno
+import http.client
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import subprocess
 import sys
 from policy import LEVELS, pr_decision
 from sign_update import sign, verify
-from urllib.error import HTTPError
-from urllib.parse import quote, urlencode
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 REPO = "JimMarley420/Preset_launcher"
@@ -182,8 +188,69 @@ def request(url, method="GET", payload=None, token=None, file=None):
     if payload is not None:
         headers["Content-Type"] = "application/json"
         data = json.dumps(payload).encode()
-    with urlopen(Request(url, data=data, headers=headers, method=method), timeout=30) as response:
-        return json.load(response)
+    attempts = 4 if method == "GET" and data is None else 1
+    for attempt in range(attempts):
+        try:
+            with urlopen(Request(url, data=data, headers=headers, method=method), timeout=30) as response:
+                return json.load(response)
+        except (HTTPError, URLError, TimeoutError, ConnectionError, http.client.IncompleteRead,
+                http.client.RemoteDisconnected) as error:
+            if attempt == attempts - 1 or not transient(error):
+                raise
+            delay = retry_delay(error, attempt)
+            if delay is None:
+                raise
+            # Log only the path, not authorization headers, query parameters or payloads.
+            print(f"GitHub GET {urlsplit(url).path}: {type(error).__name__}"
+                  f"{' ' + str(error.code) if isinstance(error, HTTPError) else ''}; "
+                  f"retry {attempt + 1}/{attempts - 1} in {delay:.1f}s", file=sys.stderr, flush=True)
+            if isinstance(error, HTTPError):
+                error.close()
+            time.sleep(delay)
+
+
+def transient(error):
+    if isinstance(error, HTTPError):
+        # A normal 403 is not retryable. GitHub also uses 403 for rate limits.
+        return (error.code in (429, 500, 502, 503, 504)
+                or (error.code == 403 and (error.headers is not None and
+                    (error.headers.get("Retry-After") is not None
+                     or error.headers.get("X-RateLimit-Remaining") == "0"))))
+    reason = error.reason if isinstance(error, URLError) else error
+    return (isinstance(reason, (TimeoutError, ConnectionError, http.client.IncompleteRead,
+                                http.client.RemoteDisconnected))
+            or isinstance(reason, OSError) and reason.errno in
+            (errno.EAGAIN, errno.ETIMEDOUT, errno.ECONNRESET, errno.ECONNREFUSED,
+             errno.ECONNABORTED, errno.EHOSTUNREACH, errno.ENETUNREACH))
+
+
+def retry_delay(error, attempt):
+    # Full jitter, with a 30-second ceiling on server-requested delays.
+    delay = random.uniform(0, min(8, 2 ** (attempt + 1)))
+    if not isinstance(error, HTTPError) or error.headers is None:
+        return delay
+    headers = error.headers
+    now = datetime.now(timezone.utc)
+    retry_after = headers.get("Retry-After")
+    if retry_after is not None:
+        try:
+            if retry_after.isascii() and retry_after.isdecimal():
+                requested = int(retry_after)
+            else:
+                target = parsedate_to_datetime(retry_after)
+                if target.tzinfo is None:
+                    target = target.replace(tzinfo=timezone.utc)
+                requested = (target - now).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            return None
+        delay = max(delay, requested)
+    if headers.get("X-RateLimit-Remaining") == "0":
+        try:
+            delay = max(delay, int(headers["X-RateLimit-Reset"]) - now.timestamp())
+        except (KeyError, ValueError, TypeError, OverflowError):
+            return None
+    # Never retry before the server's requested time. Let a later workflow retry.
+    return delay if delay <= 30 else None
 
 
 def git(*args):

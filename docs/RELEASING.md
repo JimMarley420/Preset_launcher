@@ -49,6 +49,8 @@ Reserve required updates for security, data integrity, compatibility or a delibe
 4. Merge only after every branch CI job succeeds. A main pipeline calculates the version, builds, tests, packages and checks fresh install and upgrade. Publication is serialized and rejects stale plans or an advanced main branch. Documentation-only changes do not publish.
 5. CircleCI creates a draft, uploads the exact smoke-tested installer and SHA256SUMS.txt, verifies the GitHub asset digests, then publishes it as latest. GitHub generates release notes. Never overwrite published assets or reuse a version.
 
+GitHub API reads retry transient HTTP and network errors up to three times with exponential backoff and jitter. Rate-limit responses are retried only when the requested wait fits within 30 seconds. Release creation, asset uploads and publication are not retried automatically because the outcome of a failed write may be ambiguous.
+
 Only publish-release receives the token. PRs and tags cannot publish. Do not require the main-only publication job on PRs.
 
 If publication fails after creating a draft, inspect the draft and its target commit and assets. Existing tags and drafts are deliberately rejected. Delete only an identified abandoned draft and its unpublished tag if present and no published release references it. Then trigger a fresh main pipeline. If main or the latest release advanced, trigger a fresh pipeline rather than rerunning only the stale publication job.

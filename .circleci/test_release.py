@@ -1,11 +1,17 @@
 import hashlib
+import io
+import errno
+import ssl
+from email.message import Message
+from datetime import datetime, timezone, timedelta
+from email.utils import format_datetime
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import release
 from release import make_plan, version
@@ -106,6 +112,114 @@ class InstallerLaneTests(unittest.TestCase):
         with patch.object(release, "git", side_effect=["", "merge-base", paths]) as git:
             self.assertTrue(release.validate_installer("feature", metadata, "head"))
         self.assertIn("--no-renames", git.call_args.args)
+
+
+class GitHubRequestTests(unittest.TestCase):
+    url = "https://api.github.com/repos/example/project/pulls/10"
+
+    def error(self, code, **headers):
+        message = Message()
+        for name, value in headers.items():
+            message[name] = value
+        return HTTPError(self.url, code, "test error", message, io.BytesIO(b"{}"))
+
+    def test_transient_http_errors_recover(self):
+        for code in (429, 500, 502, 503, 504):
+            with self.subTest(code=code), patch.object(release, "urlopen", side_effect=[
+                    self.error(code), io.BytesIO(b'{"ok": true}')]) as call, \
+                    patch.object(release.time, "sleep") as sleep, \
+                    patch.object(release.random, "uniform", return_value=1):
+                self.assertEqual(release.request(self.url), {"ok": True})
+                self.assertEqual(call.call_count, 2)
+                sleep.assert_called_once_with(1)
+                self.assertEqual(call.call_args.kwargs["timeout"], 30)
+
+    def test_network_errors_recover(self):
+        for error in (TimeoutError(), ConnectionResetError(), URLError(TimeoutError()),
+                      URLError(OSError(errno.ECONNREFUSED, "refused"))):
+            with self.subTest(error=error), patch.object(release, "urlopen", side_effect=[
+                    error, io.BytesIO(b'{"ok": true}')]) as call, patch.object(release.time, "sleep"):
+                self.assertEqual(release.request(self.url), {"ok": True})
+                self.assertEqual(call.call_count, 2)
+
+    def test_retry_budget_exhausted(self):
+        errors = [self.error(504) for _ in range(4)]
+        with patch.object(release, "urlopen", side_effect=errors) as call, \
+                patch.object(release.time, "sleep") as sleep, \
+                patch.object(release.random, "uniform", side_effect=[1, 2, 4]) as jitter:
+            with self.assertRaises(HTTPError) as raised:
+                release.request(self.url)
+            self.assertIs(raised.exception, errors[-1])
+            self.assertEqual(call.call_count, 4)
+            self.assertEqual([item.args for item in sleep.call_args_list], [(1,), (2,), (4,)])
+            self.assertEqual([item.args for item in jitter.call_args_list], [(0, 2), (0, 4), (0, 8)])
+
+    def test_permanent_errors_are_not_retried(self):
+        for error in (self.error(401), self.error(403), self.error(404), self.error(422),
+                      URLError(ssl.SSLCertVerificationError("bad certificate"))):
+            with self.subTest(error=error), patch.object(release, "urlopen", side_effect=error) as call, \
+                    patch.object(release.time, "sleep") as sleep:
+                with self.assertRaises(type(error)):
+                    release.request(self.url)
+                call.assert_called_once()
+                sleep.assert_not_called()
+
+    def test_retry_after_and_rate_limit(self):
+        for error, expected in ((self.error(429, **{"Retry-After": "7"}), 7),
+                                (self.error(403, **{"Retry-After": "9"}), 9)):
+            with self.subTest(expected=expected), patch.object(release, "urlopen", side_effect=[
+                    error, io.BytesIO(b"{}")]), patch.object(release.time, "sleep") as sleep, \
+                    patch.object(release.random, "uniform", return_value=1):
+                self.assertEqual(release.request(self.url), {})
+                sleep.assert_called_once_with(expected)
+
+    def test_http_date_retry_after(self):
+        future = datetime.now(timezone.utc) + timedelta(seconds=15)
+        error = self.error(503, **{"Retry-After": format_datetime(future, usegmt=True)})
+        with patch.object(release.random, "uniform", return_value=0):
+            self.assertGreater(release.retry_delay(error, 0), 12)
+            self.assertLessEqual(release.retry_delay(error, 0), 15)
+
+    def test_long_or_invalid_rate_limit_wait_fails_without_early_retry(self):
+        for error in (self.error(429, **{"Retry-After": "3600"}),
+                      self.error(429, **{"Retry-After": "invalid"}),
+                      self.error(403, **{"X-RateLimit-Remaining": "0"})):
+            with self.subTest(error=error), patch.object(release, "urlopen", side_effect=error) as call, \
+                    patch.object(release.time, "sleep") as sleep:
+                with self.assertRaises(HTTPError):
+                    release.request(self.url)
+                call.assert_called_once()
+                sleep.assert_not_called()
+
+    def test_primary_rate_limit_reset_is_respected(self):
+        reset = int(datetime.now(timezone.utc).timestamp()) + 15
+        error = self.error(403, **{"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(reset)})
+        with patch.object(release.random, "uniform", return_value=0):
+            self.assertGreater(release.retry_delay(error, 0), 12)
+            self.assertLessEqual(release.retry_delay(error, 0), 15)
+
+    def test_mutations_and_uploads_are_never_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            asset = Path(directory) / "asset.exe"
+            asset.write_bytes(b"test")
+            for method, options in (("POST", {"payload": {"draft": True}}),
+                                    ("PATCH", {"payload": {"draft": False}}),
+                                    ("POST", {"file": asset})):
+                with self.subTest(method=method, options=options), \
+                        patch.object(release, "urlopen", side_effect=self.error(504)) as call, \
+                        patch.object(release.time, "sleep") as sleep:
+                    with self.assertRaises(HTTPError):
+                        release.request(self.url, method, **options)
+                    call.assert_called_once()
+                    sleep.assert_not_called()
+
+    def test_invalid_json_is_not_retried(self):
+        with patch.object(release, "urlopen", return_value=io.BytesIO(b"invalid")) as call, \
+                patch.object(release.time, "sleep") as sleep:
+            with self.assertRaises(json.JSONDecodeError):
+                release.request(self.url)
+            call.assert_called_once()
+            sleep.assert_not_called()
 
 
 class PublishTests(unittest.TestCase):
