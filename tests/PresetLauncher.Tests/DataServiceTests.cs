@@ -33,6 +33,39 @@ public sealed class DataServiceTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void InstallerFixtureUsesTheProductionStorageContract(bool invalidIdentity)
+    {
+        var fixtures = Path.Combine(AppContext.BaseDirectory, "Fixtures");
+        var json = File.ReadAllText(Path.Combine(fixtures, "smoke-data.json"));
+        if (invalidIdentity)
+            json = json.Replace("f0d45f28-37a3-4cc8-a167-efd4d6393c2d", "ci-fixture", StringComparison.Ordinal);
+        File.WriteAllText(dataPath, json);
+        var service = new DataService(dataPath);
+        service.Load();
+        Assert.AreEqual(invalidIdentity, service.LoadFailed);
+        if (invalidIdentity) return;
+
+        var preset = service.Data.Presets.Single();
+        var program = preset.Executables.Single();
+        var history = service.Data.History.Single();
+        Assert.AreEqual("Preserve me", preset.Name);
+        Assert.AreEqual(preset.Id, history.PresetId);
+        Assert.AreEqual(preset.Name, history.PresetName);
+        Assert.AreEqual(program.Path, history.Details.Single().ExecutablePath);
+        Assert.AreEqual(1, history.SuccessCount);
+        Assert.AreEqual(3, service.Data.UsageStats[program.Path]);
+
+        var settings = new SettingsService(Path.Combine(fixtures, "smoke-settings.json"));
+        settings.Load();
+        Assert.AreEqual("en", settings.CurrentSettings.Language);
+        Assert.AreEqual("dark", settings.CurrentSettings.Theme);
+        Assert.IsFalse(settings.CurrentSettings.ConfirmBeforeLaunch);
+        Assert.AreEqual(19, settings.CurrentSettings.MaxHistoryEntries);
+    }
+
+    [TestMethod]
     public void PresetAndUsageSurviveReload()
     {
         var file = Path.Combine(directory, "example.exe");

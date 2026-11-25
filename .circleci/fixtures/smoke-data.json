@@ -1,0 +1,40 @@
+{
+  "Presets": [
+    {
+      "Id": "f0d45f28-37a3-4cc8-a167-efd4d6393c2d",
+      "Name": "Preserve me",
+      "Description": "Installer smoke test",
+      "LaunchCount": 3,
+      "Executables": [
+        {
+          "Id": "2edd8622-ec32-4527-9f71-8b482d30de2a",
+          "Path": "C:\\Windows\\System32\\cmd.exe",
+          "Name": "Command Prompt",
+          "LaunchCount": 3
+        }
+      ]
+    }
+  ],
+  "History": [
+    {
+      "Id": "1b817758-2a77-4611-b760-da5153113944",
+      "PresetId": "f0d45f28-37a3-4cc8-a167-efd4d6393c2d",
+      "PresetName": "Preserve me",
+      "ExecutedAt": "2025-01-01T12:00:00Z",
+      "ExecutablesCount": 1,
+      "SuccessCount": 1,
+      "Duration": "00:00:01",
+      "Details": [
+        {
+          "ExecutableName": "Command Prompt",
+          "ExecutablePath": "C:\\Windows\\System32\\cmd.exe",
+          "Success": true,
+          "StartedAt": "2025-01-01T12:00:00Z"
+        }
+      ]
+    }
+  ],
+  "UsageStats": {
+    "C:\\Windows\\System32\\cmd.exe": 3
+  }
+}
