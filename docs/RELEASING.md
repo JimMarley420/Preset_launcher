@@ -17,7 +17,7 @@ The release plan in artifacts/release-plan.json is the source of the published a
 
 ## Pull request validation
 
-The required validate-pr-title job checks the actual open PR title and labels via the public GitHub API. Open a PR before running it. A stacked PR from this repository can validate against another branch when its title is non-releasing. Production versioning still uses PRs merged into main. A releasing PR must have exactly one of the three update labels below; non-releasing PRs must have none. Only the maintainer selects labels.
+The validate-pr-title job checks the actual open PR title and stacked-PR eligibility; validate-update-label independently checks the maintainer-selected update policy via the public GitHub API. Both must succeed before plan-release. If the title is invalid, the label check explicitly defers classification to the title check. Open a PR before running it. A stacked PR from this repository can validate against another branch when its title is non-releasing. Production versioning still uses PRs merged into main. A releasing PR must have exactly one of the three update labels below; non-releasing PRs must have none. Only the maintainer selects labels.
 
 After changing a title or label, rerun the workflow: metadata changes do not change the commit SHA and may not trigger CircleCI automatically. A successful commit status cannot guarantee that subsequently edited metadata remains valid at merge time. Release planning on main resolves merged PRs by their squash commit; publication recomputes the plan before creating a draft and again before publishing. A changed decision blocks publication until a fresh pipeline validates it. Do not change labels on merged PRs pending publication unless intentionally correcting a release decision.
 
@@ -64,7 +64,7 @@ The active PROD ruleset for the default branch requires these CircleCI checks. T
 - `ci/circleci: test-windows`
 - `ci/circleci: package-installer`
 
-CircleCI also reports `validate-pr-title` and `smoke-installer` individually. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
+CircleCI also reports `validate-pr-title`, `validate-update-label` and `smoke-installer` individually. Add the new `ci/circleci: validate-update-label` status to PROD after its first successful run. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
 
 ## Migration from the legacy update server
 
