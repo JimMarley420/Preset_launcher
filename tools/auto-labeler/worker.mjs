@@ -43,9 +43,7 @@ function labelCandidates(issue, paths) {
     if (matched || (!issue.pull_request && textRule.test(title + " " + formArea))) add("area: ", [area, ...(aliases[area] || [])]);
   }
   const securityPath = p => updateVerification.test(p) || updateSigning.test(p) || passwordService.test(p);
-  if (paths.some(securityPath) || (!issue.pull_request && /\b(authentication|password|mot de passe)\b/i.test(title + " " + formArea))) {
-    add("type: ", ["security"]);
-  }
+  if (paths.some(securityPath)) add("type: ", ["security"]);
   if (!hasType) {
     let inferred = Object.hasOwn(types, kind) ? types[kind] : [];
     if (!inferred.length && !issue.pull_request) {

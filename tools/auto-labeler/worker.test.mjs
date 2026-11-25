@@ -75,6 +75,7 @@ test("identifies signing, protected state, and download verification as security
     ["area: ci", "area: tests", "type: bug"]);
   assert.deepEqual(classify({...issue, title:"docs: explain update signing"}, ["SECURITY.md", "docs/RELEASING.md"], catalog),
     ["type: documentation"]);
+  assert.deepEqual(classify({title:"docs: explain password verification", labels:[]}, [], catalog), ["type: documentation"]);
 });
 
 test("recognizes persistence beyond DataService and avoids duplicate update aliases", () => {
