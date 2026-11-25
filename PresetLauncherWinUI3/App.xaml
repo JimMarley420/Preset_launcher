@@ -1,77 +1,36 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Application
-    x:Class="PresetLauncher.App"
+<Application x:Class="PresetLauncher.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:PresetLauncher">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/>
             </ResourceDictionary.MergedDictionaries>
-            
-            <!-- ============ PRIMARY COLORS ============ -->
-            <!-- Primary gradient: Blue to Purple -->
-            <Color x:Key="PrimaryBlue">#0078D4</Color>
-            <Color x:Key="PrimaryPurple">#7D2BE8</Color>
-            <Color x:Key="AccentGreen">#10B981</Color>
-            <Color x:Key="WarningAmber">#F59E0B</Color>
-            <Color x:Key="ErrorRed">#EF4444</Color>
-            
-            <!-- ============ LIGHT THEME PALETTE ============ -->
-            <Color x:Key="LightBackground">#FAFBFC</Color>
-            <Color x:Key="LightSurfaceColor">#F0F2F5</Color>
-            <Color x:Key="LightCardBackground">#FFFFFF</Color>
-            <Color x:Key="LightCardAlt">#F7F9FC</Color>
-            <Color x:Key="LightTextColor">#1A1A1A</Color>
-            <Color x:Key="LightSecondaryText">#5A5A5A</Color>
-            <Color x:Key="LightTertiaryText">#888888</Color>
-            <Color x:Key="LightDivider">#E5E7EB</Color>
-            
-            <!-- ============ DARK THEME PALETTE ============ -->
-            <Color x:Key="DarkBackground">#0A0E27</Color>
-            <Color x:Key="DarkSurfaceColor">#1A1F3A</Color>
-            <Color x:Key="DarkCardBackground">#1F2847</Color>
-            <Color x:Key="DarkCardAlt">#252D4A</Color>
-            <Color x:Key="DarkTextColor">#E8EAED</Color>
-            <Color x:Key="DarkSecondaryText">#A0A4AF</Color>
-            <Color x:Key="DarkTertiaryText">#7A7E89</Color>
-            <Color x:Key="DarkDivider">#2A2F48</Color>
-            
-            <!-- ============ BRUSHES ============ -->
-            <SolidColorBrush x:Key="PrimaryBlueBrush" Color="{ThemeResource PrimaryBlue}"/>
-            <SolidColorBrush x:Key="PrimaryPurpleBrush" Color="{ThemeResource PrimaryPurple}"/>
-            <SolidColorBrush x:Key="AccentGreenBrush" Color="{ThemeResource AccentGreen}"/>
-            <SolidColorBrush x:Key="WarningAmberBrush" Color="{ThemeResource WarningAmber}"/>
-            <SolidColorBrush x:Key="ErrorRedBrush" Color="{ThemeResource ErrorRed}"/>
-            
-            <!-- ============ CUSTOM STYLES ============ -->
-            <!-- Premium Card Style -->
-            <Style x:Key="PremiumCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
-                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
-                <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="CornerRadius" Value="12"/>
-                <Setter Property="Padding" Value="20,16"/>
+            <Style x:Key="DesktopPageTitle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
+                <Setter Property="FontSize" Value="24"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
-            
-            <!-- KPI Card Style -->
-            <Style x:Key="KPICardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
-                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
-                <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="CornerRadius" Value="12"/>
-                <Setter Property="Padding" Value="24,20"/>
+            <Style x:Key="DesktopSectionTitle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+                <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
-
-            <!-- Gradient Accent Button -->
-            <Style x:Key="GradientAccentButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="{ThemeResource AccentButtonBackground}"/>
-                <Setter Property="Foreground" Value="{ThemeResource AccentButtonForeground}"/>
-                <Setter Property="Padding" Value="16,8"/>
-                <Setter Property="CornerRadius" Value="8"/>
+            <Style x:Key="DesktopSecondaryText" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
-            
+            <Style x:Key="DesktopAccentIcon" TargetType="FontIcon">
+                <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+            </Style>
+            <Style x:Key="DesktopMetric" TargetType="TextBlock" BasedOn="{StaticResource DesktopSectionTitle}">
+                <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+            </Style>
+            <Style x:Key="DesktopWarningText" TargetType="TextBlock" BasedOn="{StaticResource DesktopSecondaryText}">
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}"/>
+            </Style>
+            <Style x:Key="DesktopDivider" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                <Setter Property="Padding" Value="0,8"/>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

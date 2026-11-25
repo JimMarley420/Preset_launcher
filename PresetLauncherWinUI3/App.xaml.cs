@@ -1,5 +1,4 @@
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using PresetLauncher.Services;
 
 namespace PresetLauncher;
@@ -9,57 +8,33 @@ public partial class App : Application
     public static SettingsService Settings { get; private set; } = null!;
     public static DataService Data { get; private set; } = null!;
     public static LocalizationService Localization { get; private set; } = null!;
-    public static ThemeService Theme { get; private set; } = null!;
+    internal static ThemeService Theme { get; private set; } = null!;
     public static new App Current => (App)Application.Current;
 
-    public Window? MainWindow { get; private set; }
-
+    public MainWindow MainWindow { get; private set; } = null!;
     public UpdateCoordinator Updates { get; } = new();
 
-    public App()
-    {
-        this.InitializeComponent();
-    }
+    public App() => InitializeComponent();
 
-    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         Settings = new SettingsService();
         Settings.Load();
-
         Localization = new LocalizationService();
-        Localization.SetLanguage(Settings.CurrentSettings.Language);
-
         Theme = new ThemeService();
-
         Data = new DataService();
         Data.Load();
 
         MainWindow = new MainWindow();
-        MainWindow.Closed += (s, e) => SaveAndExit();
+        var root = (FrameworkElement)MainWindow.Content;
+        root.Loaded += OnRootLoaded;
         MainWindow.Activate();
 
-        Theme.SetWindow(MainWindow);
-        Theme.ApplyTheme(Settings.CurrentSettings.Theme);
-        Theme.ApplyBackdrop(Settings.CurrentSettings.Backdrop);
-
-        if (MainWindow.Content is FrameworkElement root)
+        async void OnRootLoaded(object sender, RoutedEventArgs e)
         {
-            if (root.IsLoaded) _ = Updates.CheckAsync(manual: false);
-            else
-            {
-                root.Loaded += OnRootLoaded;
-                async void OnRootLoaded(object sender, RoutedEventArgs e)
-                {
-                    root.Loaded -= OnRootLoaded;
-                    await Updates.CheckAsync(manual: false);
-                }
-            }
+            root.Loaded -= OnRootLoaded;
+            try { await Updates.CheckAsync(manual: false); }
+            finally { MainWindow.FinishStartup(); }
         }
-    }
-
-    public static void SaveAndExit()
-    {
-        Settings.Save();
-        Data.Save();
     }
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using PresetLauncher.Views;
 
 namespace PresetLauncher.Services;
 
@@ -93,7 +94,7 @@ public sealed class UpdateCoordinator
                 {
                     XamlRoot = root,
                     Title = T(required ? "update.requiredTitle" : recommended ? "update.recommendedTitle" : "settings.updateAvailable"),
-                    Content = T(required ? "update.requiredMessage" : recommended ? "update.recommendedMessage" : "update.optionalMessage", installed, update.Version.ToString(3)),
+                    Content = DesktopUi.Text(T(required ? "update.requiredMessage" : recommended ? "update.recommendedMessage" : "update.optionalMessage", installed, update.Version.ToString(3))),
                     PrimaryButtonText = T("update.install"),
                     SecondaryButtonText = required || recommended ? "" : T("update.skip"),
                     CloseButtonText = T(required ? "update.exit" : recommended ? "update.remindTomorrow" : "update.later"),
@@ -105,14 +106,15 @@ public sealed class UpdateCoordinator
                     if (required) CloseApp();
                     else if (recommended)
                     {
-                        settings.DeferredUpdateVersion = update.Version.ToString(3);
-                        settings.DeferredUpdateUntil = DateTimeOffset.UtcNow.AddHours(24);
-                        App.Settings.Save();
+                        App.Settings.Update(value =>
+                        {
+                            value.DeferredUpdateVersion = update.Version.ToString(3);
+                            value.DeferredUpdateUntil = DateTimeOffset.UtcNow.AddHours(24);
+                        });
                     }
                     else if (choice == ContentDialogResult.Secondary)
                     {
-                        settings.SkippedUpdateVersion = update.Version.ToString(3);
-                        App.Settings.Save();
+                        App.Settings.Update(value => value.SkippedUpdateVersion = update.Version.ToString(3));
                     }
                     return;
                 }
@@ -122,7 +124,6 @@ public sealed class UpdateCoordinator
                 try
                 {
                     installer = await DownloadAsync(root, update);
-                    App.SaveAndExit();
                     using var process = Process.Start(new ProcessStartInfo { FileName = installer, UseShellExecute = true });
                     if (process is null) throw new InvalidOperationException("Installer did not start.");
                     launched = true;
@@ -155,6 +156,8 @@ public sealed class UpdateCoordinator
             Debug.WriteLine(ex);
             // A known mandatory update cannot be bypassed by a failed modal dialog.
             if (required) CloseApp();
+            else if (manual)
+                await MessageAsync(root, "dialog.error", T("settings.saveFailed"));
         }
         finally { _checking = false; }
     }
@@ -166,7 +169,6 @@ public sealed class UpdateCoordinator
 
     private static void CloseApp()
     {
-        App.SaveAndExit();
         App.Current.MainWindow?.Close();
     }
 
@@ -175,7 +177,7 @@ public sealed class UpdateCoordinator
         using var cancellation = new CancellationTokenSource();
         var status = new TextBlock { Text = T("settings.updatePreparing"), TextWrapping = TextWrapping.Wrap };
         var progressBar = new ProgressBar { Minimum = 0, Maximum = 100 };
-        var panel = new StackPanel { Spacing = 12, MinWidth = 280 };
+        var panel = new StackPanel { Spacing = 12 };
         panel.Children.Add(status);
         panel.Children.Add(progressBar);
         var dialog = new ContentDialog
@@ -193,7 +195,7 @@ public sealed class UpdateCoordinator
             var progress = new Progress<int>(percent =>
             {
                 progressBar.Value = percent;
-                status.Text = $"{T("settings.updateDownloading")} {percent}%";
+                status.Text = T("settings.updateProgress", percent / 100d);
             });
             return await _service.DownloadVerifiedAsync(update, progress, cancellation.Token);
         }
@@ -210,7 +212,7 @@ public sealed class UpdateCoordinator
         {
             XamlRoot = root,
             Title = T("update.requiredTitle"),
-            Content = message + "\n\n" + T("update.requiredRetry"),
+            Content = DesktopUi.Text(message + "\n\n" + T("update.requiredRetry")),
             PrimaryButtonText = T("update.retry"),
             CloseButtonText = T("update.exit")
         };
@@ -219,7 +221,7 @@ public sealed class UpdateCoordinator
 
     private static async Task MessageAsync(XamlRoot root, string title, string message)
     {
-        var dialog = new ContentDialog { XamlRoot = root, Title = T(title), Content = message, CloseButtonText = T("dialog.ok") };
+        var dialog = new ContentDialog { XamlRoot = root, Title = T(title), Content = DesktopUi.Text(message), CloseButtonText = T("dialog.ok") };
         await dialog.ShowAsync();
     }
 }
