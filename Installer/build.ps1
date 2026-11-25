@@ -69,10 +69,14 @@ try {
         $timer.Restart()
         New-Item -ItemType Directory -Force $output | Out-Null
         $name = "PresetLauncher_Setup_${Version}$($entry.suffix)"
-        $pin = if ($UsePinnedCompiler) { @('/DRequirePinnedCompiler') } else { @() }
-        & $compiler @pin "/DAppVersion=$Version" "/DTargetArchitecture=$target" `
-            "/DPayloadRid=$($entry.rid)" "/DSetupName=$name" "/DAllowedArchitecture=$($entry.allowed)" `
-            "/DMode64Architecture=$($entry.mode64)" "/O$output" (Join-Path $PSScriptRoot PresetLauncher.iss)
+        $compilerArgs = @(
+            "/DAppVersion=$Version", "/DTargetArchitecture=$target", "/DPayloadRid=$($entry.rid)",
+            "/DSetupName=$name", "/DAllowedArchitecture=$($entry.allowed)", "/DMode64Architecture=$($entry.mode64)",
+            "/O$output"
+        )
+        if ($UsePinnedCompiler) { $compilerArgs += '/DRequirePinnedCompiler=1' }
+        $compilerArgs += (Join-Path $PSScriptRoot PresetLauncher.iss)
+        & $compiler @compilerArgs
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $output "$name.exe") -PathType Leaf)) {
             throw "Installer compilation failed: $target"
         }
