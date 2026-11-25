@@ -1,11 +1,19 @@
 import hashlib
+import io
+import errno
+import ssl
+import socket
+import http.client
+from email.message import Message
+from datetime import datetime, timezone, timedelta
+from email.utils import format_datetime
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import release
 from release import make_plan, version
@@ -106,6 +114,149 @@ class InstallerLaneTests(unittest.TestCase):
         with patch.object(release, "git", side_effect=["", "merge-base", paths]) as git:
             self.assertTrue(release.validate_installer("feature", metadata, "head"))
         self.assertIn("--no-renames", git.call_args.args)
+
+
+class GitHubRequestTests(unittest.TestCase):
+    url = "https://api.github.com/repos/example/project/pulls/10"
+
+    def error(self, code, **headers):
+        message = Message()
+        for name, value in headers.items():
+            message[name] = value
+        return HTTPError(self.url, code, "test error", message, io.BytesIO(b"{}"))
+
+    def test_transient_http_errors_recover(self):
+        for code in (500, 502, 503, 504):
+            with self.subTest(code=code), patch.object(release, "urlopen", side_effect=[
+                    self.error(code), io.BytesIO(b'{"ok": true}')]) as call, \
+                    patch.object(release.time, "sleep") as sleep, \
+                    patch.object(release.random, "uniform", return_value=1):
+                self.assertEqual(release.request(self.url), {"ok": True})
+                self.assertEqual(call.call_count, 2)
+                sleep.assert_called_once_with(1)
+                self.assertEqual(call.call_args.kwargs["timeout"], 30)
+
+    def test_network_errors_recover(self):
+        for error in (TimeoutError(), ConnectionResetError(), URLError(TimeoutError()),
+                      URLError(OSError(errno.ECONNREFUSED, "refused")),
+                      OSError(errno.ENETUNREACH, "unreachable"),
+                      socket.gaierror(socket.EAI_AGAIN, "temporary DNS"),
+                      URLError(socket.gaierror(socket.EAI_AGAIN, "temporary DNS"))):
+            with self.subTest(error=error), patch.object(release, "urlopen", side_effect=[
+                    error, io.BytesIO(b'{"ok": true}')]) as call, patch.object(release.time, "sleep"):
+                self.assertEqual(release.request(self.url), {"ok": True})
+                self.assertEqual(call.call_count, 2)
+
+    def test_retry_budget_exhausted(self):
+        errors = [self.error(504) for _ in range(4)]
+        with patch.object(release, "urlopen", side_effect=errors) as call, \
+                patch.object(release.time, "sleep") as sleep, \
+                patch.object(release.random, "uniform", side_effect=[1, 2, 4]) as jitter:
+            with self.assertRaises(HTTPError) as raised:
+                release.request(self.url)
+            self.assertIs(raised.exception, errors[-1])
+            self.assertEqual(call.call_count, 4)
+            self.assertEqual([item.args for item in sleep.call_args_list], [(1,), (2,), (4,)])
+            self.assertEqual([item.args for item in jitter.call_args_list], [(0, 2), (0, 4), (0, 8)])
+
+    def test_permanent_errors_are_not_retried(self):
+        for error in (self.error(401), self.error(403), self.error(404), self.error(422),
+                      URLError(ssl.SSLCertVerificationError("bad certificate")),
+                      ssl.SSLCertVerificationError("bad certificate"),
+                      socket.gaierror(socket.EAI_NONAME, "unknown host"),
+                      URLError(socket.gaierror(socket.EAI_NONAME, "unknown host")),
+                      OSError(errno.EACCES, "permission denied")):
+            with self.subTest(error=error), patch.object(release, "urlopen", side_effect=error) as call, \
+                    patch.object(release.time, "sleep") as sleep:
+                with self.assertRaises(type(error)):
+                    release.request(self.url)
+                call.assert_called_once()
+                sleep.assert_not_called()
+
+    def test_retry_after_and_rate_limit(self):
+        for error, expected in ((self.error(429, **{"Retry-After": "7"}), 7),
+                                (self.error(403, **{"Retry-After": "9"}), 9)):
+            with self.subTest(expected=expected), patch.object(release, "urlopen", side_effect=[
+                    error, io.BytesIO(b"{}")]), patch.object(release.time, "sleep") as sleep, \
+                    patch.object(release.random, "uniform", return_value=1):
+                self.assertEqual(release.request(self.url), {})
+                sleep.assert_called_once_with(expected)
+
+    def test_http_date_retry_after(self):
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        future = now + timedelta(seconds=15)
+        error = self.error(503, **{"Retry-After": format_datetime(future, usegmt=True)})
+        with patch.object(release, "datetime") as clock, patch.object(release.random, "uniform", return_value=0):
+            clock.now.return_value = now
+            self.assertEqual(release.retry_delay(error, 0), 15)
+
+    def test_long_or_invalid_rate_limit_wait_fails_without_early_retry(self):
+        for error in (self.error(429), self.error(429, **{"X-RateLimit-Remaining": "12"}),
+                      self.error(429, **{"Retry-After": "3600"}),
+                      self.error(429, **{"Retry-After": "invalid"}),
+                      self.error(403, **{"X-RateLimit-Remaining": "0"})):
+            with self.subTest(error=error), patch.object(release, "urlopen", side_effect=error) as call, \
+                    patch.object(release.time, "sleep") as sleep:
+                with self.assertRaises(HTTPError):
+                    release.request(self.url)
+                call.assert_called_once()
+                sleep.assert_not_called()
+
+    def test_primary_rate_limit_reset_is_respected(self):
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        reset = int(now.timestamp()) + 15
+        error = self.error(403, **{"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(reset)})
+        with patch.object(release, "datetime") as clock, patch.object(release.random, "uniform", return_value=0):
+            clock.now.return_value = now
+            self.assertEqual(release.retry_delay(error, 0), 15)
+
+    def test_cumulative_sleep_budget_is_not_reset(self):
+        errors = [self.error(429, **{"Retry-After": "20"}) for _ in range(2)]
+        with patch.object(release, "urlopen", side_effect=errors) as call, \
+                patch.object(release.time, "sleep") as sleep, \
+                patch.object(release.time, "monotonic", side_effect=[100, 120]):
+            with self.assertRaises(HTTPError) as raised:
+                release.request(self.url)
+            self.assertIs(raised.exception, errors[1])
+            self.assertEqual(call.call_count, 2)
+            sleep.assert_called_once_with(20)
+            self.assertTrue(all(error.fp.closed for error in errors))
+
+    def test_truncated_http_response_is_retried(self):
+        class Socket:
+            def makefile(self, *args, **kwargs):
+                return io.BytesIO(b"HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n{}")
+        truncated = http.client.HTTPResponse(Socket())
+        truncated.begin()
+        with patch.object(release, "urlopen", side_effect=[truncated, io.BytesIO(b'{"ok": true}')]) as call, \
+                patch.object(release.time, "sleep"):
+            self.assertEqual(release.request(self.url), {"ok": True})
+            self.assertEqual(call.call_count, 2)
+            self.assertTrue(truncated.closed)
+
+    def test_mutations_and_uploads_are_never_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            asset = Path(directory) / "asset.exe"
+            asset.write_bytes(b"test")
+            for method, options in (("POST", {"payload": {"draft": True}}),
+                                    ("PATCH", {"payload": {"draft": False}}),
+                                    ("POST", {"file": asset}),
+                                    ("GET", {"payload": {"unexpected": True}})):
+                with self.subTest(method=method, options=options), \
+                        patch.object(release, "urlopen", side_effect=self.error(504)) as call, \
+                        patch.object(release.time, "sleep") as sleep:
+                    with self.assertRaises(HTTPError):
+                        release.request(self.url, method, **options)
+                    call.assert_called_once()
+                    sleep.assert_not_called()
+
+    def test_invalid_json_is_not_retried(self):
+        with patch.object(release, "urlopen", return_value=io.BytesIO(b"invalid")) as call, \
+                patch.object(release.time, "sleep") as sleep:
+            with self.assertRaises(json.JSONDecodeError):
+                release.request(self.url)
+            call.assert_called_once()
+            sleep.assert_not_called()
 
 
 class PublishTests(unittest.TestCase):
@@ -221,6 +372,41 @@ class PublishTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release.publish()
         self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
+
+    def test_main_advancing_during_final_decisions_blocks_patch(self):
+        # Keep real request handling. The transport simulates GitHub responses.
+        head = self.sha
+        collections = 0
+
+        def collect(*args):
+            nonlocal head, collections
+            collections += 1
+            if collections == 2:
+                head = "b" * 40
+            return [decision("fix: repair")]
+
+        def transport(req, timeout):
+            url, method = req.full_url, req.get_method()
+            if url.endswith("/git/ref/heads/main"):
+                self.calls.append((method, url, None))
+                return io.BytesIO(json.dumps({"object": {"sha": head}}).encode())
+            if "/assets?" in url:
+                self.calls.append((method, url, None))
+                name = url.split("name=")[1]
+                digest = hashlib.sha256(req.data.read()).hexdigest()
+                return io.BytesIO(json.dumps({"name": name, "state": "uploaded", "digest": f"sha256:{digest}"}).encode())
+            payload = json.loads(req.data) if req.data else None
+            result = self.response(url, method, payload)
+            return io.BytesIO(json.dumps(result).encode())
+
+        with patch.object(release, "collect_decisions", side_effect=collect), \
+                patch.object(release, "urlopen", side_effect=transport):
+            with self.assertRaisesRegex(ValueError, "Main advanced"):
+                release.publish()
+        self.assertEqual(collections, 2)
+        self.assertEqual(sum("/assets?" in url for _, url, _ in self.calls), 2)
+        self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
+        self.assertTrue(self.calls[-1][1].endswith("/git/ref/heads/main"))
 
     def test_publish_occurs_after_both_uploads(self):
         with patch.object(release, "request", side_effect=self.response):
