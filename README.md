@@ -41,12 +41,11 @@ Download the installer for your processor from the [latest release](https://gith
 | 32-bit x86 | `PresetLauncher_Setup_<version>_x86.exe` |
 | ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` |
 
-Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version. ARM64 packages are cross-compiled and inspected on x64 CI. Native ARM64 installation and startup still require validation on ARM64 hardware. Existing installations update in their current architecture, including under emulation. To switch architectures, uninstall the current copy first. Your presets, history, statistics, settings and protected update policy survive uninstallation.
-
-If the legacy updater in version 1.2.6 or earlier cannot find the latest release, install it manually.
+Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version. ARM64 packages are cross-compiled and inspected on x64 CI. Native ARM64 installation and startup still require validation on ARM64 hardware. 
 
 ## Documentation
 
 [User guide](docs/USAGE.md) · [Build from source](docs/DEVELOPMENT.md#build-from-source) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 Built with C#, .NET and WinUI 3. Distributed under the [MIT license](LICENSE).
+By Jimmy Marley
