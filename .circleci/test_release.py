@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
@@ -74,12 +75,13 @@ class InstallerLaneTests(unittest.TestCase):
     def test_regular_changes_use_fast_lane(self):
         self.assertFalse(release.needs_installer([
             "README.md", "tests/PresetLauncher.Tests/ServiceTests.cs",
-            "PresetLauncherWinUI3/Services/LauncherService.cs",
+            "PresetLauncherWinUI3/Services/DataService.cs",
         ]))
 
     def test_installer_updater_and_publish_paths_require_full_lane(self):
         for path in (
-            ".circleci/config.yml", "Installer/PresetLauncher.iss", "global.json",
+            "unrecognized.dat", "PresetLauncherWinUI3/Services/LauncherService.cs",
+            "Installer/architectures.json", ".circleci/config.yml", "Installer/PresetLauncher.iss", "global.json",
             "PresetLauncherWinUI3/favicon.ico",
             "PresetLauncherWinUI3/MainWindow.xaml.cs",
             "PresetLauncherWinUI3/Views/Pages/SettingsPage.xaml.cs",
@@ -99,21 +101,63 @@ class InstallerLaneTests(unittest.TestCase):
             git.assert_not_called()
 
     def test_stacked_pr_uses_its_actual_base(self):
-        metadata = {"base": {"ref": "feat/github-release-updater"}}
-        with patch.object(release, "git", side_effect=["", "merge-base", "README.md\0"]) as git:
+        metadata = {"base": {"ref": "feat/github-release-updater", "sha": "a" * 40}, "head": {"sha": "head"}}
+        with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", "M\0README.md\0"]) as git:
             self.assertFalse(release.validate_installer("feat/dotnet-10-migration", metadata, "head"))
         self.assertEqual(git.call_args_list[0].args[-1], "refs/heads/feat/github-release-updater")
         self.assertEqual(git.call_args_list[-1].args, (
-            "diff", "--name-only", "--no-renames", "-z", "merge-base", "head", "--",
+            "diff", "--name-status", "--no-renames", "-z", "merge-base", "head", "--",
         ))
 
 
     def test_renamed_sensitive_file_still_requires_full_lane(self):
-        metadata = {"base": {"ref": "main"}}
-        paths = "docs/archive.txt\0PresetLauncherWinUI3/Services/LocalizationService.cs\0"
-        with patch.object(release, "git", side_effect=["", "merge-base", paths]) as git:
+        metadata = {"base": {"ref": "main", "sha": "a" * 40}, "head": {"sha": "head"}}
+        paths = "A\0docs/archive.txt\0D\0PresetLauncherWinUI3/Services/LocalizationService.cs\0"
+        with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", paths]) as git:
             self.assertTrue(release.validate_installer("feature", metadata, "head"))
         self.assertIn("--no-renames", git.call_args.args)
+
+    def test_source_change_status_controls_validation_lane(self):
+        source = "PresetLauncherWinUI3/Services/DataService.cs"
+        metadata = {"base": {"ref": "main", "sha": "a" * 40}, "head": {"sha": "head"}}
+        for diff, full in [
+            (f"M\0{source}\0", False),
+            ("A\0docs/new.md\0", False),
+            ("A\0PresetLauncherWinUI3/Views/Pages/Tool.xaml\0", True),
+            ("A\0PresetLauncherWinUI3/Services/Tool.cs\0", True),
+            (f"D\0{source}\0A\0PresetLauncherWinUI3/Services/MovedService.cs\0", True),
+            (f"T\0{source}\0", True),
+            ("M\0unrecognized.dat\0", True),
+            ("M\0", True),
+        ]:
+            with self.subTest(diff=diff), patch.object(
+                release, "git", side_effect=["", "a" * 40, "merge-base", diff, ""]
+            ):
+                self.assertEqual(full, release.validate_installer("feature", metadata, "head"))
+
+    def test_native_api_edit_requires_full_lane_in_ordinary_source(self):
+        source = "PresetLauncherWinUI3/Services/DataService.cs"
+        metadata = {"base": {"ref": "main", "sha": "a" * 40}, "head": {"sha": "head"}}
+        with patch.object(release, "git", side_effect=["", "a" * 40, "merge-base", f"M\0{source}\0", source]) as git:
+            self.assertTrue(release.validate_installer("feature", metadata, "head"))
+        self.assertIn("-G", git.call_args.args)
+        self.assertIn("DllImport", git.call_args.args[4])
+
+
+class ArchitectureContractTests(unittest.TestCase):
+    def test_distribution_contract_matches_project(self):
+        root = Path(release.__file__).resolve().parent.parent
+        project = ET.parse(root / "PresetLauncherWinUI3/PresetLauncherWinUI3.csproj")
+        mapping = release.ARCHITECTURES
+        self.assertEqual(list(mapping), ["x64", "x86", "arm64"])
+        self.assertEqual({row["platform"] for row in mapping.values()},
+                         set(project.findtext(".//Platforms").split(";")))
+        self.assertEqual({row["rid"] for row in mapping.values()},
+                         set(project.findtext(".//RuntimeIdentifiers").split(";")))
+        self.assertEqual([release.installer_name("3.2.1", arch) for arch in mapping],
+                         ["PresetLauncher_Setup_3.2.1.exe", "PresetLauncher_Setup_3.2.1_x86.exe",
+                          "PresetLauncher_Setup_3.2.1_arm64.exe"])
+        self.assertEqual(list((root / "Installer").glob("*.iss")), [root / "Installer/PresetLauncher.iss"])
 
 
 class GitHubRequestTests(unittest.TestCase):
@@ -268,23 +312,41 @@ class PublishTests(unittest.TestCase):
         self.output.mkdir()
         self.installer = self.output / "PresetLauncher_Setup_1.2.7.exe"
         self.installer.write_bytes(b"test installer")
-        digest = hashlib.sha256(self.installer.read_bytes()).hexdigest()
+        installers = {}
+        lines = []
+        for arch, entry in release.ARCHITECTURES.items():
+            name = release.installer_name("1.2.7", arch)
+            asset = self.output / name
+            asset.write_bytes(arch.encode())
+            digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+            installers[arch] = {"size": asset.stat().st_size, "sha256": digest}
+            lines.append(f"{digest}  {name}")
         self.sums = self.output / "SHA256SUMS.txt"
-        self.sums.write_text(f"{digest}  {self.installer.name}\n", encoding="ascii")
+        self.sums.write_text("\n".join(lines) + "\n", encoding="ascii")
         self.previous = {"tag_name": "1.2.6", "body": ""}
         self.sha = "a" * 40
         self.plan = root / "plan.json"
-        self.plan.write_text(json.dumps(make_plan(self.previous, [decision("fix: repair")], self.sha)), encoding="utf-8")
+        self.plan.write_text(json.dumps(
+            make_plan(self.previous, [decision("fix: repair")], self.sha) | {"validate_installer": True}),
+            encoding="utf-8")
+        self.evidence = root / "evidence.json"
+        self.evidence.write_text(json.dumps({
+            "sha": self.sha, "version": "1.2.7", "full": True, "audit": True, "test": True,
+            "built": list(release.ARCHITECTURES), "installers": installers,
+            "smoke": {"x64": "native", "x86": "wow64", "arm64": "incompatible-host-rejected"},
+        }), encoding="utf-8")
         self.calls = []
         self.signer = patch.object(release, "sign", return_value="test-signature")
         self.signer.start()
         self.addCleanup(self.signer.stop)
         for patcher in (
             patch.object(release, "PLAN", self.plan),
+            patch.object(release, "EVIDENCE", self.evidence),
+            patch.object(release, "sign_message", return_value="manifest-signature"),
             patch.object(release, "OUTPUT", self.output),
             patch.object(release, "git", return_value=self.sha),
             patch.object(release, "collect_decisions", return_value=[decision("fix: repair")]),
-            patch.dict(os.environ, {"CIRCLE_BRANCH": "main", "GH_RELEASE_TOKEN": "test-token"}),
+            patch.dict(os.environ, {"CIRCLE_BRANCH": "main", "CIRCLE_SHA1": self.sha, "GH_RELEASE_TOKEN": "test-token"}),
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -308,7 +370,7 @@ class PublishTests(unittest.TestCase):
             return {"id": 42}
         if "/assets?" in url:
             digest = hashlib.sha256(file.read_bytes()).hexdigest()
-            return {"name": file.name, "state": "uploaded", "digest": f"sha256:{digest}"}
+            return {"name": file.name, "size": file.stat().st_size, "state": "uploaded", "digest": f"sha256:{digest}"}
         if url.endswith("/releases/42") and method == "PATCH":
             return {"draft": False, "tag_name": "v1.2.7", "html_url": "https://github.com/example"}
         self.fail(f"Unexpected API request: {method} {url}")
@@ -318,7 +380,7 @@ class PublishTests(unittest.TestCase):
             release.verify_previous({"tag_name": "v1.3.1", "body": "<!-- presetlauncher:min-supported=1.3.0 -->"})
 
     def test_signed_previous_floor_is_verified(self):
-        previous = {"tag_name": "v1.3.1", "body": "<!-- presetlauncher:min-supported=1.3.0 -->\n"
+        previous = {"tag_name": "v1.3.1", "assets": [], "body": "<!-- presetlauncher:min-supported=1.3.0 -->\n"
                     "<!-- presetlauncher:update-policy=optional -->\n<!-- presetlauncher:signature-v1=dGVzdA== -->"}
         with patch.object(release, "installer_asset", return_value={"size": 4, "sha256": "ab" * 32}), patch.object(release, "verify") as verify:
             release.verify_previous(previous)
@@ -367,6 +429,23 @@ class PublishTests(unittest.TestCase):
                 release.publish()
         self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
 
+    def test_missing_architecture_prevents_draft(self):
+        (self.output / release.installer_name("1.2.7", "arm64")).unlink()
+        with patch.object(release, "request", side_effect=self.response):
+            with self.assertRaisesRegex(ValueError, "Incorrect installer asset set"):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
+
+    def test_failed_upload_leaves_draft_unpublished(self):
+        def fail_upload(url, method="GET", payload=None, token=None, file=None):
+            if "/assets?" in url and file.name.endswith("_x86.exe"):
+                raise HTTPError(url, 500, "Upload failed", None, None)
+            return self.response(url, method, payload, token, file)
+        with patch.object(release, "request", side_effect=fail_upload):
+            with self.assertRaises(HTTPError):
+                release.publish()
+        self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
+
     def test_signing_failure_prevents_release_mutation(self):
         with patch.object(release, "sign", side_effect=ValueError("key mismatch")), patch.object(release, "request", side_effect=self.response):
             with self.assertRaises(ValueError):
@@ -393,8 +472,9 @@ class PublishTests(unittest.TestCase):
             if "/assets?" in url:
                 self.calls.append((method, url, None))
                 name = url.split("name=")[1]
-                digest = hashlib.sha256(req.data.read()).hexdigest()
-                return io.BytesIO(json.dumps({"name": name, "state": "uploaded", "digest": f"sha256:{digest}"}).encode())
+                content = req.data.read()
+                digest = hashlib.sha256(content).hexdigest()
+                return io.BytesIO(json.dumps({"name": name, "size": len(content), "state": "uploaded", "digest": f"sha256:{digest}"}).encode())
             payload = json.loads(req.data) if req.data else None
             result = self.response(url, method, payload)
             return io.BytesIO(json.dumps(result).encode())
@@ -404,14 +484,14 @@ class PublishTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Main advanced"):
                 release.publish()
         self.assertEqual(collections, 2)
-        self.assertEqual(sum("/assets?" in url for _, url, _ in self.calls), 2)
+        self.assertEqual(sum("/assets?" in url for _, url, _ in self.calls), 4)
         self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
         self.assertTrue(self.calls[-1][1].endswith("/git/ref/heads/main"))
 
-    def test_publish_occurs_after_both_uploads(self):
+    def test_publish_occurs_after_all_uploads(self):
         with patch.object(release, "request", side_effect=self.response):
             release.publish()
-        self.assertEqual(sum("/assets?" in url for _, url, _ in self.calls), 2)
+        self.assertEqual(sum("/assets?" in url for _, url, _ in self.calls), 4)
         self.assertEqual(self.calls[-1][0], "PATCH")
         self.assertFalse(self.calls[-1][2]["draft"])
 

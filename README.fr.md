@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71" alt="Interface de PresetLauncher" width="880">
+  <img src="https://github.com/user-attachments/assets/f793c7ed-9a23-4a1a-a7f7-33bc0f7a3db0" alt="Interface de PresetLauncher" width="880">
 </p>
 
 ## À propos
@@ -33,12 +33,19 @@ PresetLauncher permet de regrouper des programmes dans des presets. Créez un pr
 
 ## Installation
 
-Téléchargez `PresetLauncher_Setup_<version>.exe` depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest), puis lancez le fichier. L'installeur contient tout le nécessaire.
+Téléchargez le programme d’installation adapté depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 
-Windows 10 ou 11 (x64). Les mises à jour sont disponibles dans les paramètres. Si vous utilisez encore la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien système de mise à jour ne la trouve pas.
+| Processeur Windows | Programme d’installation | Validation |
+| --- | --- | --- |
+| x64 | `PresetLauncher_Setup_<version>.exe` | ✅ Testé nativement |
+| x86 32 bits | `PresetLauncher_Setup_<version>_x86.exe` | ✅ Testé sous WOW64 |
+| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` | ⚠️ Tests natifs en attente |
+
+Consultez **Paramètres → Système → Informations système → Type du système**. Utilisez une version de Windows prise en charge par Microsoft.
 
 ## Documentation
 
 [Guide d'utilisation](docs/USAGE.fr.md) · [Compiler le projet](docs/DEVELOPMENT.md#build-from-source) · [Contribuer](CONTRIBUTING.md) · [Sécurité](SECURITY.md)
 
 Développé en C# avec .NET et WinUI 3. Distribué sous [licence MIT](LICENSE).
+Par Jimmy Marley

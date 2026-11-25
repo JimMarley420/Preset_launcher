@@ -1,5 +1,8 @@
 # Run only on an isolated Windows CI VM, never on a developer's installed copy.
-param([Parameter(Mandatory = $true)][string]$PlanPath)
+param(
+    [Parameter(Mandatory = $true)][string]$PlanPath,
+    [Parameter(Mandatory = $true)][string]$Architecture
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -7,34 +10,80 @@ $root = Split-Path $PSScriptRoot -Parent
 $plan = Get-Content $PlanPath -Raw | ConvertFrom-Json
 $version = [string]$plan.version
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid planned version' }
-$setup = Join-Path $root "Installer\Output\PresetLauncher_Setup_$version.exe"
-$logs = Join-Path $root 'artifacts\installer-logs'
+$mapping = Get-Content "$root/Installer/architectures.json" -Raw | ConvertFrom-Json
+$entry = $mapping.$Architecture
+$setup = Join-Path $root "Installer\Output\PresetLauncher_Setup_${version}$($entry.suffix).exe"
+$logs = Join-Path $root "artifacts\installer-logs\$Architecture"
 New-Item -ItemType Directory -Force $logs | Out-Null
 $installDir = Join-Path $env:TEMP "PresetLauncher-CI-$([guid]::NewGuid())"
 $dataDir = Join-Path $env:LOCALAPPDATA 'PresetLauncher'
 $dataFile = Join-Path $dataDir 'data.json'
 $settingsFile = Join-Path $dataDir 'settings.json'
+$policyFile = Join-Path $dataDir 'Security/update-policy.dat'
+$policyLock = Join-Path $dataDir 'Security/update-policy.lock'
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'PresetLauncher/PresetLauncher.lnk'
 $uninstallKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1'
 $registryPath = "HKCU:\$uninstallKey"
+$installationKey = 'Software\PresetLauncher\Installation'
+$architectureRegistryPath = "HKCU:\$installationKey"
 
 if ($env:CIRCLECI -ne 'true') { throw 'Smoke test requires an isolated CircleCI VM' }
-if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path "HKLM:\$uninstallKey") -or (Test-Path "$env:LOCALAPPDATA\Programs\PresetLauncher")) {
+$machineKeys = [Microsoft.Win32.RegistryView]::Registry32, [Microsoft.Win32.RegistryView]::Registry64 |
+    ForEach-Object {
+        $hive = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $_)
+        try {
+            foreach ($subkey in $uninstallKey, $installationKey) {
+                $key = $hive.OpenSubKey($subkey)
+                if ($key) { $key.Dispose(); $true }
+            }
+        }
+        finally { $hive.Dispose() }
+    }
+if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path $architectureRegistryPath) -or
+    $machineKeys -or (Test-Path $shortcut) -or
+    (Test-Path "$env:LOCALAPPDATA\Programs\PresetLauncher")) {
     throw 'Existing PresetLauncher installation or data; refusing to run smoke test'
 }
 if (-not (Test-Path $setup -PathType Leaf)) { throw "Installer not found: $setup" }
 
-function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogName) {
+function Invoke-Package([string]$Path, [string]$LogName) {
     $log = Join-Path $logs $LogName
+    $process = Start-Process -FilePath $Path -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LANG=english /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log) -WindowStyle Hidden -Wait -PassThru
+    try { return $process.ExitCode }
+    finally { $process.Dispose() }
+}
+
+if ($Architecture -eq 'arm64' -and [Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'Arm64') {
+    $code = Invoke-Package $setup 'incompatible.log'
+    $log = Get-Content (Join-Path $logs 'incompatible.log') -Raw
+    if ($code -ne 1 -or $log -notmatch 'This program does not support the version of Windows your computer is running\.' -or
+        (Test-Path $installDir) -or (Test-Path $registryPath) -or (Test-Path $architectureRegistryPath)) {
+        throw 'ARM64 setup failed to reject an incompatible Windows host at initialization'
+    }
+    Write-Host 'ARM64 setup rejected this host. Native execution requires Windows ARM64.'
+    return
+}
+
+function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogName) {
     Write-Host "Running $LogName"
     $timer = [Diagnostics.Stopwatch]::StartNew()
-    $process = Start-Process -FilePath $Path -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log) -WindowStyle Hidden -Wait -PassThru
+    $code = Invoke-Package $Path $LogName
     Write-Host ("{0}: {1:F2}s" -f $LogName, $timer.Elapsed.TotalSeconds)
-    if ($process.ExitCode -ne 0) { throw "Setup failed: $($process.ExitCode)" }
+    if ($code -ne 0) { throw "Setup failed: $code" }
     if (-not (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe') -PathType Leaf)) { throw 'Installed executable missing' }
+    if (-not (Test-Path $shortcut -PathType Leaf)) { throw 'Start menu shortcut missing' }
     if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $ExpectedVersion) { throw 'Unexpected installed registry version' }
 }
 
 function Assert-CurrentPackage {
+    & "$root/Installer/assert-payload.ps1" -Directory $installDir -Machine $entry.machine
+    if (-not (Test-Path -LiteralPath $architectureRegistryPath)) {
+        throw "Missing installation architecture registration: $Architecture"
+    }
+    $registered = Get-ItemPropertyValue -LiteralPath $architectureRegistryPath -Name PresetLauncherArchitecture
+    if ($registered -cne $Architecture) {
+        throw "Incorrect architecture registration: expected $Architecture, found $registered"
+    }
     $dll = Join-Path $installDir 'PresetLauncherWinUI3.dll'
     foreach ($file in @($dll, (Join-Path $installDir 'coreclr.dll'), (Join-Path $installDir 'Microsoft.UI.Xaml.dll'))) {
         if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installed file: $file" }
@@ -48,6 +97,14 @@ function Assert-CurrentPackage {
     if ((Get-Item $dll).VersionInfo.FileVersion -ne "$version.0") { throw 'Installed assembly version does not match installer version' }
 }
 
+# These existing controls are enabled only once the startup and mandatory-update
+# gates release input. The edit control also proves the app loaded the fixture.
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+$newPreset = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, 'New preset')
+$editPreset = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, 'Edit Preserve me')
+$recovery = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,
+    'Application data could not be read. The original file was kept. Restore a backup in Settings.')
+
 function Assert-ApplicationStarts([string]$Phase) {
     $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
     Write-Host "Starting application ($Phase)"
@@ -58,12 +115,25 @@ function Assert-ApplicationStarts([string]$Phase) {
             $process.Refresh()
             if ($process.HasExited) { throw "Application exited during startup: $($process.ExitCode)" }
             if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
-                Write-Host ("Startup ({0}): {1:F2}s" -f $Phase, $timer.Elapsed.TotalSeconds)
-                return
+                try {
+                    $window = [Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+                    $scope = [Windows.Automation.TreeScope]::Descendants
+                    if ($window.FindFirst($scope, $recovery)) { throw 'Application entered data recovery mode' }
+                    $create = $window.FindFirst($scope, $newPreset)
+                    $edit = $window.FindFirst($scope, $editPreset)
+                    if ($create -and $edit -and $create.Current.IsEnabled -and $edit.Current.IsEnabled -and
+                        (Test-Path $policyFile -PathType Leaf) -and (Test-Path $policyLock -PathType Leaf)) {
+                        Write-Host ("Startup ({0}): {1:F2}s" -f $Phase, $timer.Elapsed.TotalSeconds)
+                        return
+                    }
+                }
+                catch [Windows.Automation.ElementNotAvailableException] {
+                    # WinUI can replace its automation elements during initial layout.
+                }
             }
-            Start-Sleep -Milliseconds 250
+            if ($process.WaitForExit(250)) { throw "Application exited during startup: $($process.ExitCode)" }
         } while ($timer.Elapsed.TotalSeconds -lt 30)
-        throw 'Application main window did not initialize within 30 seconds'
+        throw 'Enabled preset controls and protected policy were not available within 30 seconds'
     }
     finally {
         if (-not $process.HasExited) { Stop-Process -InputObject $process -Force }
@@ -77,6 +147,10 @@ function Assert-UserData {
         (Get-FileHash $settingsFile -Algorithm SHA256).Hash -ne $settingsHash) {
         throw 'Installer modified user data'
     }
+    if ($policyHash -and ((Get-FileHash $policyFile -Algorithm SHA256).Hash -ne $policyHash -or
+        (Get-FileHash $policyLock -Algorithm SHA256).Hash -ne $policyLockHash)) {
+        throw 'Installer modified protected update policy or its initialization marker'
+    }
 }
 
 function Remove-Package([string]$LogName) {
@@ -87,29 +161,45 @@ function Remove-Package([string]$LogName) {
     $process = Start-Process -FilePath $uninstaller -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="{0}"' -f $log) -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Uninstall failed: $($process.ExitCode)" }
     if ((Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe')) -or
-        (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.dll')) -or (Test-Path $registryPath)) {
+        (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.dll')) -or (Test-Path $registryPath) -or
+        (Test-Path $architectureRegistryPath) -or (Test-Path $shortcut)) {
         throw 'Uninstall left application files or registry entry'
     }
     Assert-UserData
 }
 
 New-Item -ItemType Directory $dataDir | Out-Null
-'{"Presets":[{"Id":"ci-fixture","Name":"Preserve me","Executables":[]}],"History":[],"UsageStats":{}}' | Set-Content $dataFile -Encoding UTF8
-'{"Language":"en","Theme":"dark"}' | Set-Content $settingsFile -Encoding UTF8
-$dataHash = (Get-FileHash $dataFile -Algorithm SHA256).Hash
-$settingsHash = (Get-FileHash $settingsFile -Algorithm SHA256).Hash
+# DataServiceTests loads these exact files through the production services.
+$dataFixture = Join-Path $PSScriptRoot 'fixtures/smoke-data.json'
+$settingsFixture = Join-Path $PSScriptRoot 'fixtures/smoke-settings.json'
+Copy-Item -LiteralPath $dataFixture -Destination $dataFile
+Copy-Item -LiteralPath $settingsFixture -Destination $settingsFile
+$dataHash = (Get-FileHash $dataFixture -Algorithm SHA256).Hash
+$settingsHash = (Get-FileHash $settingsFixture -Algorithm SHA256).Hash
+$policyHash = $null
+$policyLockHash = $null
 $previousSetup = Join-Path $env:TEMP "PresetLauncher-previous-$([guid]::NewGuid()).exe"
 try {
     Install-Package $setup $version 'install.log'
     Assert-CurrentPackage
     Assert-UserData
     Assert-ApplicationStarts fresh
+    $policyHash = (Get-FileHash $policyFile -Algorithm SHA256).Hash
+    $policyLockHash = (Get-FileHash $policyLock -Algorithm SHA256).Hash
+    if ($Architecture -in 'x64', 'x86') {
+        $other = if ($Architecture -eq 'x64') { 'x86' } else { 'x64' }
+        $conflict = Join-Path $root "Installer/Output/PresetLauncher_Setup_${version}$($mapping.$other.suffix).exe"
+        if ((Invoke-Package $conflict 'migration-conflict.log') -ne 7) {
+            throw 'Expected setup to reject an in-place architecture switch'
+        }
+        Assert-CurrentPackage
+    }
     Remove-Package 'uninstall.log'
 
-    if ($plan.PSObject.Properties['previous_installer']) {
+    if ($plan.PSObject.Properties['previous_installers'] -and $plan.previous_installers.PSObject.Properties[$Architecture]) {
         $previous = ([string]$plan.previous).TrimStart('v')
-        $asset = $plan.previous_installer
-        $expectedUrl = "https://github.com/JimMarley420/Preset_launcher/releases/download/$($plan.previous)/PresetLauncher_Setup_$previous.exe"
+        $asset = $plan.previous_installers.$Architecture
+        $expectedUrl = "https://github.com/JimMarley420/Preset_launcher/releases/download/$($plan.previous)/PresetLauncher_Setup_${previous}$($entry.suffix).exe"
         if ($previous -notmatch '^\d+\.\d+\.\d+$' -or $asset.url -cne $expectedUrl -or
             $asset.sha256 -notmatch '^[0-9a-f]{64}$' -or $asset.size -le 0 -or $asset.size -gt 1GB) {
             throw 'Invalid previous installer plan'
@@ -132,7 +222,10 @@ try {
 }
 finally {
     if (Test-Path $previousSetup) { Remove-Item $previousSetup -Force }
-    if (Test-Path $dataFile) { Remove-Item $dataFile -Force }
-    if (Test-Path $settingsFile) { Remove-Item $settingsFile -Force }
-    if ((Test-Path $dataDir) -and -not (Get-ChildItem $dataDir -Force)) { Remove-Item $dataDir }
+    $resolved = (Resolve-Path -LiteralPath $dataDir).Path
+    if ($resolved -ne (Join-Path (Resolve-Path -LiteralPath $env:LOCALAPPDATA).Path 'PresetLauncher') -or
+        (Get-Item -LiteralPath $dataDir).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) {
+        throw 'Unsafe smoke data directory'
+    }
+    Remove-Item -LiteralPath $resolved -Recurse -Force
 }

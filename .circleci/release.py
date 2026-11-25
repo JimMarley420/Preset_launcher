@@ -1,4 +1,5 @@
 """Plan stable releases from Conventional Commits and publish tested artifacts."""
+import base64
 import hashlib
 import json
 import os
@@ -15,7 +16,7 @@ from email.utils import parsedate_to_datetime
 import subprocess
 import sys
 from policy import LEVELS, pr_decision
-from sign_update import sign, verify
+from sign_update import sign, sign_message, verify, verify_message
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
@@ -23,7 +24,9 @@ from urllib.request import Request, urlopen
 REPO = "JimMarley420/Preset_launcher"
 API = f"https://api.github.com/repos/{REPO}"
 PLAN = Path("artifacts/release-plan.json")
-OUTPUT = Path("artifacts/verified-installer")
+OUTPUT = Path("Installer/Output")
+EVIDENCE = Path("artifacts/windows-validation.json")
+ARCHITECTURES = json.loads((Path(__file__).resolve().parent.parent / "Installer/architectures.json").read_text())
 VERSION = re.compile(r"v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\Z")
 POLICY = re.compile(r"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", re.M)
 # Last main commit before mandatory PR metadata was introduced.
@@ -123,20 +126,33 @@ def branch_pr(sha, branch):
     return matches[0]
 
 
+def is_source(path):
+    return path.casefold().endswith((".cs", ".xaml"))
+
+
 def needs_installer(paths):
-    for path in paths:
+    for path in filter(None, paths):
         path = path.casefold()
         name = path.rsplit("/", 1)[-1]
+        if name.endswith(".cs") and any(part in name for part in ("update", "interop", "native")):
+            return True
         if (path.startswith((".circleci/", "installer/"))
                 or "/publishprofiles/" in path
                 or name.endswith((".csproj", ".props", ".targets", ".iss", ".pubxml", ".sln",
                                   ".slnx", ".vcxproj", ".manifest", ".ps1", ".pfx"))
                 or name in ("global.json", "nuget.config", "packages.lock.json", "packages.config")
-                or (name.endswith(".cs") and ("update" in name or name in ("app.xaml.cs", "appsettings.cs",
-                                                                          "settingsservice.cs", "mainwindow.xaml.cs", "settingspage.xaml.cs",
-                                                                          "localizationservice.cs")))
-                or name in ("app.xaml", "mainwindow.xaml", "settingspage.xaml", "favicon.ico")):
+                or name in ("app.xaml.cs", "appsettings.cs", "settingsservice.cs", "mainwindow.xaml.cs",
+                            "settingspage.xaml.cs", "localizationservice.cs")
+                or name in ("app.xaml", "mainwindow.xaml", "settingspage.xaml", "favicon.ico",
+                            "nativewindow.cs", "processselector.cs", "launcherservice.cs", "exportpath.cs",
+                            "windowssystemdispatcherqueuehelper.cs", "themeservice.cs")):
             return True
+        if path in ("readme.md", "readme.fr.md", "security.md", "contributing.md", "code_of_conduct.md") or (
+                path.startswith("docs/") and path.endswith(".md")):
+            continue
+        if path.startswith(("presetlauncherwinui3/", "tests/presetlauncher.tests/")) and is_source(path):
+            continue
+        return True
     return False
 
 
@@ -145,10 +161,35 @@ def validate_installer(branch, pr, sha):
         return True
     base = pr["base"]["ref"]
     git("fetch", "--no-tags", f"https://github.com/{REPO}.git", f"refs/heads/{base}")
-    comparison = git("merge-base", "FETCH_HEAD", sha)
-    # Report both sides of a rename as changed paths.
-    changed = git("diff", "--name-only", "--no-renames", "-z", comparison, sha, "--")
-    return needs_installer(changed.split("\0"))
+    base_sha = pr["base"].get("sha")
+    if not base_sha or not re.fullmatch(r"[0-9a-f]{40}", base_sha):
+        return True
+    if pr["head"]["sha"] != sha or git("rev-parse", "FETCH_HEAD") != base_sha:
+        return True
+    comparison = git("merge-base", base_sha, sha)
+    # Report renames as deletion plus addition. A new source path has no
+    # established classification, even if it resembles ordinary application code.
+    changed = git("diff", "--name-status", "--no-renames", "-z", comparison, sha, "--")
+    if not changed:
+        return False
+    fields = changed.removesuffix("\0").split("\0")
+    if len(fields) % 2 or not changed.endswith("\0"):
+        return True
+    paths = []
+    for status, path in zip(fields[::2], fields[1::2]):
+        if not path or status not in ("A", "M", "D") or (status == "A" and is_source(path)):
+            return True
+        paths.append(path)
+    if needs_installer(paths):
+        return True
+    app_sources = [path for path in paths if path.casefold().startswith("presetlauncherwinui3/") and is_source(path)]
+    if not app_sources:
+        return False
+    # Also catch native API or architecture selection introduced in an
+    # otherwise ordinary source file.
+    platform_api = (r"\b(DllImport|LibraryImport|NativeLibrary|Marshal|IntPtr|UIntPtr|nint|nuint|"
+                    r"RuntimeInformation|ProcessArchitecture|OSArchitecture|RegistryView|Microsoft\.Win32)\b")
+    return bool(git("diff", "--name-only", "--no-renames", "-G", platform_api, comparison, sha, "--", *app_sources))
 
 
 def branch_decision(pr):
@@ -160,9 +201,13 @@ def branch_decision(pr):
     return decision
 
 
-def installer_asset(release):
+def installer_name(value, architecture):
+    return f"PresetLauncher_Setup_{value}{ARCHITECTURES[architecture]['suffix']}.exe"
+
+
+def installer_asset(release, architecture="x64"):
     tag = release["tag_name"]
-    name = f"PresetLauncher_Setup_{format_version(version(tag))}.exe"
+    name = installer_name(format_version(version(tag)), architecture)
     assets = [asset for asset in release["assets"] if asset["name"] == name]
     if len(assets) != 1:
         raise ValueError("Expected one previous release installer")
@@ -294,6 +339,76 @@ def verify_previous(release):
     data = {"version": format_version(version(tag)),
             "minimum_supported_version": format_version(floor), "policy": levels[0]}
     verify(data, asset["size"], asset["sha256"], signatures[0])
+    manifests = re.findall(r"^<!-- presetlauncher:manifest-v2=([A-Za-z0-9+/=]+)\.([A-Za-z0-9+/=]+) -->\r?$", body, re.M)
+    extra_installers = any(item["name"] == installer_name(data["version"], arch)
+                           for item in release["assets"] for arch in ARCHITECTURES if arch != "x64")
+    if not manifests and not extra_installers and "presetlauncher:manifest-v2" not in body:
+        return
+    if len(manifests) != 1:
+        raise ValueError("Missing or ambiguous previous architecture manifest")
+    encoded, signature = manifests[0]
+    previous_assets = {arch: installer_asset(release, arch) for arch in ARCHITECTURES}
+    message = base64.b64decode(encoded, validate=True)
+    verify_message(message, signature)
+    if message != manifest_message(data, previous_assets):
+        raise ValueError("Previous architecture manifest does not match the release")
+    return previous_assets
+
+
+def manifest_message(data, installers):
+    manifest = {key: data[key] for key in ("version", "minimum_supported_version", "policy")}
+    manifest["installers"] = [
+        {"architecture": arch, "name": installer_name(data["version"], arch),
+         "size": installers[arch]["size"], "sha256": installers[arch]["sha256"]}
+        for arch in ARCHITECTURES
+    ]
+    return b"presetlauncher-update-v2\n" + json.dumps(manifest, separators=(",", ":")).encode("ascii")
+
+
+def signed_update_markers(data, installers):
+    x64 = installers["x64"]
+    signature = sign(data, x64["size"], x64["sha256"])
+    message = manifest_message(data, installers)
+    manifest = base64.b64encode(message).decode("ascii") + "." + sign_message(message)
+    return (f"<!-- presetlauncher:min-supported={data['minimum_supported_version']} -->\n"
+            f"<!-- presetlauncher:update-policy={data['policy']} -->\n"
+            f"<!-- presetlauncher:signature-v1={signature} -->\n"
+            f"<!-- presetlauncher:manifest-v2={manifest} -->")
+
+
+def validated_installers(data, required_gate=None):
+    evidence = json.loads(EVIDENCE.read_text(encoding="utf-8-sig"))
+    full = data["validate_installer"]
+    if type(full) is not bool or (os.environ["CIRCLE_BRANCH"] == "main" and not full):
+        raise ValueError("Invalid Windows validation lane")
+    if (data["sha"] != os.environ["CIRCLE_SHA1"] or evidence["sha"] != data["sha"]
+            or evidence["version"] != data["version"] or evidence["full"] is not full):
+        raise ValueError("Windows evidence does not match the validation plan")
+    if evidence["audit"] is not True or evidence["test"] is not True:
+        raise ValueError("Dependency audit or regression reports missing")
+    targets = list(ARCHITECTURES) if full else ["x64"]
+    expected_smoke = {"x64": "native", "x86": "wow64", "arm64": "incompatible-host-rejected"} if full else {}
+    if evidence["built"] != targets or evidence["smoke"] != expected_smoke:
+        raise ValueError("Required architecture validation missing")
+    if not full or required_gate in ("dependency-audit", "test-windows", "build-windows", "smoke-installer"):
+        return {}
+
+    names = [installer_name(data["version"], arch) for arch in targets]
+    if {path.name for path in OUTPUT.iterdir()} != {*names, "SHA256SUMS.txt"}:
+        raise ValueError("Incorrect installer asset set")
+    installers = {}
+    for arch, name in zip(targets, names):
+        path = OUTPUT / name
+        size = path.stat().st_size
+        if not 0 < size <= 1024**3:
+            raise ValueError(f"Invalid installer size: {name}")
+        with path.open("rb") as stream:
+            installers[arch] = {"size": size, "sha256": hashlib.file_digest(stream, "sha256").hexdigest()}
+    expected = [f"{installers[arch]['sha256']}  {name}" for arch, name in zip(targets, names)]
+    if ((OUTPUT / "SHA256SUMS.txt").read_text(encoding="ascii").splitlines() != expected
+            or evidence["installers"] != installers):
+        raise ValueError("Validated installer checksum mismatch")
+    return installers
 
 
 def plan():
@@ -305,7 +420,7 @@ def plan():
     # Use the upstream release tag even when validating a contribution from a fork.
     tag = previous["tag_name"]
     version(tag)
-    verify_previous(previous)
+    previous_assets = verify_previous(previous)
     git("fetch", f"https://github.com/{REPO}.git", f"refs/tags/{tag}:refs/tags/{tag}")
     sha = git("rev-parse", "HEAD")
     tag_sha = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
@@ -315,7 +430,7 @@ def plan():
     result = make_plan(previous, collect_decisions(previous, sha, branch, pr), sha)
     result["validate_installer"] = validate_installer(branch, pr, sha)
     if result["validate_installer"] and (result["release"] or branch != "main"):
-        result["previous_installer"] = installer_asset(previous)
+        result["previous_installers"] = previous_assets or {"x64": installer_asset(previous)}
     PLAN.parent.mkdir(parents=True, exist_ok=True)
     PLAN.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
@@ -346,13 +461,10 @@ def publish():
     floor = version(data["minimum_supported_version"])
     if not minimum(previous) <= floor <= version(value):
         raise ValueError("Invalid release policy")
-    installer = OUTPUT / f"PresetLauncher_Setup_{value}.exe"
-    sums = OUTPUT / "SHA256SUMS.txt"
-    with installer.open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    if sums.read_text(encoding="ascii").strip() != f"{digest}  {installer.name}":
-        raise ValueError("Validated installer checksum mismatch")
-    signature = sign(data, installer.stat().st_size, digest)
+    installers = validated_installers(data)
+    paths = [OUTPUT / installer_name(value, arch) for arch in ARCHITECTURES]
+    paths.append(OUTPUT / "SHA256SUMS.txt")
+    markers = signed_update_markers(data, installers)
     # Do not reuse an existing tag or silently overwrite a partial release.
     try:
         request(API + "/git/ref/tags/" + quote(tag, safe=""), token=token)
@@ -374,20 +486,19 @@ def publish():
                      "previous_tag_name": data["previous"]}, token)
     if re.search(r"(?m)^<!-- presetlauncher:", notes["body"]):
         raise ValueError("Generated notes contain reserved update metadata")
-    body = (f"<!-- presetlauncher:min-supported={format_version(floor)} -->\n"
-            f"<!-- presetlauncher:update-policy={data['policy']} -->\n"
-            f"<!-- presetlauncher:signature-v1={signature} -->\n\n" + notes["body"])
+    body = markers + "\n\n" + notes["body"]
     release = request(API + "/releases", "POST",
                       {"tag_name": tag, "target_commitish": data["sha"], "name": f"PresetLauncher {tag}",
                        "body": body, "draft": True, "prerelease": False}, token)
     release_id = release["id"]
     print(f"Draft created: {release_id}. If interrupted, inspect the draft before retrying.")
-    for path in (installer, sums):
+    for path in paths:
         upload_url = f"https://uploads.github.com/repos/{REPO}/releases/{release_id}/assets?{urlencode({'name': path.name})}"
         asset = request(upload_url, "POST", token=token, file=path)
         with path.open("rb") as stream:
             expected = hashlib.file_digest(stream, "sha256").hexdigest()
-        if asset["name"] != path.name or asset["state"] != "uploaded" or asset["digest"] != f"sha256:{expected}":
+        if (asset["name"] != path.name or asset["state"] != "uploaded"
+                or asset["size"] != path.stat().st_size or asset["digest"] != f"sha256:{expected}"):
             raise ValueError("GitHub asset verification failed; draft left unpublished")
     # Recheck main and latest before making the draft visible.
     if request(API + "/releases/latest", token=token)["tag_name"] != data["previous"]:
@@ -405,6 +516,9 @@ def publish():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == "gate":
+        validated_installers(json.loads(PLAN.read_text(encoding="utf-8")), sys.argv[2])
+        sys.exit(0)
     if len(sys.argv) != 2 or sys.argv[1] not in ("plan", "publish"):
         sys.exit("usage: release.py plan|publish")
     {"plan": plan, "publish": publish}[sys.argv[1]]()

@@ -12,13 +12,16 @@ cd Preset_launcher
 dotnet build .\PresetLauncherWinUI3\PresetLauncherWinUI3.csproj -c Release -p:Platform=x64
 ```
 
-To produce the self-contained x64 installer, install Inno Setup 6 and run:
+Use Inno Setup 6 to build a self-contained installer on Windows. The x64 default and `-Version` option are available on every local build.
 
 ```powershell
-.\Installer\build.ps1
+.\Installer\build.ps1 -Architecture x64
+.\Installer\build.ps1 -Architecture x86
+.\Installer\build.ps1 -Architecture arm64
+.\Installer\build.ps1 -Architecture all
 ```
 
-The installer is written to `Installer/Output/`. Local builds default to version `0.0.0` and do not check for production updates. CircleCI calculates published versions automatically. See [release operations](RELEASING.md) for versioning and publication.
+The mapping in `Installer/architectures.json` supplies the MSBuild platform, RID, output suffix, Inno compatibility and install mode, and expected PE machine. The script isolates restore and build intermediates by target and checks the app host, .NET runtime and WinUI binaries. Use `-UsePinnedCompiler` for CircleCI’s SHA-256-verified 6.7.1 compiler. The installers are written to `Installer/Output/`. Local builds default to version `0.0.0` and do not check for production updates. CircleCI calculates published versions automatically. See [release operations](RELEASING.md) for versioning and publication.
 
 ## Source layout
 
@@ -64,25 +67,17 @@ The CircleCI `plan-release` job checks Worker syntax and runs the regression sui
 
 ## Continuous integration
 
-CircleCI runs the same named checks for each validated PR. The release plan selects the installer lane from the diff against the PR's actual base, including both paths of a rename. Changes to the installer, updater, app startup and update settings, SDK and NuGet declarations, publishing profiles, build scripts and CircleCI configuration require the full lane. Main always runs the full lane.
+CircleCI retains the eight named required checks. Linux checks PR metadata, tests the Python release contracts and plans validation using the actual PR head and base SHA. A single Windows Medium VM restores and audits the x64 test graph, runs the full x64 regression suite and retains JUnit, TRX and Cobertura. Linux gates verify the Windows evidence for the same commit, version and lane.
 
-| Job | Responsibility |
+| Lane | Windows work |
 | --- | --- |
-| validate-pr-title | Validate the Conventional Commit title and stacked PR eligibility. |
-| validate-update-label | Validate the update policy label independently. |
-| plan-release | Test release planning, calculate version and minimum supported version, and select the validation lane. |
-| dependency-audit | Restore and audit the application and test graph on Windows. |
-| test-windows | Compile the app and test projects, run MSTest and retain JUnit, TRX and application coverage in both lanes. |
-| build-windows | In the full lane, audit and publish the self-contained x64 graph, compile the Inno Setup installer on the same VM, and persist the installer and checksum. In the fast lane, the test job supplies the application compilation check. |
-| package-installer | Verify the full-lane installer and checksum after build, audit and tests succeed. Log the lane decision on fast PRs. |
-| smoke-installer | In the full lane, verify the checksum, exercise fresh install, startup and uninstall, and verify staged artifact integrity. Full-lane PRs and planned production releases also upgrade from the previous public installer. |
-| publish-release | Publish the smoke-tested installer and checksum on main when a release is planned. |
+| Documentation and ordinary application PRs | Audited x64 test restore and x64 compile/regression. Documentation retains the same regression guarantee. |
+| Architecture-sensitive PRs | x64 regression, three isolated publish restores, three PE checks and installers, x64 and WOW64 x86 smoke, and ARM64-setup rejection on x64. |
+| Every main commit | Full validation. A planned production release also verifies a historical installer for each architecture previously released and stages the complete release for Linux publication. |
 
-The dependency audit runs in parallel with release planning and the test path. NuGet caches are keyed by branch and the tracked restore inputs, including SDK, projects, props, targets, lock files and NuGet configuration. PRs can read a matching main cache. The serialized audit job saves caches only on main with seven-day retention. Restore still queries the vulnerability feeds and fails on the configured audit errors. The workflow transfers the release plan, the compressed installer and checksum, and the smoke-verified checksum. Published binaries stay on the VM that compiles the installer.
+Installer, updater, startup, interop, project, dependency, publish, and CI changes take the full lane. New and renamed C# or XAML files, unknown paths, ambiguous change records, and a mismatched base/head also take the full lane. Deleted paths keep their previous classification. Known platform API changes are checked in existing application sources. Ordinary edits with no platform indicators keep the x64 lane, whose regression compile satisfies the build check. Full-lane reports distinguish PE inspection, native x64 startup and WOW64 x86 startup. Use a disposable Windows ARM64 environment for native application smoke and for x64 emulation verification. Use suitable 32-bit Windows hardware or a VM for native x86 verification.
 
-Install the [.NET 10 LTS SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and run `dotnet --version` from the repository root. `global.json` requires 10.0.404 or a later patch in the 10.0.4xx feature band. CircleCI uses the exact pin and verifies the x64 host path and resolved SDK. If the image lacks the pin, it verifies the SHA-512 of the Microsoft SDK archive before extraction, whether it came from cache or Microsoft. Update `.circleci/dotnet-sdk.sha512` from Microsoft release metadata when changing the pin. The audit job also owns the SDK archive cache. A cache miss downloads the Microsoft archive and runs the same checksum and SDK version checks. For timing comparisons, use the individual cache, SDK preparation and audited restore steps in CircleCI. CircleCI verifies the official Inno Setup 6.7.1 download by SHA-256 and installs the compiler in portable mode.
-
-The x64 Release installer bundles both the .NET and Windows App SDK runtimes. ReadyToRun is disabled based on the packaging benchmark. Trimming stays disabled to preserve reflection-based serialization and WinUI behavior. The Windows API target remains build 19041 and the installer minimum remains build 17763. The production packaging path uses Inno Setup with solid `lzma2/fast` compression. The review benchmark measured ReadyToRun and the Inno compression levels separately and the final full lane verifies the selected combination, including startup and upgrade.
+The x64 host uses the SDK pinned in `global.json`. The SDK archive is checked against Microsoft's SHA-512 before extraction. Exact input NuGet and SDK caches are restored once and saved only on main with seven-day retention. NuGet audit still queries the advisory feeds. Full validation restores the publish targets separately with a shared package cache. Trimming and ReadyToRun remain disabled. Release packaging uses solid `lzma2/fast`. Publish directories stay on the worker. The workspace retains one copy of the installers, checksums and evidence. Downstream jobs may download the same workspace layer independently. Only reports and diagnostics are stored as CircleCI artifacts.
 
 Run the non-UI tests locally on Windows:
 
@@ -90,8 +85,31 @@ Run the non-UI tests locally on Windows:
 dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj -c Release -r win-x64 -p:Platform=x64 --settings tests/ci.runsettings --collect "Code Coverage;Format=Cobertura"
 ```
 
-Tests exercise real application classes with temporary files, not mocked copies. They do not launch or kill external applications, contact GitHub, or automate WinUI controls. Updater tests use a deterministic HTTP handler to exercise the real verification code. The installer smoke test waits for the installed WinUI application to open its main window. It refuses to run outside CircleCI or against an existing installation. The smoke test also checks upgrading from the latest public release on full-lane PRs and when a new version is planned. UI interactions, actual application launching, live updater download/install and older Windows versions still require separate validation.
+The regression suite reads the exact installer fixtures through production data and settings services. The Python publisher signs a fixed cross-language fixture with a dedicated test key, and MSTest passes its release JSON through both production C# verifiers. Regenerate it with `python .circleci/test_sign_update.py` and OpenSSL on PATH. The checked-in signatures stay fixed between regenerations.
 
-CircleCI setup: connect this GitHub repository and select .circleci/config.yml. Enable branch-push triggers (including main), avoid duplicate push/PR triggers, and enable auto-cancel of redundant non-default-branch workflows. Once the first Windows run succeeds, add the observed job status checks (or the complete workflow check) to GitHub branch protection. Keep commit status updates enabled for individual job status on pull requests. The CircleCI Checks app reports the workflow status separately. Keep secrets unavailable to fork builds. Use the Tests and Artifacts tabs to review results, coverage and installer logs. The Linux open-source credit allowance does not cover Windows builds. Monitor Windows credits and artifact storage.
+The installed application must expose enabled preset controls in Windows UI Automation, including the edit control for the fixture preset. The check exercises the existing startup gate and fails on premature exit, recovery mode or a readiness timeout. The smoke script refuses to run outside CircleCI or against existing user data. It checks the validated fixture bytes and protected policy files across installation, uninstallation and upgrades from a verified matching public predecessor. Live updater installation and older Windows versions require separate validation.
 
-References: [Windows execution](https://circleci.com/docs/guides/execute/using-windows/), [dependency caching](https://circleci.com/docs/guides/optimize/caching/), [test results](https://circleci.com/docs/guides/test/collect-test-data/), [auto-cancel](https://circleci.com/docs/guides/orchestrate/skip-build/), [WinUI testing](https://learn.microsoft.com/en-us/windows/apps/develop/testing/).
+Configure one branch-push trigger for main and one PR validation trigger for branches where the integration supports this split. Disable overlapping push, PR and comment triggers for the same revision. Keep per-job commit statuses and fork secret isolation. If the integration supports cancellation of superseded non-default-branch workflows, verify main publication remains excluded. The repository does not require a schedule or paid infrastructure.
+
+### Compute and storage measurement
+
+CircleCI advertises 30,000 monthly Free credits for Windows/macOS and up to 400,000 additional eligible public Linux credits. Windows Medium is 40 credits/minute, Windows Large is 120 and Small Linux Docker is 5. Compute by summing each resource class's job durations. Track cache transfers, workspace uploads/downloads and artifacts separately in the Usage dashboard. The Windows-only theoretical ceiling is 750 Medium minutes per month before other eligible consumption. [Open-source allowance](https://circleci.com/open-source/) · [Price list](https://circleci.com/pricing/price-list/) · [Using credits](https://circleci.com/docs/guides/plans-pricing/credits/)
+
+| Workflow | Windows jobs / SDK preparations / restore scopes / compiler preparations | Windows min | Linux min | Estimated compute credits, Windows + Linux | Wall min |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Original x64 fast, pipeline 72 | 4 / 2 / 2 / 0 | 3.33 | 1.05 | 133 + 5 | 3.76 |
+| Original x64 full PR, pipeline 67 | 4 / 3 / 3 / 1 | 7.82 | 1.22 | 313 + 6 | 6.31 |
+| Original x64 release, pipeline 68 | 4 / 3 / 3 / 1 | 6.89 | 1.22 | 276 + 6 | 6.17 |
+| Consolidated ordinary | 1 / 1 / 1 / 0 | NOT RUN | NOT RUN | 40 × Windows min + 5 × Linux min | NOT RUN |
+| Consolidated full | 1 / 1 / 4 / 1 | NOT RUN | NOT RUN | 40 × Windows min + 5 × Linux min | NOT RUN |
+| Consolidated production | 1 / 1 / 4 / 1 | NOT RUN | NOT RUN | Full lane plus Linux publication | NOT RUN |
+
+The original figures are public job elapsed times rounded from the API. The estimates exclude storage, network and provider billing adjustments. On the warm fast baseline the two Windows jobs spent 56.1 s selecting/extracting the SDK, 35.6 s restoring caches, 7.3 s restoring and auditing dependencies, and 55.4 s running the regression command including its restore and compile. The SDK cache transferred 274 MiB and NuGet 965 MiB per hit. On the warm non-releasing main pipeline 73, x64 publish took 44.7 s including restore, Inno preparation 9.6 s, compression 22.4 s, smoke 18.1 s and workspace upload 16.9 s for 76 MiB. A release smoke with historical upgrade took 114.7 s on pipeline 68. A controlled cold/warm comparison, billed credits and organization-level storage totals were unavailable.
+
+To reproduce, retrieve the project pipelines from `https://circleci.com/api/v2/project/gh/JimMarley420/Preset_launcher/pipeline`, then use `/api/v2/pipeline/{id}/workflow` and `/api/v2/workflow/{id}/job` for timestamps. Query `/api/v1.1/project/github/JimMarley420/Preset_launcher/{job_number}` for individual step durations in `steps[].actions[].run_time_millis`. Check the corresponding logs for cache hits or misses and transferred bytes. Compare the first naturally cold build following an input change to the next compatible warm build. Use one full PR and the next actual production release for the remaining rows. The build script logs per-target restore, publish and compression times. Consult Usage before projecting monthly capacity.
+
+A local warm build with .NET SDK 10.0.404 and the pinned Inno Setup 6.7.1 produced 80.1 MB (x64), 55.6 MB (x86) and 77.5 MB (ARM64) installers. Compiler preparation took 8.3 s. The publish and PE steps took 11.7 s, 10.1 s and 9.9 s respectively. Compression took 19.9 s, 15.9 s and 19.4 s. The combined payload was 213.2 MB before workspace transport. These are workstation measurements from `.\Installer\build.ps1 -Architecture all -UsePinnedCompiler`. Hosted execution and transfer times require a CircleCI run.
+
+CircleCI's `attach_workspace` takes a destination and downloads upstream layers. The evidence-only gates depend on the completed Windows job, so separate persistence steps in that job would still expose the installer layer to all five gates. Moving evidence to artifacts would add retrieval and retention management, while collapsing the check names would require a ruleset migration. The workflow keeps the existing workspace and status checks. Measure each gate's attachment duration and transferred bytes before revisiting that tradeoff. [CircleCI workspace behavior](https://circleci.com/docs/guides/orchestrate/workspaces/) · [Configuration reference](https://circleci.com/docs/reference/configuration-reference/#attach_workspace)
+
+A dedicated self-hosted Windows runner is an optional future alternative. It requires maintenance, an isolated disposable execution environment and separate runner storage/egress accounting. Keep public PR builds and release secrets off personal runners. [CircleCI runner documentation](https://circleci.com/docs/runner/overview/)

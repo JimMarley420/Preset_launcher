@@ -47,7 +47,7 @@ Reserve required updates for security, data integrity, compatibility or a delibe
    Verify that restriction is supported and enforced by your integration before enabling publication. Store the token as GH_RELEASE_TOKEN only in this context. Never put it in project-level variables, checkout, test or fork jobs.
 3. Protect main with required reviews and the actual CI check names from a successful branch build. Require reviewed changes to CircleCI and release scripts. Enable immutable releases if available.
 4. Merge only after every branch CI job succeeds. A main pipeline calculates the version, builds, tests, packages and checks fresh install and upgrade. Publication is serialized and rejects stale plans or an advanced main branch. Documentation-only changes do not publish.
-5. CircleCI creates a draft, uploads the exact smoke-tested installer and SHA256SUMS.txt, verifies the GitHub asset digests, then publishes it as latest. GitHub generates release notes. Never overwrite published assets or reuse a version.
+5. CircleCI creates a draft, uploads the three validated installers and SHA256SUMS.txt in deterministic order, verifies the GitHub asset sizes and digests, then publishes it as latest. GitHub generates release notes. Never overwrite published assets or reuse a version.
 
 GitHub API reads retry transient HTTP and network errors up to three times with exponential backoff and jitter. The cumulative sleep budget is 30 seconds per request, including actual sleep time. Requests with rate-limit responses require valid server timing within the remaining budget. Without it, GitHub's minimum 60-second secondary-limit wait exceeds the budget and the request fails. The 30-second socket timeout is not an end-to-end deadline. Release creation, asset uploads and publication are not retried automatically because the outcome of a failed write may be ambiguous. The final main ref check follows release decision collection immediately before publication. The check and PATCH are not atomic.
 
@@ -69,15 +69,9 @@ Require these eight CircleCI status checks in the PROD ruleset.
 - `ci/circleci: validate-update-label`
 - `ci/circleci: smoke-installer`
 
-The serial-group markers are internal to CircleCI and should not be required. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
+CircleCI validates on one Windows VM. The named Linux gates require Windows evidence bound to the commit, version and validation lane. The package and publication checks independently hash the installers and verify the exact asset set. Keep the eight required names and the separately serialized publication job. See [CI lanes and measurement](DEVELOPMENT.md#continuous-integration).
 
-### Storage and cache policy
-
-The dependency-audit job saves SDK and NuGet caches only on main, with seven-day retention for new objects. PR jobs can restore matching main caches (or existing branch caches until they expire). A new SDK or dependency fingerprint on a PR can require a cold download. Cache misses do not bypass the pinned SDK digest or dependency audit. Cache keys remain branch-scoped, with main fallback and exact input checksums. Existing objects keep their original retention.
-
-Full-lane PRs still expose the verified installer in CircleCI artifacts. Main keeps the installer and smoke-tested checksum in the workflow workspace for publication, but does not upload a second copy as a CircleCI artifact. Published installers remain on GitHub Releases. Non-releasing main builds do not retain a downloadable installer artifact. Test reports, coverage and smoke logs remain available.
-
-Compare storage credits, cache hit rates and Windows job duration in Insights after rollout. Reconsider the seven-day retention if frequent cache misses outweigh the storage savings.
+Main alone writes verified SDK and dependency caches. Use the existing seven-day retention for new caches. Check usage and cap workspace retention at the period required for workflow retries. The pipeline retains a workspace copy for validation/publication and keeps test reports and smoke logs. GitHub Releases is the permanent distribution location.
 
 ## Migration from the legacy update server
 
@@ -92,7 +86,7 @@ CI does not change the old host. Do not shut it down prematurely. Older clients 
 
 ## Verification and security
 
-The smoke test installs and removes the new package. On full-lane PR branches and for a planned release on main it also verifies the previous public installer digest, installs it, upgrades in place, and checks application version, registry and preservation of disposable user data. It verifies the bundled .NET 10 runtime and the executable and assembly file versions. The smoke test also waits for the installed WinUI main window to initialize after each installation. For changes to the updater, manually test both languages, optional skip, the 24-hour recommended reminder, mandatory update, offline retry, download errors, canceled installation and the legacy bridge in a disposable Windows VM.
+Full validation checks PE machine values for each published app host and key self-contained native libraries. The x64 worker installs, starts and removes x64 and x86 in sequence with isolated state. Windows UI Automation checks that startup has enabled the preset controls and that the installed app can see the fixture preset. The production data and settings readers validate the same fixture in the regression suite. Smoke checks registration, shortcuts and preservation of presets, history, statistics, preferences and both protected policy files. It upgrades from the authenticated matching predecessor where one exists. The first release of each new architecture uses fresh-install smoke. The x64 host checks ARM64 setup rejection. Obtain maintainer approval after native ARM64 smoke on a supported Windows ARM64 device before calling that target fully verified.
 
 The new updater checks GitHub's HTTPS metadata and verifies downloaded bytes. A checksum is not independent code signing: configure Authenticode signing before claiming publisher verification or SmartScreen trust. Limit repository and publication access.
 
@@ -109,7 +103,11 @@ openssl pkey -in "$keydir/update-private.pem" -pubout -out .circleci/update-poli
 
 Commit only `.circleci/update-policy-public.pem` to the updater branch. Store the base64 encoding of the private PEM as `UPDATE_SIGNING_KEY_B64` in the existing restricted `presetlauncher-release` context. Use a trusted local environment to encode and transfer it directly to the CircleCI secret field. Do not print it in CI logs. Remove the temporary private file after securely backing it up.
 
-Publication signs the version, minimum supported version, policy, installer size and SHA-256 using ECDSA P-256 with SHA-256 and a DER signature. The signature is stored in a `presetlauncher:signature-v1` HTML comment. The original two markers remain for older clients. The public key is checked in PR validation. A missing private key or mismatch blocks publication before a draft is created. Signed predecessor releases are verified before carrying forward their minimum version. Only the historical releases 1.2.6 and v1.3.0 may lack a signature. The client pins the public key in its assembly and rejects unsigned newer releases.
+Publication emits exactly one legacy v1 ECDSA P-256 signature and keeps the unsuffixed x64 filename and original policy comments. Existing x64 update clients can verify that installer unchanged.
+
+New clients require `presetlauncher:manifest-v2` in the release body. It contains base64-encoded signed message bytes, a dot and a base64 DER ECDSA P-256/SHA-256 signature. The signed message begins with ASCII `presetlauncher-update-v2` and an LF, followed by compact ASCII JSON with `version`, `minimum_supported_version`, `policy` and `installers`. Installer entries are ordered x64, x86, ARM64, each with `architecture`, `name`, `size` and lowercase `sha256`. Clients verify the original bytes with the existing pinned key, apply the authenticated policy floor and then match the process architecture and GitHub asset metadata. A missing or invalid asset leaves the authenticated minimum in effect. A v1 marker alone cannot authorize a download by a v2 client.
+
+Signed predecessors are checked under their published protocol before reusing their floors and installers. The historical unsigned exceptions are limited to 1.2.6 and v1.3.0. The same restricted release context signs both formats.
 
 The signing key is pinned. A replacement key requires a compatible client migration and transition plan before switching the signer. Clients that miss the transition may require a manual installer. Do not replace the CircleCI secret alone.
 

@@ -1,0 +1,5 @@
+{
+  "x64": { "platform": "x64", "rid": "win-x64", "suffix": "", "allowed": "x64compatible", "mode64": "x64compatible", "machine": 34404 },
+  "x86": { "platform": "x86", "rid": "win-x86", "suffix": "_x86", "allowed": "x86compatible", "mode64": "", "machine": 332 },
+  "arm64": { "platform": "ARM64", "rid": "win-arm64", "suffix": "_arm64", "allowed": "arm64", "mode64": "arm64", "machine": 43620 }
+}

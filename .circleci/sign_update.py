@@ -24,19 +24,26 @@ def validate_public_key():
 
 
 def verify(data, size, digest, signature):
+    verify_message(payload(data, size, digest), signature)
+
+
+def verify_message(message, signature):
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "signature.der"
         path.write_bytes(base64.b64decode(signature, validate=True))
         subprocess.run(["openssl", "dgst", "-sha256", "-verify", str(PUBLIC_KEY),
-                        "-signature", str(path)], input=payload(data, size, digest),
+                        "-signature", str(path)], input=message,
                        check=True, stdout=subprocess.DEVNULL)
 
 
 def sign(data, size, digest):
+    return sign_message(payload(data, size, digest))
+
+
+def sign_message(message):
     validate_public_key()
     # The key never enters a command argument or the checkout.
     private = base64.b64decode(os.environ["UPDATE_SIGNING_KEY_B64"], validate=True)
-    message = payload(data, size, digest)
     with tempfile.TemporaryDirectory() as directory:
         key = Path(directory) / "key.pem"
         signature = Path(directory) / "signature.der"
@@ -49,7 +56,7 @@ def sign(data, size, digest):
         subprocess.run(["openssl", "dgst", "-sha256", "-sign", str(key),
                         "-out", str(signature)], input=message, check=True)
         encoded = base64.b64encode(signature.read_bytes()).decode("ascii")
-        verify(data, size, digest, encoded)
+        verify_message(message, encoded)
         return encoded
 
 

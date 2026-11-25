@@ -33,12 +33,19 @@ PresetLauncher groups programs into presets. Create a preset for work, gaming or
 
 ## Installation
 
-Download `PresetLauncher_Setup_<version>.exe` from the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest) and run it. The installer includes everything the app needs to run.
+Download the installer for your processor from the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 
-Windows 10 or 11 (x64). Updates are available from Settings. If you're still using version 1.2.6 or earlier, install the latest release manually if the old updater doesn't find it.
+| Windows processor | Installer | Runtime validation |
+| --- | --- | --- |
+| x64 | `PresetLauncher_Setup_<version>.exe` | ✅ Tested natively |
+| 32-bit x86 | `PresetLauncher_Setup_<version>_x86.exe` | ✅ Tested under WOW64 |
+| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` | ⚠️ Native testing pending |
+
+Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version.
 
 ## Documentation
 
 [User guide](docs/USAGE.md) · [Build from source](docs/DEVELOPMENT.md#build-from-source) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 Built with C#, .NET and WinUI 3. Distributed under the [MIT license](LICENSE).
+By Jimmy Marley

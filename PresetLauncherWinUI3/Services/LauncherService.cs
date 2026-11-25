@@ -132,9 +132,9 @@ public class LauncherService
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr OpenProcess(ProcessAccessFlags dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool QueryFullProcessImageName(IntPtr hProcess, int dwFlags, StringBuilder lpExeName, out int lpdwSize);
+    private static extern bool QueryFullProcessImageName(IntPtr hProcess, int dwFlags, StringBuilder lpExeName, ref int lpdwSize);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -153,7 +153,8 @@ public class LauncherService
             try
             {
                 var sb = new StringBuilder(1024);
-                if (QueryFullProcessImageName(hProcess, 0, sb, out var size))
+                var size = sb.Capacity;
+                if (QueryFullProcessImageName(hProcess, 0, sb, ref size))
                 {
                     path = sb.ToString();
                     return true;
