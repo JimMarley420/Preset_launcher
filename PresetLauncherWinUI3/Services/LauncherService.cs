@@ -17,8 +17,11 @@ public class LauncherService
         QueryLimitedInformation = 0x1000
     }
 
-    public async Task LaunchPresetMissingAsync(Preset preset)
+    public (int SuccessCount, int FailedCount) LaunchPresetMissing(Preset preset)
     {
+        preset = PresetDraft.Copy(preset);
+        var started = new List<string>();
+        int failed = 0;
         var running = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in GetRunningProcesses())
         {
@@ -39,8 +42,7 @@ public class LauncherService
             running.Add(System.IO.Path.GetFileName(p.Path));
         }
 
-        var orderedExes = new List<ExecutableItem>(preset.Executables);
-        orderedExes.Sort((a, b) => a.Order.CompareTo(b.Order));
+        var orderedExes = preset.Executables.OrderBy(item => item.Order);
 
         foreach (var exe in orderedExes)
         {
@@ -76,16 +78,19 @@ public class LauncherService
                 if (exe.RunAsAdmin)
                     startInfo.Verb = "runas";
 
-                Process.Start(startInfo);
-                exe.LaunchCount++;
+                using var launched = Process.Start(startInfo);
+                if (exe.LaunchCount < int.MaxValue) exe.LaunchCount++;
                 exe.LastLaunched = DateTime.Now;
-                App.Data.UpdateUsageStats(exe.Path);
+                started.Add(exe.Path);
             }
             catch
             {
-                // ignore
+                failed++;
             }
         }
+        if (started.Count > 0)
+            App.Data.RecordLaunch(preset, started, null, 0);
+        return (started.Count, failed);
     }
 
     public List<ProcessInfo> GetRunningProcessSummaries()
@@ -106,13 +111,14 @@ public class LauncherService
                 }
                 catch
                 {
-                    // ignore per-process failures
+                    // A process can exit during enumeration.
                 }
+                finally { p.Dispose(); }
             }
         }
-        catch
+        catch (System.ComponentModel.Win32Exception ex)
         {
-            // ignore overall failures
+            Debug.WriteLine(ex.GetType().Name);
         }
 
         return processes;
@@ -165,7 +171,7 @@ public class LauncherService
         // fallback: try Process.MainModule
         try
         {
-            var proc = Process.GetProcessById(pid);
+            using var proc = Process.GetProcessById(pid);
             if (!string.IsNullOrEmpty(proc.MainModule?.FileName))
             {
                 path = proc.MainModule.FileName;
@@ -174,17 +180,18 @@ public class LauncherService
         }
         catch
         {
-            // ignore — process may have elevated privileges or be inaccessible
+            // The process may have exited or may be inaccessible.
         }
 
         return false;
     }
 
     public event EventHandler<string>? StatusChanged;
-    public event EventHandler<ExecutionHistory>? ExecutionCompleted;
 
     public async Task<ExecutionHistory> LaunchPresetAsync(Preset preset)
     {
+        preset = PresetDraft.Copy(preset);
+        var started = new List<string>();
         var history = new ExecutionHistory
         {
             PresetId = preset.Id,
@@ -193,13 +200,12 @@ public class LauncherService
             ExecutablesCount = preset.Executables.Count
         };
 
-        var startTime = DateTime.Now;
-        var orderedExes = new List<ExecutableItem>(preset.Executables);
-        orderedExes.Sort((a, b) => a.Order.CompareTo(b.Order));
+        var stopwatch = Stopwatch.StartNew();
+        var orderedExes = preset.Executables.OrderBy(item => item.Order);
 
         foreach (var exe in orderedExes)
         {
-            StatusChanged?.Invoke(this, App.Localization.Get("execution.launching", exe.Name));
+            StatusChanged?.Invoke(this, exe.Name);
 
             var detail = new ExecutionDetail
             {
@@ -227,15 +233,15 @@ public class LauncherService
                     startInfo.Verb = "runas";
                 }
 
-                Process.Start(startInfo);
+                using var launched = await Task.Run(() => Process.Start(startInfo));
                 
                 detail.Success = true;
                 history.SuccessCount++;
                 
-                exe.LaunchCount++;
+                if (exe.LaunchCount < int.MaxValue) exe.LaunchCount++;
                 exe.LastLaunched = DateTime.Now;
                 
-                App.Data.UpdateUsageStats(exe.Path);
+                started.Add(exe.Path);
             }
             catch (Exception ex)
             {
@@ -247,19 +253,12 @@ public class LauncherService
             history.Details.Add(detail);
         }
 
-        history.Duration = DateTime.Now - startTime;
+        history.Duration = stopwatch.Elapsed;
         
-        preset.LaunchCount++;
+        if (preset.LaunchCount < int.MaxValue) preset.LaunchCount++;
         preset.LastLaunched = DateTime.Now;
 
-        App.Data.AddHistory(history);
-        App.Data.Save();
-
-        StatusChanged?.Invoke(this, history.FailedCount == 0 
-            ? App.Localization.Get("execution.success") 
-            : App.Localization.Get("execution.failed"));
-
-        ExecutionCompleted?.Invoke(this, history);
+        App.Data.RecordLaunch(preset, started, history, App.Settings.CurrentSettings.MaxHistoryEntries);
 
         return history;
     }
@@ -351,7 +350,7 @@ public class LauncherService
                         {
                             try
                             {
-                                var proc = Process.GetProcessById(pid);
+                                using var proc = Process.GetProcessById(pid);
                                 if (proc.CloseMainWindow())
                                 {
                                     await Task.Delay(500);
@@ -398,22 +397,4 @@ public class ProcessInfo
     public string Name { get; set; } = string.Empty;
     public string Path { get; set; } = string.Empty;
     public int Id { get; set; }
-
-    public override string ToString()
-    {
-        try
-        {
-            var file = string.IsNullOrEmpty(Path) ? "" : System.IO.Path.GetFileName(Path);
-            if (!string.IsNullOrEmpty(file))
-            {
-                return $"{Name} — {file} ({Id})";
-            }
-            return $"{Name} ({Id})";
-        }
-        catch
-        {
-            return Name;
-        }
-    }
 }
-

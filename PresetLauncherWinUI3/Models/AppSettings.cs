@@ -4,6 +4,8 @@ namespace PresetLauncher.Models
 {
     public class AppSettings
     {
+        internal AppSettings Copy() => (AppSettings)MemberwiseClone();
+
         public string Language { get; set; } = "fr";
         public string Theme { get; set; } = "system";
         // Backdrop: none | mica | acrylic

@@ -1,239 +1,129 @@
-using System;
-using Microsoft.UI.Xaml;
-using Microsoft.Win32;
+using System.Diagnostics;
 using Microsoft.UI.Composition.SystemBackdrops;
-using Microsoft.UI.Xaml.Media;
-using System.Runtime.InteropServices;
-using WinRT;
-using WinRT.Interop;
-using Microsoft.UI;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Windows.UI;
+using PresetLauncher.Models;
+using Windows.UI.ViewManagement;
+using WinRT;
 
 namespace PresetLauncher.Services;
 
-public class ThemeService
+internal sealed class ThemeService
 {
-    public event EventHandler<string>? ThemeChanged;
-    
-    private Window? _mainWindow;
+    private Window _window = null!;
+    private FrameworkElement _root = null!;
+    private Border _fallback = null!;
+    private readonly AccessibilitySettings _accessibility = new();
+    private readonly UISettings _system = new();
+    private readonly WindowsSystemDispatcherQueueHelper _queue = new();
+    private ISystemBackdropControllerWithTargets? _controller;
+    private SystemBackdropConfiguration? _configuration;
+    private string? _material;
+    private string _theme = "system";
+    private string _backdrop = "none";
+    private bool _active;
+    private bool _closed;
 
-    private WindowsSystemDispatcherQueueHelper? _dqHelper;
-    private MicaController? _micaController;
-    private DesktopAcrylicController? _acrylicController;
-    private SystemBackdropConfiguration? _backdropConfiguration;
-
-    public void SetWindow(Window window)
+    public void Attach(Window window, FrameworkElement root, Border fallback)
     {
-        _mainWindow = window;
+        _window = window;
+        _root = root;
+        _fallback = fallback;
+        _root.ActualThemeChanged += ActualThemeChanged;
+        _window.Activated += Activated;
+        _window.Closed += Closed;
+        _system.ColorValuesChanged += SystemColorsChanged;
     }
 
-    public void ApplyTheme(string theme)
+    public void Apply(AppSettings settings)
     {
-        if (_mainWindow == null) return;
-        
-        var actualTheme = theme;
-        
-        if (theme == "system")
-        {
-            actualTheme = IsSystemDarkTheme() ? "dark" : "light";
-        }
-
-        var rootElement = _mainWindow.Content as FrameworkElement;
-        if (rootElement != null)
-        {
-            rootElement.RequestedTheme = actualTheme == "dark" 
-                ? ElementTheme.Dark 
-                : ElementTheme.Light;
-        }
-
-        ThemeChanged?.Invoke(this, actualTheme);
+        _theme = settings.Theme;
+        _backdrop = settings.Backdrop;
+        UpdateAppearance();
     }
 
-    public ElementTheme GetElementTheme(string theme)
+    private void UpdateAppearance()
     {
-        if (theme == "system")
+        if (_closed) return;
+        var highContrast = _accessibility.HighContrast;
+        _root.RequestedTheme = highContrast ? ElementTheme.Default : _theme switch
         {
-            return IsSystemDarkTheme() ? ElementTheme.Dark : ElementTheme.Light;
-        }
-        return theme == "dark" ? ElementTheme.Dark : ElementTheme.Light;
+            "light" => ElementTheme.Light,
+            "dark" => ElementTheme.Dark,
+            _ => _system.GetColorValue(UIColorType.Background).R < 128 ? ElementTheme.Dark : ElementTheme.Light
+        };
+        SetMaterial(highContrast ? "none" : _backdrop);
+        SyncTheme();
     }
 
-    public void ApplyBackdrop(string backdrop)
+    private void SetMaterial(string material)
     {
-        if (_mainWindow == null) return;
+        if (material == _material)
+            return;
+        _material = material;
+        _controller?.Dispose();
+        _controller = null;
+        _configuration = null;
+        _fallback.Visibility = Visibility.Visible;
 
-        // Ensure dispatcher queue is available
-        _dqHelper ??= new WindowsSystemDispatcherQueueHelper();
-        _dqHelper.EnsureWindowsSystemDispatcherQueueController();
-
-        // Dispose existing controllers and remove handlers
-        TryRemoveWindowHandlers();
-        _micaController?.Dispose();
-        _micaController = null;
-        _acrylicController?.Dispose();
-        _acrylicController = null;
-        _backdropConfiguration = null;
-
-        var rootElement = _mainWindow.Content as FrameworkElement;
-
-        // Helper to set background safely on various element types
-        void SetElementBackground(FrameworkElement? el, Brush? brush)
-        {
-            if (el == null || brush == null) return;
-            try
-            {
-                if (el is Control ctrl)
-                {
-                    ctrl.Background = brush;
-                }
-                else if (el is Panel panel)
-                {
-                    panel.Background = brush;
-                }
-                else if (el is Border border)
-                {
-                    border.Background = brush;
-                }
-            }
-            catch { }
-        }
-
-        // Restore or set transparent backgrounds depending on backdrop selection
-        Brush? normalBackground = null;
         try
         {
-            normalBackground = Application.Current?.Resources["ApplicationPageBackgroundThemeBrush"] as Brush;
+            _controller = material switch
+            {
+                "mica" when MicaController.IsSupported() => new MicaController(),
+                "acrylic" when DesktopAcrylicController.IsSupported() => new DesktopAcrylicController(),
+                _ => null
+            };
+            if (_controller is null)
+                return;
+            _queue.EnsureWindowsSystemDispatcherQueueController();
+            _configuration = new SystemBackdropConfiguration { IsInputActive = _active, Theme = BackdropTheme };
+            if (!_controller.AddSystemBackdropTarget(_window.As<Microsoft.UI.Composition.ICompositionSupportsSystemBackdrop>()))
+                throw new InvalidOperationException("Backdrop target could not be attached.");
+            _controller.SetSystemBackdropConfiguration(_configuration);
+            _fallback.Visibility = Visibility.Collapsed;
         }
-        catch { }
-
-        var transparentBrush = new SolidColorBrush(Colors.Transparent);
-
-        // If selecting none, restore normal backgrounds; otherwise make backgrounds transparent so system backdrop is visible
-        var useTransparent = backdrop == "mica" || backdrop == "acrylic";
-        if (rootElement != null)
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
-            SetElementBackground(rootElement, useTransparent ? transparentBrush : normalBackground ?? transparentBrush);
-
-            // Try to find common title bar element by name and update its background as well
-            try
-            {
-                var titleBarEl = rootElement.FindName("AppTitleBar") as FrameworkElement;
-                SetElementBackground(titleBarEl, useTransparent ? transparentBrush : normalBackground ?? transparentBrush);
-            }
-            catch { }
-
-                // Also try to apply transparent/normal backgrounds to common navigation and content elements
-                try
-                {
-                    var navViewEl = rootElement.FindName("NavView") as FrameworkElement;
-                    SetElementBackground(navViewEl, useTransparent ? transparentBrush : normalBackground ?? transparentBrush);
-                }
-                catch { }
-
-                try
-                {
-                    var contentFrameEl = rootElement.FindName("ContentFrame") as FrameworkElement;
-                    SetElementBackground(contentFrameEl, useTransparent ? transparentBrush : normalBackground ?? transparentBrush);
-                }
-                catch { }
-
-                try
-                {
-                    var rootGridEl = rootElement.FindName("RootGrid") as FrameworkElement;
-                    SetElementBackground(rootGridEl, useTransparent ? transparentBrush : normalBackground ?? transparentBrush);
-                }
-                catch { }
-        }
-
-        if (backdrop == "mica")
-        {
-            try
-            {
-                _backdropConfiguration = new SystemBackdropConfiguration();
-                _backdropConfiguration.IsInputActive = true;
-                _backdropConfiguration.Theme = IsSystemDarkTheme() ? SystemBackdropTheme.Dark : SystemBackdropTheme.Default;
-
-                _micaController = new MicaController();
-                var target = _mainWindow.As<Microsoft.UI.Composition.ICompositionSupportsSystemBackdrop>();
-                _micaController.AddSystemBackdropTarget(target);
-                _micaController.SetSystemBackdropConfiguration(_backdropConfiguration);
-                _mainWindow.Activated += Window_Activated;
-                _mainWindow.Closed += Window_Closed;
-            }
-            catch
-            {
-            }
-        }
-        else if (backdrop == "acrylic")
-        {
-            try
-            {
-                _backdropConfiguration = new SystemBackdropConfiguration();
-                _backdropConfiguration.IsInputActive = true;
-                _backdropConfiguration.Theme = IsSystemDarkTheme() ? SystemBackdropTheme.Dark : SystemBackdropTheme.Default;
-
-                _acrylicController = new DesktopAcrylicController();
-                var target = _mainWindow.As<Microsoft.UI.Composition.ICompositionSupportsSystemBackdrop>();
-                _acrylicController.AddSystemBackdropTarget(target);
-                _acrylicController.SetSystemBackdropConfiguration(_backdropConfiguration);
-                _mainWindow.Activated += Window_Activated;
-                _mainWindow.Closed += Window_Closed;
-            }
-            catch
-            {
-            }
+            Debug.WriteLine(ex.GetType().Name);
+            _controller?.Dispose();
+            _controller = null;
+            _configuration = null;
         }
     }
 
-    private void Window_Activated(object? sender, WindowActivatedEventArgs e)
+    private SystemBackdropTheme BackdropTheme => _root.ActualTheme == ElementTheme.Dark ?
+        SystemBackdropTheme.Dark : SystemBackdropTheme.Light;
+
+    private void SyncTheme()
     {
-        if (_backdropConfiguration == null) return;
-        _backdropConfiguration.IsInputActive = e.WindowActivationState != WindowActivationState.Deactivated;
+        if (_configuration is not null)
+            _configuration.Theme = BackdropTheme;
+        if (AppWindowTitleBar.IsCustomizationSupported())
+            _window.AppWindow.TitleBar.PreferredTheme = _accessibility.HighContrast ? TitleBarTheme.UseDefaultAppMode :
+                _root.ActualTheme == ElementTheme.Dark ? TitleBarTheme.Dark : TitleBarTheme.Light;
     }
 
-    private void Window_Closed(object? sender, WindowEventArgs e)
+    private void ActualThemeChanged(FrameworkElement sender, object args) => SyncTheme();
+
+    private void Activated(object sender, WindowActivatedEventArgs args)
     {
-        TryRemoveWindowHandlers();
-        _micaController?.Dispose();
-        _acrylicController?.Dispose();
-        _backdropConfiguration = null;
+        _active = args.WindowActivationState != WindowActivationState.Deactivated;
+        if (_configuration is not null)
+            _configuration.IsInputActive = _active;
     }
 
-    private void TryRemoveWindowHandlers()
-    {
-        if (_mainWindow == null) return;
-        try
-        {
-            _mainWindow.Activated -= Window_Activated;
-            _mainWindow.Closed -= Window_Closed;
-        }
-        catch
-        {
-        }
-    }
+    private void SystemColorsChanged(UISettings sender, object args) => QueueRefresh();
+    private void QueueRefresh() => _root.DispatcherQueue.TryEnqueue(UpdateAppearance);
 
-    private bool IsSystemDarkTheme()
+    private void Closed(object sender, WindowEventArgs args)
     {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            
-            if (key != null)
-            {
-                var value = key.GetValue("AppsUseLightTheme");
-                if (value is int intValue)
-                {
-                    return intValue == 0;
-                }
-            }
-        }
-        catch
-        {
-        }
-        
-        return false;
+        _closed = true;
+        _system.ColorValuesChanged -= SystemColorsChanged;
+        _root.ActualThemeChanged -= ActualThemeChanged;
+        _window.Activated -= Activated;
+        _window.Closed -= Closed;
+        _controller?.Dispose();
     }
 }

@@ -7,7 +7,9 @@ namespace PresetLauncher.Models
 {
     public partial class Preset : ObservableObject
     {
-        public string ProgramsText => $"{Executables.Count} {LocalizationService.Instance?.Get("exe.programs") ?? "programmes"}";
+        [Newtonsoft.Json.JsonIgnore]
+        public string ProgramsText => LocalizationService.Instance.Get(
+            Executables.Count == 1 ? "exe.programOne" : "exe.programMany", Executables.Count);
         [ObservableProperty]
         private string id = Guid.NewGuid().ToString();
 

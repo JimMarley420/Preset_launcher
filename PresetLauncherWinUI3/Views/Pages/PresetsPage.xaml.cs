@@ -1,287 +1,178 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using PresetLauncher.Models;
 using PresetLauncher.Services;
-using PresetLauncher.Views.Dialogs;
-using Windows.Storage.Pickers;
-using WinRT.Interop;
+using static PresetLauncher.Views.DesktopUi;
 
 namespace PresetLauncher.Views.Pages;
 
-public sealed partial class PresetsPage : Page
+public sealed class PresetsPage : DesktopPage
 {
-    public ObservableCollection<Preset> FilteredPresets { get; } = new();
     private readonly LauncherService _launcher = new();
+    private readonly TextBox _search = new();
+    private readonly TextBlock _title;
+    private readonly Button _create;
+    private readonly Button _import;
+    private readonly ProgressBar _progress = new() { IsIndeterminate = true, Visibility = Visibility.Collapsed };
 
     public PresetsPage()
     {
-        this.InitializeComponent();
-        UpdateLocalizedText();
-        RefreshPresets();
-        PresetsRepeater.ElementPrepared += PresetsRepeater_ElementPrepared;
+        _title = Heading("preset.title", page: true);
+        _create = Button("preset.new", (_, _) => Shell.EditPreset(null), accent: true);
+        _import = Button("preset.import", Import);
+        Header.Children.Add(_title);
+        Header.Children.Add(AdaptivePair(_search, Actions(_create, _import), 540));
+        Header.Children.Add(_progress);
+        _search.TextChanged += (_, _) => ShowPresets();
     }
 
-    private void PresetsRepeater_ElementPrepared(ItemsRepeater sender, ItemsRepeaterElementPreparedEventArgs args)
+    internal override void Refresh()
     {
-        try
-        {
-            if (args.Element is FrameworkElement fe)
-            {
-                var launchBtn = fe.FindName("BtnLaunch") as Button;
-                var editBtn = fe.FindName("BtnEdit") as Button;
-                var moreBtn = fe.FindName("BtnMore") as Button;
-
-                if (launchBtn != null)
-                    ToolTipService.SetToolTip(launchBtn, App.Localization.Get("tooltip.launchPreset"));
-                if (editBtn != null)
-                    ToolTipService.SetToolTip(editBtn, App.Localization.Get("tooltip.editPreset"));
-
-                // For elements inside the DataTemplate (MenuFlyout items, labels), locate them in the visual tree
-                try
-                {
-                    // Programs label
-                    var programsLabel = fe.FindName("TxtProgramsLabel") as TextBlock;
-                    if (programsLabel != null)
-                        programsLabel.Text = App.Localization.Get("preset.programsLabel");
-
-                    // MenuFlyout: find flyout on the 'more' button and set items text/tooltips
-                    if (moreBtn != null && moreBtn.Flyout is MenuFlyout mf)
-                    {
-                        foreach (var item in mf.Items)
-                        {
-                            if (item is MenuFlyoutItem mfi)
-                            {
-                                // Attempt to set by known order/text
-                                var txt = mfi.Text?.ToString() ?? string.Empty;
-                                if (txt.Contains("Fermer") || txt.Contains("Close"))
-                                {
-                                    mfi.Text = App.Localization.Get("menu.closeProcesses");
-                                    mfi.Tag = moreBtn.Tag;
-                                }
-                                else if (txt.Contains("Supprimer") || txt.Contains("Delete"))
-                                {
-                                    mfi.Text = App.Localization.Get("menu.delete");
-                                    mfi.Tag = moreBtn.Tag;
-                                }
-                            }
-                        }
-                    }
-                }
-                catch { }
-            }
-        }
-        catch
-        {
-        }
+        base.Refresh();
+        _title.Text = T("preset.title");
+        _create.Content = T("preset.new");
+        var wasUnavailable = !_create.IsEnabled;
+        _create.IsEnabled = !App.Data.LoadFailed;
+        _import.Content = T("preset.import");
+        _import.IsEnabled = !App.Data.LoadFailed;
+        _search.PlaceholderText = T("search.placeholder");
+        Label(_search, _search.PlaceholderText);
+        Label(_progress, T("execution.inProgress"));
+        if (App.Data.LoadFailed)
+            Report("data.loadFailed", InfoBarSeverity.Error);
+        else if (wasUnavailable)
+            ClearStatus();
+        ShowPresets();
     }
 
-    private void UpdateLocalizedText()
+    private void ShowPresets()
     {
-        TxtNewPreset.Text = App.Localization.Get("preset.new");
-        TxtImport.Text = App.Localization.Get("preset.import");
-        SearchBox.PlaceholderText = App.Localization.Get("search.placeholder");
-        TxtNoPresets.Text = App.Localization.Get("preset.nopresets");
-        if (TxtPresetsTitle != null)
-            TxtPresetsTitle.Text = App.Localization.Get("preset.title");
-        if (PresetCountText != null)
-            PresetCountText.Text = App.Localization.Get("preset.subtitle");
-        // The per-item labels inside the DataTemplate are localized when each element is prepared
-    }
-
-    private void RefreshPresets(string? searchText = null)
-    {
-        FilteredPresets.Clear();
-        
-        var presets = App.Data.Data.Presets.AsEnumerable();
-        
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
-            presets = presets.Where(p => 
-                p.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                p.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase));
-        }
+        Body.Children.Clear();
+        var search = _search.Text.Trim();
+        var presets = App.Data.Data.Presets.Where(p =>
+            App.Localization.Culture.CompareInfo.IndexOf(p.Name, search, System.Globalization.CompareOptions.IgnoreCase) >= 0 ||
+            App.Localization.Culture.CompareInfo.IndexOf(p.Description, search, System.Globalization.CompareOptions.IgnoreCase) >= 0).ToArray();
+        if (presets.Length == 0)
+            Body.Children.Add(Text(T(search.Length == 0 ? "preset.nopresets" : "preset.noMatches"), "DesktopSecondaryText"));
 
         foreach (var preset in presets)
         {
-            FilteredPresets.Add(preset);
-        }
+            var name = Text(preset.Name, "DesktopSectionTitle");
+            name.MaxLines = 2;
+            name.TextTrimming = TextTrimming.CharacterEllipsis;
+            ToolTipService.SetToolTip(name, preset.Name);
+            var labels = new StackPanel { Spacing = 3 };
+            labels.Children.Add(name);
+            var missing = preset.Executables.Count(program => !program.IsValid);
+            labels.Children.Add(Text(preset.ProgramsText, "DesktopSecondaryText"));
+            if (missing > 0)
+                labels.Children.Add(Text(T("preset.programSummary", missing), "DesktopWarningText"));
+            if (!string.IsNullOrWhiteSpace(preset.Description))
+            {
+                var description = Text(preset.Description, "DesktopSecondaryText");
+                description.MaxLines = 2;
+                description.TextTrimming = TextTrimming.CharacterEllipsis;
+                ToolTipService.SetToolTip(description, preset.Description);
+                labels.Children.Add(description);
+            }
 
-        EmptyStatePanel.Visibility = FilteredPresets.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var menu = new MenuFlyout();
+            AddMenuItem(menu, "menu.closeProcesses", async (_, _) => await CloseProcesses(preset));
+            AddMenuItem(menu, "menu.delete", async (_, _) => await DeletePreset(preset));
+            var more = new Button { Content = Icon("\uE712"), Flyout = menu };
+            Label(more, T("menu.more", preset.Name));
+            var edit = Button("preset.edit", (_, _) => Shell.EditPreset(preset), glyph: "\uE70F");
+            Label(edit, T("preset.editNamed", preset.Name));
+            var row = AdaptivePair(labels, Actions(CreateLaunchButton(preset), edit, more), 390);
+            Body.Children.Add(Row(row));
+        }
     }
 
-    private void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    private DropDownButton CreateLaunchButton(Preset preset)
     {
-        if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+        var modes = new MenuFlyout();
+        AddMenuItem(modes, "preset.launchAll", async (_, _) => await Launch(preset, LaunchMode.All));
+        AddMenuItem(modes, "preset.launchMissing", async (_, _) => await Launch(preset, LaunchMode.MissingOnly));
+        var launch = new DropDownButton
         {
-            RefreshPresets(sender.Text);
-        }
-    }
-
-    private async void BtnCloseProcesses_Click(object sender, RoutedEventArgs e)
-    {
-        Preset? preset = null;
-
-        if (sender is Button btn)
-            preset = btn.Tag as Preset;
-        else if (sender is MenuFlyoutItem mfi)
-            preset = mfi.Tag as Preset;
-
-        if (preset == null) return;
-
-        // First: Show confirmation dialog
-        var confirmDialog = new ContentDialog
-        {
-            Title = App.Localization.Get("dialog.close.title"),
-            Content = App.Localization.Get("dialog.close.message"),
-            PrimaryButtonText = App.Localization.Get("dialog.yes"),
-            CloseButtonText = App.Localization.Get("dialog.cancel"),
-            XamlRoot = this.XamlRoot
+            Content = Actions(Icon("\uE768", accent: true), Text(T("preset.launch"))),
+            Flyout = modes
         };
+        Label(launch, T("preset.launchNamed", preset.Name));
+        return launch;
+    }
 
-        var confirmed = await confirmDialog.ShowAsync();
-        if (confirmed != ContentDialogResult.Primary) return;
+    private static void AddMenuItem(MenuFlyout menu, string key, RoutedEventHandler click)
+    {
+        var item = new MenuFlyoutItem { Text = T(key) };
+        item.Click += click;
+        menu.Items.Add(item);
+    }
 
-        // Second: Close processes
+    private async void Import(object sender, RoutedEventArgs args) =>
+        await Shell.RunOperationAsync(async () =>
+        {
+            var file = await OpenPicker("preset.import", ".json").PickSingleFileAsync();
+            if (file is null) return;
+            var preset = await Task.Run(() => App.Data.ImportPresetFile(file.Path));
+            if (preset is null)
+            {
+                Report("preset.importError", InfoBarSeverity.Error);
+                return;
+            }
+            App.Data.AddPreset(preset);
+            ShowPresets();
+            Report("preset.imported", InfoBarSeverity.Success);
+        }, "preset.importWriteFailed");
+
+    private Task<bool> DeletePreset(Preset preset) => Shell.RunOperationAsync(async () =>
+    {
+        if (!await Confirm(XamlRoot, "dialog.delete.title", T("dialog.delete.message", preset.Name), "menu.delete"))
+            return;
+        App.Data.RemovePreset(preset);
+        ShowPresets();
+        Report("preset.deleted", InfoBarSeverity.Success);
+    }, "data.writeFailed");
+
+    private Task<bool> CloseProcesses(Preset preset) => Shell.RunOperationAsync(async () =>
+    {
+        if (!await Confirm(XamlRoot, "dialog.close.title", T("dialog.close.message", preset.Name), "menu.closeProcesses"))
+            return;
         var count = await _launcher.ClosePresetProcessesAsync(preset);
+        Report("execution.processesClosed", InfoBarSeverity.Informational, count);
+    }, "execution.closeFailed");
 
-        var resultDialog = new ContentDialog
-        {
-            Title = App.Localization.Get("dialog.confirm"),
-            Content = string.Format(App.Localization.Get("execution.processesClosed"), count),
-            CloseButtonText = App.Localization.Get("dialog.ok"),
-            XamlRoot = this.XamlRoot
-        };
-
-        await resultDialog.ShowAsync();
-    }
-
-    private async void BtnNewPreset_Click(object sender, RoutedEventArgs e)
+    private Task<bool> Launch(Preset preset, LaunchMode mode) => Shell.RunOperationAsync(async () =>
     {
-        var dialog = new PresetEditorDialog(null)
-        {
-            XamlRoot = this.XamlRoot
-        };
-        
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary && dialog.ResultPreset != null)
-        {
-            App.Data.AddPreset(dialog.ResultPreset);
-            RefreshPresets();
-        }
-    }
+        var action = LaunchInteraction.ConfirmationAction(App.Settings.CurrentSettings, mode);
+        if (action is not null && !await Confirm(XamlRoot, action, T("dialog.launch.message", preset.Name), action))
+            return;
 
-    private async void BtnImport_Click(object sender, RoutedEventArgs e)
+        ClearStatus();
+        _progress.Visibility = Visibility.Visible;
+        try
+        {
+            _launcher.StatusChanged += LaunchStatus;
+            var result = mode == LaunchMode.All
+                ? await LaunchAll(preset)
+                : await Task.Run(() => _launcher.LaunchPresetMissing(preset));
+            Report(result.FailedCount > 0 ? "execution.resultsFailed" : "execution.results",
+                result.FailedCount > 0 ? InfoBarSeverity.Warning : InfoBarSeverity.Informational,
+                result.SuccessCount, result.FailedCount);
+        }
+        finally
+        {
+            _launcher.StatusChanged -= LaunchStatus;
+            _progress.Visibility = Visibility.Collapsed;
+        }
+    }, "execution.saveFailed");
+
+    private async Task<(int SuccessCount, int FailedCount)> LaunchAll(Preset preset)
     {
-        var picker = new FileOpenPicker();
-        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        picker.FileTypeFilter.Add(".json");
-
-        var hwnd = WindowNative.GetWindowHandle(App.Current.MainWindow);
-        InitializeWithWindow.Initialize(picker, hwnd);
-
-        var file = await picker.PickSingleFileAsync();
-        if (file != null)
-        {
-            var json = await Windows.Storage.FileIO.ReadTextAsync(file);
-            var preset = App.Data.ImportPreset(json);
-            if (preset != null)
-            {
-                App.Data.AddPreset(preset);
-                RefreshPresets();
-            }
-        }
+        var history = await _launcher.LaunchPresetAsync(preset);
+        return (history.SuccessCount, history.FailedCount);
     }
 
-    private async void BtnLaunch_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is Preset preset)
-        {
-            // First: Ask whether to launch all or only missing
-            var choiceDialog = new ContentDialog
-            {
-                Title = App.Localization.Get("dialog.launch.title"),
-                Content = App.Localization.Get("dialog.launch.message"),
-                PrimaryButtonText = App.Localization.Get("preset.launchAll"),
-                SecondaryButtonText = App.Localization.Get("preset.launchMissing"),
-                CloseButtonText = App.Localization.Get("dialog.cancel"),
-                XamlRoot = this.XamlRoot
-            };
-
-            var choice = await choiceDialog.ShowAsync();
-            if (choice == ContentDialogResult.None) return;
-
-            // Second: Show confirmation dialog
-            var confirmDialog = new ContentDialog
-            {
-                Title = App.Localization.Get("dialog.confirm"),
-                Content = App.Localization.Get("execution.inProgress"),
-                PrimaryButtonText = App.Localization.Get("dialog.yes"),
-                CloseButtonText = App.Localization.Get("dialog.cancel"),
-                XamlRoot = this.XamlRoot
-            };
-
-            var confirmed = await confirmDialog.ShowAsync();
-            if (confirmed != ContentDialogResult.Primary) return;
-
-            // Third: Execute the appropriate action
-            if (choice == ContentDialogResult.Primary)
-            {
-                await _launcher.LaunchPresetAsync(preset);
-            }
-            else if (choice == ContentDialogResult.Secondary)
-            {
-                await _launcher.LaunchPresetMissingAsync(preset);
-            }
-        }
-    }
-
-    private async void BtnEdit_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is Preset preset)
-        {
-            var dialog = new PresetEditorDialog(preset)
-            {
-                XamlRoot = this.XamlRoot
-            };
-            
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                App.Data.Save();
-                RefreshPresets();
-            }
-        }
-    }
-
-    private async void BtnDelete_Click(object sender, RoutedEventArgs e)
-    {
-        Preset? preset = null;
-
-        if (sender is Button btn)
-            preset = btn.Tag as Preset;
-        else if (sender is MenuFlyoutItem mfi)
-            preset = mfi.Tag as Preset;
-
-        if (preset == null) return;
-
-        var dialog = new ContentDialog
-        {
-            Title = App.Localization.Get("dialog.delete.title"),
-            Content = App.Localization.Get("dialog.delete.message"),
-            PrimaryButtonText = App.Localization.Get("dialog.yes"),
-            CloseButtonText = App.Localization.Get("dialog.no"),
-            XamlRoot = this.XamlRoot
-        };
-        
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary)
-        {
-            App.Data.RemovePreset(preset);
-            RefreshPresets();
-        }
-    }
+    private void LaunchStatus(object? sender, string program) =>
+        Report("execution.launching", InfoBarSeverity.Informational, program);
 }

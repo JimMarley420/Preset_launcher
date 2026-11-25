@@ -1,290 +1,209 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.IO;
-using Windows.Storage.Pickers;
-using WinRT.Interop;
+using PresetLauncher.Models;
 using PresetLauncher.Services;
-using System;
-using System.Threading.Tasks;
+using static PresetLauncher.Views.DesktopUi;
 
 namespace PresetLauncher.Views.Pages;
 
-public sealed partial class SettingsPage : Page
+public sealed class SettingsPage : DesktopPage
 {
-    private readonly UpdateService _updateService = new();
-    private bool _isInitializing = true;
+    private readonly TextBlock _title;
+    private readonly UpdateService _updates = new();
+    private int _renderGeneration;
 
     public SettingsPage()
     {
-        this.InitializeComponent();
-        LoadSettings();
-        _isInitializing = false;
+        _title = Heading("settings.title", page: true);
+        Header.Children.Add(_title);
     }
 
-    public void RefreshUI()
+    internal override void Refresh()
     {
-        _isInitializing = true;
-        LoadSettings();
-        _isInitializing = false;
-    }
+        base.Refresh();
+        _title.Text = T("settings.title");
+        var generation = ++_renderGeneration;
+        Body.Children.Clear();
 
-    private void LoadSettings()
-    {
         var settings = App.Settings.CurrentSettings;
+        Section("settings.appearance");
+        AddSetting("settings.theme", Choice("settings.theme", settings.Theme, ["system", "light", "dark"],
+            value => Change(settings => settings.Theme = value)));
+        AddSetting("settings.backdrop", Choice("settings.backdrop", settings.Backdrop, ["none", "mica", "acrylic"],
+            value => Change(settings => settings.Backdrop = value)));
+        AddSetting("settings.language", Choice("language", App.Localization.Language, ["fr", "en"],
+            value => Change(settings => settings.Language = value, refreshLanguage: true)));
 
-        foreach (ComboBoxItem item in CmbLanguage.Items)
+        Section("settings.behavior");
+        var confirmation = new ToggleSwitch
         {
-            if (item.Tag?.ToString() == settings.Language)
-            {
-                CmbLanguage.SelectedItem = item;
-                break;
-            }
-        }
-
-        foreach (ComboBoxItem item in CmbTheme.Items)
-        {
-            if (item.Tag?.ToString() == settings.Theme)
-            {
-                CmbTheme.SelectedItem = item;
-                break;
-            }
-        }
-
-        TglConfirmLaunch.IsOn = settings.ConfirmBeforeLaunch;
-        TxtDataPathValue.Text = settings.DataPath;
-        TxtVersionValue.Text = $"v{_updateService.GetInstalledVersion()}";
-
-        foreach (ComboBoxItem item in CmbBackdrop.Items)
-        {
-            if (item.Tag?.ToString() == settings.Backdrop)
-            {
-                CmbBackdrop.SelectedItem = item;
-                break;
-            }
-        }
-
-        void SetText(string name, string value)
-        {
-            var el = this.FindName(name);
-            if (el is TextBlock tb)
-                tb.Text = value;
-            else if (el is ComboBoxItem cbi)
-                cbi.Content = value;
-            else if (el is Button btn)
-                btn.Content = value;
-            else if (el is ComboBox cb)
-            {
-                try { cb.Header = value; } catch { }
-            }
-        }
-
-        string Localized(string key, string @default = "")
-        {
-            var v = App.Localization.Get(key) ?? string.Empty;
-            if (string.IsNullOrEmpty(v) || v == key) return @default;
-            return v;
-        }
-
-        SetText("TxtSettingsTitle", Localized("settings.title", "Settings"));
-        SetText("TxtSettingsSubtitle", Localized("settings.subtitle", string.Empty));
-
-        SetText("TxtAppearanceTitle", Localized("settings.appearance", string.Empty));
-        SetText("TxtThemeLabel", Localized("settings.theme", string.Empty));
-        SetText("TxtThemeSubtitle", Localized("settings.theme.subtitle", string.Empty));
-        SetText("ThemeSystem", Localized("settings.theme.system", "System"));
-        SetText("ThemeLight", Localized("settings.theme.light", "Light"));
-        SetText("ThemeDark", Localized("settings.theme.dark", "Dark"));
-
-        SetText("TxtLanguageLabel", Localized("settings.language", "Language"));
-        SetText("TxtLanguageSubtitle", Localized("settings.language.subtitle", string.Empty));
-        SetText("LangFr", Localized("language.fr", "Français"));
-        SetText("LangEn", Localized("language.en", "English"));
-
-        SetText("TxtBackdropLabel", Localized("settings.backdrop", string.Empty));
-        SetText("TxtBackdropSubtitle", Localized("settings.backdrop.subtitle", string.Empty));
-        SetText("BackdropNone", Localized("settings.backdrop.none", "None"));
-        SetText("BackdropMica", Localized("settings.backdrop.mica", "Mica"));
-        SetText("BackdropAcrylic", Localized("settings.backdrop.acrylic", "Acrylic"));
-
-        SetText("TxtBehaviorTitle", Localized("settings.behavior", string.Empty));
-        SetText("TxtConfirmLaunchLabel", Localized("settings.confirmLaunch", string.Empty));
-        SetText("TxtConfirmLaunchSubtitle", Localized("settings.confirmLaunch.subtitle", string.Empty));
-
-        SetText("TxtDataTitle", Localized("settings.data", string.Empty));
-        SetText("TxtDataPathLabel", Localized("settings.dataPath", string.Empty));
-        SetText("BtnBrowse", Localized("settings.browse", string.Empty));
-
-        SetText("TxtCleanupLabel", Localized("settings.cleanup", string.Empty));
-        SetText("TxtCleanupSubtitle", Localized("settings.cleanup.subtitle", string.Empty));
-        SetText("BtnCleanup", Localized("settings.cleanup.action", string.Empty));
-
-        SetText("TxtResetLabel", Localized("settings.reset.title", string.Empty));
-        SetText("TxtResetSubtitle", Localized("settings.reset.subtitle", string.Empty));
-        SetText("BtnReset", Localized("settings.reset.action", string.Empty));
-
-        SetText("TxtAboutTitle", Localized("settings.about", string.Empty));
-        SetText("TxtVersionLabel", Localized("settings.version", string.Empty));
-        SetText("BtnCheckUpdate", Localized("settings.checkUpdate", string.Empty));
-    }
-
-    private void CmbLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-
-        if (CmbLanguage.SelectedItem is ComboBoxItem item && item.Tag is string language)
-        {
-            App.Settings.UpdateLanguage(language);
-            App.Localization.SetLanguage(language);
-            if (App.Current.MainWindow is MainWindow mw)
-                mw.RefreshUI();
-        }
-    }
-
-    private void CmbTheme_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-
-        if (CmbTheme.SelectedItem is ComboBoxItem item && item.Tag is string theme)
-        {
-            App.Settings.UpdateTheme(theme);
-            App.Theme.ApplyTheme(theme);
-        }
-    }
-
-    private void CmbBackdrop_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-
-        if (CmbBackdrop.SelectedItem is ComboBoxItem item && item.Tag is string backdrop)
-        {
-            App.Settings.UpdateBackdrop(backdrop);
-            App.Theme.ApplyBackdrop(backdrop);
-        }
-    }
-
-    private void TglConfirmLaunch_Toggled(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing) return;
-        App.Settings.CurrentSettings.ConfirmBeforeLaunch = TglConfirmLaunch.IsOn;
-        App.Settings.Save();
-    }
-
-    private async void BtnBrowse_Click(object sender, RoutedEventArgs e)
-    {
-        var picker = new FileSavePicker();
-        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        picker.FileTypeChoices.Add("JSON files", new[] { ".json" });
-        picker.SuggestedFileName = "data";
-
-        var hwnd = WindowNative.GetWindowHandle(App.Current.MainWindow);
-        InitializeWithWindow.Initialize(picker, hwnd);
-
-        var file = await picker.PickSaveFileAsync();
-        if (file != null)
-        {
-            try
-            {
-                var sourceFile = new System.IO.FileInfo(System.IO.Path.Combine(App.Settings.CurrentSettings.DataPath, "data.json"));
-                if (sourceFile.Exists)
-                {
-                    System.IO.File.Copy(sourceFile.FullName, file.Path, overwrite: true);
-
-                    var dialog = new ContentDialog
-                    {
-                        Title = App.Localization.Get("dialog.export") ?? "Export",
-                        Content = App.Localization.Get("preset.exported") ?? "Preset exported successfully!",
-                        CloseButtonText = App.Localization.Get("dialog.ok") ?? "OK",
-                        XamlRoot = this.XamlRoot
-                    };
-                    await dialog.ShowAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                var dialog = new ContentDialog
-                {
-                    Title = App.Localization.Get("dialog.error") ?? "Error",
-                    Content = $"{App.Localization.Get("settings.export.error") ?? "Error exporting"}: {ex.Message}",
-                    CloseButtonText = App.Localization.Get("dialog.ok") ?? "OK",
-                    XamlRoot = this.XamlRoot
-                };
-                await dialog.ShowAsync();
-            }
-        }
-    }
-
-    private async void BtnCleanup_Click(object sender, RoutedEventArgs e)
-    {
-        App.Data.CleanupInvalidExecutables();
-
-        var dialog = new ContentDialog
-        {
-            Title = App.Localization.Get("settings.cleanup.title") ?? "Cleanup",
-            Content = App.Localization.Get("settings.cleanup.success") ?? "Data cleaned successfully.",
-            CloseButtonText = App.Localization.Get("dialog.ok") ?? "OK",
-            XamlRoot = this.XamlRoot
+            IsOn = settings.ConfirmBeforeLaunch,
+            OnContent = T("settings.on"),
+            OffContent = T("settings.off")
         };
-        await dialog.ShowAsync();
+        Label(confirmation, T("settings.confirmLaunch"));
+        confirmation.Toggled += (_, _) =>
+        {
+            if (generation == _renderGeneration && confirmation.IsLoaded &&
+                App.Settings.CurrentSettings.ConfirmBeforeLaunch != confirmation.IsOn)
+                Change(settings => settings.ConfirmBeforeLaunch = confirmation.IsOn);
+        };
+        AddSetting("settings.confirmLaunch", confirmation);
+
+        Section("settings.data");
+        AddSetting("settings.dataPath", description: App.Data.StoragePath);
+        AddSetting("data.backupScope", DataAction("data.export", Export), T("data.exportScope"));
+        AddSetting("data.restoreTitle", Button("data.import", Import), T("data.restoreScope"));
+        AddSetting("settings.cleanup", DataAction("settings.cleanup.action", Cleanup), T("settings.cleanup.subtitle"));
+
+        Section("settings.about");
+        AddSetting("settings.version", Button("settings.checkUpdate", CheckUpdates), _updates.GetInstalledVersion());
+
+        Section("settings.reset.section");
+        AddSetting("settings.reset.title", DataAction("settings.reset.action", Reset), T("settings.reset.subtitle"));
     }
 
-    private async void BtnReset_Click(object sender, RoutedEventArgs e)
+    private static Button DataAction(string key, RoutedEventHandler action)
     {
-        var confirmDialog = new ContentDialog
+        var button = Button(key, action);
+        button.IsEnabled = !App.Data.LoadFailed;
+        return button;
+    }
+
+    private void Section(string key)
+    {
+        var heading = Heading(key);
+        heading.Margin = new Thickness(0, 10, 0, 0);
+        Body.Children.Add(heading);
+    }
+
+    private void AddSetting(string key, FrameworkElement? action = null, string? description = null)
+    {
+        var labels = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        labels.Children.Add(Text(T(key)));
+        if (description is not null)
         {
-            Title = App.Localization.Get("settings.reset.title") ?? "Reset",
-            Content = "Êtes-vous sûr de vouloir réinitialiser l'application ?\n\nCette action va :\n- Supprimer tous les presets\n- Supprimer l'historique d'exécution\n- Réinitialiser tous les paramètres\n\nCette action est IRRÉVERSIBLE !",
-            PrimaryButtonText = App.Localization.Get("settings.reset.action") ?? "Reset",
-            CloseButtonText = App.Localization.Get("dialog.cancel") ?? "Cancel",
-            XamlRoot = this.XamlRoot
+            var detail = Text(description, "DesktopSecondaryText");
+            if (action is null)
+                detail.IsTextSelectionEnabled = true;
+            labels.Children.Add(detail);
+        }
+        Body.Children.Add(Row(action is null ? labels : AdaptivePair(labels, action, 500)));
+    }
+
+    private ComboBox Choice(string category, string selected, string[] choices, Action<string> changed)
+    {
+        var generation = _renderGeneration;
+        var selector = new ComboBox { MinWidth = 132 };
+        Label(selector, T(category == "language" ? "settings.language" : category));
+        foreach (var choice in choices)
+            selector.Items.Add(new ComboBoxItem { Content = T($"{category}.{choice}"), Tag = choice });
+        selector.SelectedIndex = Math.Max(0, Array.IndexOf(choices, selected));
+        var committedSelection = (string)((ComboBoxItem)selector.SelectedItem).Tag;
+        selector.SelectionChanged += (_, _) =>
+        {
+            if (generation != _renderGeneration || !selector.IsLoaded ||
+                selector.SelectedItem is not ComboBoxItem { Tag: string value } || committedSelection == value)
+                return;
+            committedSelection = value;
+            changed(value);
         };
+        return selector;
+    }
 
-        var result = await confirmDialog.ShowAsync();
-
-        if (result == ContentDialogResult.Primary)
+    private void Change(Action<AppSettings> change, bool refreshLanguage = false)
+    {
+        try
         {
-            try
-            {
-                App.Data.ClearAllData();
-                App.Settings.Reset();
-
-                App.Localization.SetLanguage("fr");
-                App.Theme.ApplyTheme("system");
-                App.Theme.ApplyBackdrop("mica");
-
-                _isInitializing = true;
-                LoadSettings();
-                _isInitializing = false;
-
-                if (App.Current.MainWindow is MainWindow mw)
-                    mw.RefreshUI();
-
-                var successDialog = new ContentDialog
-                {
-                    Title = App.Localization.Get("settings.cleanupDone") ?? "Cleanup completed!",
-                    Content = App.Localization.Get("settings.cleanup.success") ?? "Data cleaned successfully.",
-                    CloseButtonText = App.Localization.Get("dialog.ok") ?? "OK",
-                    XamlRoot = this.XamlRoot
-                };
-                await successDialog.ShowAsync();
-            }
-            catch (Exception ex)
-            {
-                var errorDialog = new ContentDialog
-                {
-                    Title = App.Localization.Get("dialog.error") ?? "Error",
-                    Content = $"Erreur lors de la réinitialisation : {ex.Message}",
-                    CloseButtonText = App.Localization.Get("dialog.ok") ?? "OK",
-                    XamlRoot = this.XamlRoot
-                };
-                await errorDialog.ShowAsync();
-            }
+            App.Settings.Update(change);
+            if (refreshLanguage)
+                Shell.ApplyPreferences();
+            else
+                App.Theme.Apply(App.Settings.CurrentSettings);
+        }
+        catch (Exception ex) when (DataService.IsFileError(ex))
+        {
+            Refresh();
+            Report("settings.saveFailed", InfoBarSeverity.Error);
         }
     }
 
-    private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        BtnCheckUpdate.IsEnabled = false;
-        try { await App.Current.Updates.CheckAsync(manual: true); }
-        finally { BtnCheckUpdate.IsEnabled = true; }
-    }
+    private async void Export(object sender, RoutedEventArgs args) =>
+        await Shell.RunOperationAsync(async () =>
+        {
+            if (!await Confirm(XamlRoot, "data.export", T("data.sensitivity"), "data.export"))
+                return;
+            var file = await BackupPicker().PickSaveFileAsync();
+            if (file is null) return;
+            await Task.Run(() => App.Data.ExportData(file.Path));
+            Report("data.exported", InfoBarSeverity.Success);
+        }, "settings.export.error");
+
+    private async void Import(object sender, RoutedEventArgs args) =>
+        await Shell.RunOperationAsync(async () =>
+        {
+            var file = await OpenPicker("data.import", ".json").PickSingleFileAsync();
+            if (file is null) return;
+
+            AppData backup;
+            try { backup = await Task.Run(() => DataService.ReadBackup(file.Path)); }
+            catch (Exception ex) when (DataService.IsFileError(ex))
+            {
+                Report("data.invalidBackup", InfoBarSeverity.Error);
+                return;
+            }
+
+            var summary = new StackPanel { Spacing = 8 };
+            summary.Children.Add(Text(T("data.importReplace")));
+            summary.Children.Add(Text(T("data.importSummary", backup.Presets.Count, backup.History.Count, backup.UsageStats.Count)));
+            if (!await Confirm(XamlRoot, "data.import", summary, "data.replace"))
+                return;
+            var previous = await Task.Run(() => App.Data.RestoreBackup(backup));
+            Refresh();
+            if (previous is null)
+                Report("data.imported", InfoBarSeverity.Success);
+            else
+                Report("data.importedWithCopy", InfoBarSeverity.Success, System.IO.Path.GetFileName(previous));
+        }, "data.restoreFailed");
+
+    private async void Cleanup(object sender, RoutedEventArgs args) =>
+        await Shell.RunOperationAsync(async () =>
+        {
+            var missing = await Task.Run(App.Data.FindMissingExecutables);
+            if (missing.Count == 0)
+            {
+                Report("cleanup.none");
+                return;
+            }
+
+            var preview = new StackPanel { Spacing = 6 };
+            foreach (var group in missing.GroupBy(item => (item.PresetId, item.PresetName)))
+            {
+                preview.Children.Add(Text(group.Key.PresetName, "DesktopSectionTitle"));
+                foreach (var item in group)
+                    preview.Children.Add(PathText(item.Path));
+            }
+            var scroller = Scroll(preview);
+            scroller.MaxHeight = 180;
+            var panel = new StackPanel { Spacing = 10 };
+            panel.Children.Add(Text(T("cleanup.confirm", missing.Count)));
+            panel.Children.Add(scroller);
+            if (!await Confirm(XamlRoot, "settings.cleanup", panel, "cleanup.remove"))
+                return;
+            var removed = await Task.Run(() => App.Data.CleanupInvalidExecutables(missing));
+            Report("cleanup.removed", InfoBarSeverity.Success, removed);
+        }, "data.writeFailed");
+
+    private async void Reset(object sender, RoutedEventArgs args) =>
+        await Shell.RunOperationAsync(async () =>
+        {
+            if (!await Confirm(XamlRoot, "settings.reset.title", T("settings.reset.confirm"), "settings.reset.action"))
+                return;
+            try { await Task.Run(() => App.Data.ResetApplication(App.Settings)); }
+            finally { Shell.ApplyPreferences(); }
+            Report("settings.reset.success", InfoBarSeverity.Success);
+        }, "settings.reset.failed");
+
+    private async void CheckUpdates(object sender, RoutedEventArgs args) =>
+        await Shell.RunOperationAsync(() => App.Current.Updates.CheckAsync(manual: true), "settings.updateCheckFailed");
 }

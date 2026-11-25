@@ -16,7 +16,9 @@ namespace PresetLauncher.Models
         public TimeSpan Duration { get; set; }
         public List<ExecutionDetail> Details { get; set; } = new();
         
-        public string SuccessText => $"{SuccessCount}/{ExecutablesCount} {LocalizationService.Instance?.Get("history.success") ?? "reussi(s)"}";
+        [Newtonsoft.Json.JsonIgnore]
+        public string SuccessText => LocalizationService.Instance.Get(
+            FailedCount > 0 ? "history.failure" : "history.success", SuccessCount, ExecutablesCount, FailedCount);
     }
 
     public class ExecutionDetail

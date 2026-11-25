@@ -28,7 +28,7 @@ PresetLauncher permet de regrouper des programmes dans des presets. Créez un pr
 
 * Lancez tous les programmes d'un preset ou seulement ceux qui ne sont pas déjà ouverts.
 * Ajoutez des applications, des raccourcis et des scripts, avec un délai de lancement et des droits administrateur au choix.
-* Importez des presets au format JSON et consultez l'historique des lancements.
+* Importez des presets au format JSON, filtrez l’historique des lancements et sauvegardez les données de l’application.
 * Choisissez un thème clair ou sombre et utilisez l'application en français ou en anglais.
 
 ## Installation
