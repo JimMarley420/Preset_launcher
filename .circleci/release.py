@@ -4,12 +4,20 @@ import json
 import os
 from pathlib import Path
 import re
+import random
+import time
+import errno
+import http.client
+import socket
+import ssl
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import subprocess
 import sys
 from policy import LEVELS, pr_decision
 from sign_update import sign, verify
-from urllib.error import HTTPError
-from urllib.parse import quote, urlencode
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 REPO = "JimMarley420/Preset_launcher"
@@ -175,15 +183,94 @@ def request(url, method="GET", payload=None, token=None, file=None):
     if file is not None:
         headers["Content-Type"] = "application/octet-stream"
         headers["Content-Length"] = str(file.stat().st_size)
-        with file.open("rb") as stream:
-            with urlopen(Request(url, data=stream, headers=headers, method=method), timeout=300) as response:
-                return json.load(response)
+        try:
+            with file.open("rb") as stream:
+                with urlopen(Request(url, data=stream, headers=headers, method=method), timeout=300) as response:
+                    return json.load(response)
+        except HTTPError as error:
+            error.close()
+            raise
     data = None
     if payload is not None:
         headers["Content-Type"] = "application/json"
         data = json.dumps(payload).encode()
-    with urlopen(Request(url, data=data, headers=headers, method=method), timeout=30) as response:
-        return json.load(response)
+    attempts = 4 if method == "GET" and data is None else 1
+    remaining_sleep = 30.0
+    for attempt in range(attempts):
+        try:
+            with urlopen(Request(url, data=data, headers=headers, method=method), timeout=30) as response:
+                return json.load(response)
+        except (OSError, http.client.IncompleteRead) as error:
+            try:
+                if attempt == attempts - 1 or not transient(error):
+                    raise
+                delay = retry_delay(error, attempt)
+                if delay is None or delay > remaining_sleep:
+                    raise
+            finally:
+                if isinstance(error, HTTPError):
+                    error.close()
+            # Log only the path, not authorization headers, query parameters or payloads.
+            print(f"GitHub GET {urlsplit(url).path}: {type(error).__name__}"
+                  f"{' ' + str(error.code) if isinstance(error, HTTPError) else ''}; "
+                  f"retry {attempt + 1}/{attempts - 1} in {delay:.1f}s", file=sys.stderr, flush=True)
+            started = time.monotonic()
+            time.sleep(delay)
+            remaining_sleep -= max(delay, time.monotonic() - started)
+
+
+def transient(error):
+    if isinstance(error, HTTPError):
+        # A normal 403 is not retryable. GitHub also uses 403 for rate limits.
+        return (error.code in (429, 500, 502, 503, 504)
+                or (error.code == 403 and (error.headers is not None and
+                    (error.headers.get("Retry-After") is not None
+                     or error.headers.get("X-RateLimit-Remaining") == "0"))))
+    reason = error.reason if isinstance(error, URLError) else error
+    if isinstance(reason, ssl.SSLError):
+        return False
+    if isinstance(reason, socket.gaierror):
+        return reason.errno == socket.EAI_AGAIN
+    return (isinstance(reason, (TimeoutError, ConnectionError, http.client.IncompleteRead,
+                                http.client.RemoteDisconnected))
+            or isinstance(reason, OSError) and reason.errno in
+            (errno.EAGAIN, errno.ETIMEDOUT, errno.ECONNRESET, errno.ECONNREFUSED,
+             errno.ECONNABORTED, errno.EHOSTUNREACH, errno.ENETUNREACH))
+
+
+def retry_delay(error, attempt):
+    delay = random.uniform(0, min(8, 2 ** (attempt + 1)))
+    if not isinstance(error, HTTPError):
+        return delay
+    headers = error.headers or {}
+    now = datetime.now(timezone.utc)
+    retry_after = headers.get("Retry-After")
+    primary = headers.get("X-RateLimit-Remaining") == "0"
+    if retry_after is not None:
+        try:
+            if retry_after.isascii() and retry_after.isdecimal():
+                requested = int(retry_after)
+            else:
+                target = parsedate_to_datetime(retry_after)
+                if target.tzinfo is None:
+                    return None
+                requested = (target - now).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            return None
+        delay = max(delay, requested)
+    if primary:
+        try:
+            reset = headers.get("X-RateLimit-Reset")
+            if not reset or not reset.isascii() or not reset.isdecimal():
+                return None
+            delay = max(delay, int(reset) - now.timestamp())
+        except (KeyError, ValueError, TypeError, OverflowError):
+            return None
+    if error.code in (403, 429) and retry_after is None and not primary:
+        # GitHub requires at least 60 seconds without explicit rate-limit timing.
+        # The cumulative sleep budget is only 30 seconds.
+        return None
+    return delay
 
 
 def git(*args):
@@ -303,13 +390,13 @@ def publish():
         if asset["name"] != path.name or asset["state"] != "uploaded" or asset["digest"] != f"sha256:{expected}":
             raise ValueError("GitHub asset verification failed; draft left unpublished")
     # Recheck main and latest before making the draft visible.
-    if request(API + "/git/ref/heads/main", token=token)["object"]["sha"] != data["sha"]:
-        raise ValueError("Main advanced during upload; draft left unpublished")
     if request(API + "/releases/latest", token=token)["tag_name"] != data["previous"]:
         raise ValueError("Latest release changed during upload; draft left unpublished")
     final_plan = make_plan(previous, collect_decisions(previous, data["sha"], "main"), data["sha"])
     if any(data.get(key) != value for key, value in final_plan.items()):
         raise ValueError("PR metadata changed during upload; draft left unpublished")
+    if request(API + "/git/ref/heads/main", token=token)["object"]["sha"] != data["sha"]:
+        raise ValueError("Main advanced during upload; draft left unpublished")
     published = request(API + f"/releases/{release_id}", "PATCH",
                         {"draft": False, "make_latest": "true"}, token)
     if published["draft"] or published["tag_name"] != tag:
