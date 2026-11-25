@@ -125,6 +125,9 @@ class PublishTests(unittest.TestCase):
         self.plan = root / "plan.json"
         self.plan.write_text(json.dumps(make_plan(self.previous, [decision("fix: repair")], self.sha)), encoding="utf-8")
         self.calls = []
+        self.signer = patch.object(release, "sign", return_value="test-signature")
+        self.signer.start()
+        self.addCleanup(self.signer.stop)
         for patcher in (
             patch.object(release, "PLAN", self.plan),
             patch.object(release, "OUTPUT", self.output),
@@ -149,6 +152,7 @@ class PublishTests(unittest.TestCase):
             return {"body": "Changes"}
         if url.endswith("/releases") and method == "POST":
             self.assertTrue(payload["draft"])
+            self.assertIn("<!-- presetlauncher:signature-v1=test-signature -->", payload["body"])
             self.assertEqual(payload["target_commitish"], self.sha)
             return {"id": 42}
         if "/assets?" in url:
@@ -200,6 +204,12 @@ class PublishTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release.publish()
         self.assertFalse(any(method == "PATCH" for method, _, _ in self.calls))
+
+    def test_signing_failure_prevents_release_mutation(self):
+        with patch.object(release, "sign", side_effect=ValueError("key mismatch")), patch.object(release, "request", side_effect=self.response):
+            with self.assertRaises(ValueError):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
 
     def test_publish_occurs_after_both_uploads(self):
         with patch.object(release, "request", side_effect=self.response):

@@ -1,0 +1,31 @@
+import base64
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import sign_update
+
+
+class SigningTests(unittest.TestCase):
+    def test_signature_verifies_and_changed_payload_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private = Path(directory) / "private.pem"
+            public = Path(directory) / "public.pem"
+            sig = Path(directory) / "sig.der"
+            subprocess.run(["openssl", "genpkey", "-algorithm", "EC", "-pkeyopt",
+                            "ec_paramgen_curve:P-256", "-out", str(private)], check=True)
+            subprocess.run(["openssl", "pkey", "-in", str(private), "-pubout", "-out", str(public)], check=True)
+            data = {"version": "1.3.1", "minimum_supported_version": "1.3.1", "policy": "required"}
+            with patch.object(sign_update, "PUBLIC_KEY", public), patch.dict(os.environ, {
+                "UPDATE_SIGNING_KEY_B64": base64.b64encode(private.read_bytes()).decode("ascii")
+            }):
+                sig.write_bytes(base64.b64decode(sign_update.sign(data, 4, "ab" * 32)))
+                command = ["openssl", "dgst", "-sha256", "-verify", str(public), "-signature", str(sig)]
+                self.assertEqual(subprocess.run(command, input=sign_update.payload(data, 4, "ab" * 32)).returncode, 0)
+                self.assertNotEqual(subprocess.run(command, input=sign_update.payload({**data, "policy": "optional"}, 4, "ab" * 32)).returncode, 0)
+                public.write_text("invalid")
+                with self.assertRaises(ValueError):
+                    sign_update.sign(data, 4, "ab" * 32)

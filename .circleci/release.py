@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from policy import LEVELS, pr_decision
+from sign_update import sign
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -243,6 +244,7 @@ def publish():
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if sums.read_text(encoding="ascii").strip() != f"{digest}  {installer.name}":
         raise ValueError("Validated installer checksum mismatch")
+    signature = sign(data, installer.stat().st_size, digest)
     # Do not reuse an existing tag or silently overwrite a partial release.
     try:
         request(API + "/git/ref/tags/" + quote(tag, safe=""), token=token)
@@ -263,7 +265,8 @@ def publish():
                     {"tag_name": tag, "target_commitish": data["sha"],
                      "previous_tag_name": data["previous"]}, token)
     body = (f"<!-- presetlauncher:min-supported={format_version(floor)} -->\n"
-            f"<!-- presetlauncher:update-policy={data['policy']} -->\n\n" + notes["body"])
+            f"<!-- presetlauncher:update-policy={data['policy']} -->\n"
+            f"<!-- presetlauncher:signature-v1={signature} -->\n\n" + notes["body"])
     release = request(API + "/releases", "POST",
                       {"tag_name": tag, "target_commitish": data["sha"], "name": f"PresetLauncher {tag}",
                        "body": body, "draft": True, "prerelease": False}, token)

@@ -72,7 +72,21 @@ public sealed class UpdateService
         using var response = await _client.GetAsync(LatestUrl, timeout.Token);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(timeout.Token);
-        return ParseRelease(json, current);
+        return ParseSignedRelease(json, current, UpdatePolicySignature.PublicKey());
+    }
+
+    public static ReleaseUpdate? ParseSignedRelease(string json, Version installed, string publicKey)
+    {
+        using var document = JsonDocument.Parse(json);
+        var release = document.RootElement;
+        if (!TryVersion(release.GetProperty("tag_name").GetString(), out var latest))
+            throw new InvalidDataException("Invalid release tag.");
+        // Installed versions need not download or validate an older release.
+        if (latest <= installed) return ParseRelease(json, installed);
+        var update = ParseRelease(json, installed)
+            ?? throw new InvalidDataException("Missing update.");
+        UpdatePolicySignature.Verify(update, release.GetProperty("body").GetString() ?? "", publicKey);
+        return update;
     }
 
     public static ReleaseUpdate? ParseRelease(string json, Version installed)
