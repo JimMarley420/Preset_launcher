@@ -1,5 +1,6 @@
 name: Bug report
 description: Report a reproducible problem in PresetLauncher.
+labels: ["type: bug", "status: needs triage"]
 body:
   - type: markdown
     attributes:
@@ -43,7 +44,8 @@ body:
         - JSON import or local data
         - History or statistics
         - Settings or appearance
-        - Installation or updates
+        - Installation or upgrade
+        - In-app update check or download
         - Other
     validations:
       required: true
@@ -51,7 +53,7 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: For launch issues, include file type, whether the program was already running, delay and administrator setting. Use anonymized examples.
+      description: For launch issues, include file type, whether the program was already running, delay and administrator setting. For updates, include installed and offered versions, optional or required status, and the error shown. Use anonymized examples.
     validations:
       required: true
   - type: textarea

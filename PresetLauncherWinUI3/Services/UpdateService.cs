@@ -1,89 +1,184 @@
-using Microsoft.Win32;
-using System;
-using System.Diagnostics;
-using System.IO;
 using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace PresetLauncher.Services;
 
-public class UpdateService
+public enum UpdatePolicy { Optional, Recommended, Required }
+
+public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVersion, Uri DownloadUri, long Size, string Sha256, UpdatePolicy Policy = UpdatePolicy.Optional);
+
+public sealed class UpdateService
 {
-    private const string VersionUrl = "https://version.multichat.cloud/PresetLauncher/version.txt";
-    private const string SetupUrlTemplate = "https://version.multichat.cloud/PresetLauncher/PresetLauncher_Setup_{0}.exe";
-    private const string InnoKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{C4A7B8D2-E3F5-4901-A2B3-C4D5E6F70819}_is1";
+    private const string Repository = "JimMarley420/Preset_launcher";
+    private const string LatestUrl = "https://api.github.com/repos/" + Repository + "/releases/latest";
+    private const long MaxInstallerSize = 1024L * 1024 * 1024;
+    private static readonly Regex StableVersion = new(@"^v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\z", RegexOptions.CultureInvariant);
+    private static readonly Regex Policy = new(@"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    private static readonly Regex PolicyLevel = new(@"^<!-- presetlauncher:update-policy=(optional|recommended|required) -->\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    private static readonly HttpClient SharedClient = CreateClient();
+    private readonly HttpClient _client;
 
-    public string GetInstalledVersion()
+    public UpdateService() : this(SharedClient) { }
+
+    public UpdateService(HttpClient client) => _client = client;
+
+    private static HttpClient CreateClient()
     {
-        using var hkcu = Registry.CurrentUser.OpenSubKey(InnoKey);
-        if (hkcu?.GetValue("DisplayVersion") is string v1 && !string.IsNullOrWhiteSpace(v1))
-            return v1.Trim();
-
-        using var hklm = Registry.LocalMachine.OpenSubKey(InnoKey);
-        if (hklm?.GetValue("DisplayVersion") is string v2 && !string.IsNullOrWhiteSpace(v2))
-            return v2.Trim();
-
-        // Fallback for dev builds not installed via InnoSetup
-#if DEBUG
-        return System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";
-#else
-        return "0.0.0";
-#endif
+        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = 2 * 1024 * 1024 };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("PresetLauncher/1.0");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        return client;
     }
 
-    public async Task<string> GetLatestVersionAsync()
+    public string GetInstalledVersion() =>
+        typeof(UpdateService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
+    public static bool TryVersion(string? value, out Version version)
     {
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        var text = await client.GetStringAsync(VersionUrl);
-        return text.Trim();
+        version = new Version(0, 0, 0);
+        if (value is null || !StableVersion.IsMatch(value) ||
+            !Version.TryParse(value.TrimStart('v'), out var parsed) ||
+            parsed.Major > 65534 || parsed.Minor > 65534 || parsed.Build > 65534)
+            return false;
+        version = parsed;
+        return true;
     }
 
-    public bool IsUpdateAvailable(string installed, string latest)
+    public bool IsUpdateAvailable(string installed, string latest) =>
+        TryVersion(installed, out var current) && TryVersion(latest, out var next) && next > current;
+
+    public static bool IsRequired(string installed, ReleaseUpdate update) =>
+        TryVersion(installed, out var current) && current < update.MinimumSupportedVersion;
+
+    public static bool ShouldPrompt(string installed, ReleaseUpdate update, string? skippedVersion, bool manual,
+        string? deferredVersion = null, DateTimeOffset? deferredUntil = null, DateTimeOffset? now = null)
     {
-        return TryNormalize(installed, out var v1)
-            && TryNormalize(latest, out var v2)
-            && v2 > v1;
+        if (!TryVersion(installed, out var current) || current >= update.Version) return false;
+        if (manual || IsRequired(installed, update)) return true;
+        var version = update.Version.ToString(3);
+        if (update.Policy == UpdatePolicy.Optional) return skippedVersion != version;
+        return deferredVersion != version || deferredUntil is null || deferredUntil <= (now ?? DateTimeOffset.UtcNow);
     }
 
-    public async Task DownloadAndInstallAsync(string version, IProgress<int>? progress, CancellationToken ct = default)
+    public async Task<ReleaseUpdate?> GetLatestUpdateAsync(string installed, CancellationToken ct = default)
     {
-        var url = string.Format(SetupUrlTemplate, version);
-        var tempPath = Path.Combine(Path.GetTempPath(), $"PresetLauncher_Setup_{version}.exe");
-
-        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!TryVersion(installed, out var current) || current == new Version(0, 0, 0))
+            return null; // Unversioned source build; never install a production release over it.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var response = await _client.GetAsync(LatestUrl, timeout.Token);
         response.EnsureSuccessStatusCode();
-
-        var total = response.Content.Headers.ContentLength ?? -1L;
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        await using var file = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
-
-        var buffer = new byte[65536];
-        long downloaded = 0;
-        int read;
-        while ((read = await stream.ReadAsync(buffer, ct)) > 0)
-        {
-            await file.WriteAsync(buffer.AsMemory(0, read), ct);
-            downloaded += read;
-            if (total > 0) progress?.Report((int)(downloaded * 100 / total));
-        }
-
-        file.Close();
-        Process.Start(new ProcessStartInfo { FileName = tempPath, UseShellExecute = true });
-        Environment.Exit(0);
+        var json = await response.Content.ReadAsStringAsync(timeout.Token);
+        return ParseRelease(json, current);
     }
 
-    private static bool TryNormalize(string input, out Version version)
+    public static ReleaseUpdate? ParseRelease(string json, Version installed)
     {
-        var parts = input.Trim().Split('.');
-        var normalized = parts.Length switch
+        using var document = JsonDocument.Parse(json);
+        var release = document.RootElement;
+        if (release.GetProperty("draft").GetBoolean() || release.GetProperty("prerelease").GetBoolean())
+            throw new InvalidDataException("Expected a stable published release.");
+
+        var tag = release.GetProperty("tag_name").GetString();
+        if (!TryVersion(tag, out var latest))
+            throw new InvalidDataException("Invalid release tag.");
+        if (latest <= installed)
+            return null;
+
+        var matches = Policy.Matches(release.GetProperty("body").GetString() ?? "");
+        Version minimum;
+        if (matches.Count == 0 && tag == "1.2.6")
+            minimum = new Version(0, 0, 0);
+        else if (matches.Count != 1 || !TryVersion(matches[0].Groups[1].Value, out minimum) || minimum > latest)
+            throw new InvalidDataException("Invalid update policy.");
+
+        var levels = PolicyLevel.Matches(release.GetProperty("body").GetString() ?? "");
+        var policy = UpdatePolicy.Optional;
+        if (levels.Count == 0 && tag == "1.2.6") { }
+        else if (levels.Count != 1)
+            throw new InvalidDataException("Missing or ambiguous update policy level.");
+        else
+            policy = levels[0].Groups[1].Value switch
+            {
+                "optional" => UpdatePolicy.Optional,
+                "recommended" => UpdatePolicy.Recommended,
+                "required" => UpdatePolicy.Required,
+                _ => throw new InvalidDataException("Invalid update policy level.")
+            };
+        if (policy == UpdatePolicy.Required && minimum != latest)
+            throw new InvalidDataException("Required release must advance the minimum version.");
+
+        var name = $"PresetLauncher_Setup_{latest.ToString(3)}.exe";
+        var assets = release.GetProperty("assets").EnumerateArray()
+            .Where(asset => asset.GetProperty("name").GetString() == name).ToArray();
+        if (assets.Length != 1)
+            throw new InvalidDataException("Expected exactly one x64 installer.");
+
+        var item = assets[0];
+        var expectedUrl = $"https://github.com/{Repository}/releases/download/{tag}/{name}";
+        var size = item.GetProperty("size").GetInt64();
+        var digest = item.GetProperty("digest").GetString();
+        if (item.GetProperty("state").GetString() != "uploaded" ||
+            item.GetProperty("browser_download_url").GetString() != expectedUrl ||
+            size <= 0 || size > MaxInstallerSize ||
+            digest is null || !Regex.IsMatch(digest, @"^sha256:[0-9a-fA-F]{64}\z"))
+            throw new InvalidDataException("Invalid installer metadata.");
+
+        return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest[7..], policy);
+    }
+
+    public async Task<string> DownloadVerifiedAsync(ReleaseUpdate update, IProgress<int>? progress = null, CancellationToken ct = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromMinutes(10));
+        var token = timeout.Token;
+        var directory = Directory.CreateTempSubdirectory("PresetLauncher-update-");
+        var path = Path.Combine(directory.FullName, $"PresetLauncher_Setup_{update.Version.ToString(3)}.exe");
+        try
         {
-            1 => input + ".0.0.0",
-            2 => input + ".0.0",
-            3 => input + ".0",
-            _ => input
-        };
-        return Version.TryParse(normalized, out version!);
+            using var response = await _client.GetAsync(update.DownloadUri, HttpCompletionOption.ResponseHeadersRead, token);
+            response.EnsureSuccessStatusCode();
+            var finalUri = response.RequestMessage?.RequestUri;
+            if (finalUri is null || finalUri.Scheme != Uri.UriSchemeHttps ||
+                (finalUri.Host != "github.com" && finalUri.Host != "release-assets.githubusercontent.com" &&
+                 finalUri.Host != "objects.githubusercontent.com"))
+                throw new InvalidDataException("Unexpected installer download host.");
+            if (response.Content.Headers.ContentLength is long length && length != update.Size)
+                throw new InvalidDataException("Installer size does not match GitHub metadata.");
+
+            await using var input = await response.Content.ReadAsStreamAsync(token);
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            long total = 0;
+            await using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, useAsync: true))
+            {
+                var buffer = new byte[65536];
+                int read;
+                while ((read = await input.ReadAsync(buffer, token)) > 0)
+                {
+                    total += read;
+                    if (total > update.Size || total > MaxInstallerSize)
+                        throw new InvalidDataException("Installer exceeds expected size.");
+                    hash.AppendData(buffer, 0, read);
+                    await output.WriteAsync(buffer.AsMemory(0, read), token);
+                    progress?.Report((int)(total * 100 / update.Size));
+                }
+            }
+
+            if (total != update.Size ||
+                !CryptographicOperations.FixedTimeEquals(hash.GetHashAndReset(), Convert.FromHexString(update.Sha256)))
+                throw new InvalidDataException("Installer integrity verification failed.");
+            token.ThrowIfCancellationRequested();
+            return path;
+        }
+        catch
+        {
+            try { directory.Delete(recursive: true); }
+            catch (IOException ex) { System.Diagnostics.Debug.WriteLine(ex); }
+            catch (UnauthorizedAccessException ex) { System.Diagnostics.Debug.WriteLine(ex); }
+            throw;
+        }
     }
 }

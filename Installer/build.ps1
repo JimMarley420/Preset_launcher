@@ -4,18 +4,13 @@
 #          .\Installer\build.ps1 -Version "1.3.0"
 # ============================================================
 param(
-    [string]$Version = ""
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = "0.0.0"
 )
 
 $ErrorActionPreference = "Stop"
 $root    = Split-Path $PSScriptRoot -Parent
 $issFile = Join-Path $PSScriptRoot "PresetLauncher.iss"
 
-# ── 1. Lire la version depuis le .iss si non fournie ─────────────────────────
-if (-not $Version) {
-    $match = Select-String -Path $issFile -Pattern '#define AppVersion "(.+)"'
-    $Version = if ($match) { $match.Matches[0].Groups[1].Value } else { "1.0.0" }
-}
 Write-Host "Version : $Version" -ForegroundColor Cyan
 
 # ── 2. dotnet publish (self-contained, dossier) ───────────────────────────────
@@ -26,16 +21,23 @@ if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 
 $csproj = Join-Path $root "PresetLauncherWinUI3\PresetLauncherWinUI3.csproj"
 
-dotnet publish $csproj `
-    --configuration Release `
-    --runtime win-x64 `
-    --self-contained true `
-    -p:WindowsPackageType=None `
-    -p:PublishReadyToRun=true `
-    -p:Version=$Version `
-    --output $publishDir
+Push-Location $root
+try {
+    dotnet publish $csproj `
+        --configuration Release `
+        --runtime win-x64 `
+        --self-contained true `
+        -p:Platform=x64 `
+        -p:WindowsPackageType=None `
+        -p:PublishTrimmed=false `
+        -p:PublishReadyToRun=false `
+        -p:Version=$Version `
+        --output $publishDir
 
-if ($LASTEXITCODE -ne 0) { Write-Error "dotnet publish a echoue (code $LASTEXITCODE)"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish a echoue (code $LASTEXITCODE)" }
+} finally {
+    Pop-Location
+}
 
 $exe = Join-Path $publishDir "PresetLauncherWinUI3.exe"
 if (-not (Test-Path $exe)) { Write-Error "Executable introuvable : $exe"; exit 1 }
@@ -68,7 +70,7 @@ New-Item -ItemType Directory -Force $outputDir | Out-Null
 if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup a echoue (code $LASTEXITCODE)"; exit 1 }
 
 # ── 4. Resultat ───────────────────────────────────────────────────────────────
-$installer = Get-ChildItem $outputDir -Filter "*.exe" | Sort-Object LastWriteTime -Desc | Select-Object -First 1
+$installer = Get-Item (Join-Path $outputDir "PresetLauncher_Setup_$Version.exe")
 if ($installer) {
     $sizeMB2 = [math]::Round($installer.Length / 1MB, 1)
     Write-Host "`n=== DONE ===" -ForegroundColor Green

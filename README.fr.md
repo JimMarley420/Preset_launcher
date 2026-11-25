@@ -4,9 +4,9 @@ Lancez ensemble les applications Windows que vous utilisez régulièrement, sans
 
 [English](README.md) · **Français**
 
-[![Version](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![Licence MIT](https://img.shields.io/badge/licence-MIT-lightgrey?style=flat-square)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases)
+[![Version](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![Licence MIT](https://img.shields.io/badge/licence-MIT-lightgrey?style=flat-square)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases) [![CircleCI](https://dl.circleci.com/status-badge/img/gh/JimMarley420/Preset_launcher/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/JimMarley420/Preset_launcher/tree/main)
 
-[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?style=flat-square)](https://www.microsoft.com/windows/) [![C#](https://img.shields.io/badge/C%23-239120?style=flat-square)](https://learn.microsoft.com/dotnet/csharp/) [![.NET 8](https://img.shields.io/badge/.NET-8-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0) [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/) [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-1.8-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/windows-app-sdk/) [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6-555555?style=flat-square)](https://jrsoftware.org/isinfo.php)
+[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?style=flat-square)](https://www.microsoft.com/windows/) [![C#](https://img.shields.io/badge/C%23-239120?style=flat-square)](https://learn.microsoft.com/dotnet/csharp/) [![.NET 10 LTS](https://img.shields.io/badge/.NET-10%20LTS-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0) [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/) [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-2.7-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/windows-app-sdk/) [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6-555555?style=flat-square)](https://jrsoftware.org/isinfo.php)
 
 [Télécharger pour Windows](https://github.com/JimMarley420/Preset_launcher/releases/latest) · [Signaler un problème](https://github.com/JimMarley420/Preset_launcher/issues/new/choose) · [Compiler le projet](#compiler-le-projet)
 
@@ -40,13 +40,15 @@ Les filtres d'historique et la préférence de confirmation de lancement sont pr
 
 ## Installation
 
-Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. L'installeur déclare Windows 10 build 17763 comme minimum ; le projet cible le build 19041. La compatibilité avec les anciens builds n'a pas été vérifiée.
+Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. L'installeur déclare Windows 10 build 17763 comme minimum ; le projet cible le build 19041. La compatibilité avec les anciens builds n'a pas été vérifiée. L'installeur inclut .NET 10 et le Windows App SDK.
 
 1. Ouvrez la page de la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 2. Téléchargez `PresetLauncher_Setup_<version>.exe` et exécutez-le.
 3. Ouvrez PresetLauncher, créez un preset et ajoutez les exécutables souhaités.
 
-L'installeur inclut l'environnement d'exécution. L'application recherche les mises à jour au démarrage et dans les réglages ; leur installation nécessite une confirmation. Elles proviennent de `version.multichat.cloud`, et non directement de GitHub Releases.
+L'installeur inclut l'environnement d'exécution. Le nouvel updater recherche les mises à jour sur GitHub Releases au démarrage et dans les réglages, vérifie la taille et l'empreinte SHA-256 de l'installeur avant de l'ouvrir et permet de reporter ou d'ignorer les mises à jour facultatives. Les mises à jour recommandées peuvent être reportées de 24 heures, mais pas ignorées définitivement. Une mise à jour peut être obligatoire si la version installée est inférieure à la version minimale prise en charge.
+
+Si vous utilisez la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien updater ne la propose pas. L'installeur conserve les presets et préférences.
 
 ## Données locales
 
@@ -59,7 +61,7 @@ La désinstallation conserve ces données. Sauvegardez manuellement les deux fic
 
 ## Compiler le projet
 
-Sous Windows, installez le SDK .NET 8 et Visual Studio 2022 avec les outils de développement WinUI / Windows App SDK. Dans PowerShell :
+Sous Windows, installez le SDK .NET 10 LTS (10.0.404 ou un correctif 10.0.4xx ultérieur) et Visual Studio 2026 avec les outils de développement WinUI / Windows App SDK. Dans PowerShell :
 
 ```powershell
 git clone https://github.com/JimMarley420/Preset_launcher.git
@@ -73,7 +75,7 @@ Pour créer l'installeur autonome x64, installez Inno Setup 6 puis lancez :
 .\Installer\build.ps1
 ```
 
-L'installeur est généré dans `Installer/Output/`. Les [notes de développement](docs/DEVELOPMENT.md) décrivent l'organisation du code et les vérifications manuelles.
+L'installeur est généré dans `Installer/Output/`. Les builds locaux utilisent par défaut la version `0.0.0` et ne recherchent pas les mises à jour de production. CircleCI calcule automatiquement les versions publiées. Voir la [documentation des releases](docs/RELEASING.md). Les [notes de développement](docs/DEVELOPMENT.md) décrivent l'organisation du code et les vérifications manuelles.
 
 ## Contribuer
 

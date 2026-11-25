@@ -22,7 +22,7 @@ public sealed partial class MainWindow : Window
         // Apply saved backdrop/materials
         App.Theme.ApplyBackdrop(App.Settings.CurrentSettings.Backdrop);
         
-        // Définir la taille de la fenêtre
+        // DÃ©finir la taille de la fenÃªtre
         AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(850, 600));
         
         UpdateLocalizedText();
@@ -65,6 +65,12 @@ public sealed partial class MainWindow : Window
                     break;
             }
         }
+    }
+
+    internal void SetUpdateGate(bool blocked)
+    {
+        NavView.IsEnabled = !blocked;
+        ContentFrame.IsEnabled = !blocked;
     }
 
     public void RefreshUI()
