@@ -15,7 +15,7 @@ def main():
         if name.endswith((".csproj", ".fsproj", ".vbproj", ".proj", ".props", ".targets",
                           ".sln", ".slnx", ".pubxml", ".lock.json", ".nupkg")) or name in (
             "global.json", "nuget.config", "packages.config", "config.yml", "dotnet-sdk.sha512"
-        ):
+        ) or path == "Installer/architectures.json":
             inputs[path] = metadata.split()[1]
     if not inputs:
         raise ValueError("No tracked restore inputs found")

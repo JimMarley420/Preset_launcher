@@ -21,7 +21,6 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
             - v1-sdk-archive-windows-x64-main-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
       - run:
           name: Select pinned .NET SDK
@@ -32,20 +31,6 @@ commands:
           key: v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
           paths:
             - artifacts/sdk-cache
-  require-installer-plan:
-    steps:
-      - run:
-          name: Select installer validation lane
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $plan = Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json
-            if ($plan.sha -ne $env:CIRCLE_SHA1 -or $plan.validate_installer -isnot [bool]) { throw 'Invalid installer validation plan' }
-            if (-not $plan.validate_installer) {
-              if ($env:CIRCLE_BRANCH -eq 'main') { throw 'Main requires installer validation' }
-              Write-Host 'Installer validation is not required for these PR paths. See plan-release.'
-              circleci-agent step halt
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
   restore-nuget-cache:
     steps:
       - run:
@@ -53,7 +38,6 @@ commands:
           command: python .circleci/nuget_inputs.py
       - restore_cache:
           keys:
-            - v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
             - v3-nuget-windows-x64-main-{{ checksum "artifacts/nuget-inputs.json" }}
   save-nuget-cache:
     steps:
@@ -90,13 +74,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Test PR metadata validator
-          command: python -m unittest discover -s .circleci -p 'test_check_pr.py'
-      - run:
-          name: Test release planning
-          command: |
-            python -m unittest discover -s .circleci -p 'test_release.py'
-            python -m unittest discover -s .circleci -p 'test_sign_update.py'
+          name: Test PR policy, release and architecture contracts
+          command: python -m unittest discover -s .circleci
       - run:
           name: Validate pinned update signing public key
           command: python .circleci/sign_update.py check-key
@@ -110,12 +89,14 @@ jobs:
       - store_artifacts:
           path: artifacts/release-plan.json
 
-  dependency-audit:
+  validate-windows:
     executor: windows-x64
     retention:
       caches: 7d
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - prepare-dotnet
       - restore-nuget-cache
       - run:
@@ -123,76 +104,12 @@ jobs:
           no_output_timeout: 15m
           command: |
             $ErrorActionPreference = 'Stop'
-            dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
+            $plan = Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json
+            if ($plan.sha -cne $env:CIRCLE_SHA1 -or $plan.version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid Windows plan' }
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+            dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release "-p:Version=$($plan.version)" -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      # Branch jobs can read main's caches, but do not create duplicate archives.
-      - when:
-          condition:
-            equal: [main, << pipeline.git.branch >>]
-          steps:
-            - save-nuget-cache
-            - save-sdk-cache
-
-  build-windows:
-    executor: windows-x64
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - require-installer-plan
-      - prepare-dotnet
-      - restore-nuget-cache
-      - run:
-          name: Publish self-contained x64 application
-          no_output_timeout: 20m
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            dotnet publish PresetLauncherWinUI3/PresetLauncherWinUI3.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:WindowsPackageType=None -p:PublishTrimmed=false -p:PublishReadyToRun=false '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905' -p:Version=$version --output publish/win-x64
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published executable missing' }
-      - run:
-          name: Install pinned Inno Setup compiler
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $installer = Join-Path $env:TEMP 'innosetup-6.7.1.exe'
-            $target = Join-Path (Get-Location).Path 'artifacts/inno-compiler'
-            curl.exe -fsSL --connect-timeout 20 --max-time 90 --retry 2 --retry-max-time 120 https://github.com/jrsoftware/issrc/releases/download/is-6_7_1/innosetup-6.7.1.exe -o $installer
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $sha256 = '4d11e8050b6185e0d49bd9e8cc661a7a59f44959a621d31d11033124c4e8a7b0'
-            if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ine $sha256) { throw 'Inno Setup download SHA-256 mismatch' }
-            $process = Start-Process -FilePath $installer -ArgumentList ('/PORTABLE=1 /VERYSILENT /CURRENTUSER /NORESTART /DIR="{0}"' -f $target) -WindowStyle Hidden -Wait -PassThru
-            if ($process.ExitCode -ne 0 -or -not (Test-Path (Join-Path $target 'ISCC.exe') -PathType Leaf)) { throw 'Pinned Inno Setup installation failed' }
-      - run:
-          name: Compile Inno Setup installer and record its SHA-256
-          no_output_timeout: 20m
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            if (-not (Test-Path 'publish/win-x64/PresetLauncherWinUI3.exe' -PathType Leaf)) { throw 'Published application missing' }
-            $iscc = Join-Path (Get-Location).Path 'artifacts/inno-compiler/ISCC.exe'
-            $outputDir = Join-Path (Get-Location).Path 'Installer\Output'
-            New-Item -ItemType Directory -Force $outputDir | Out-Null
-            & $iscc "/DRequirePinnedCompiler" "/DAppVersion=$version" "/O$outputDir" 'Installer/PresetLauncher.iss'
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            $name = "PresetLauncher_Setup_$version.exe"
-            $file = Join-Path $outputDir $name
-            if (-not (Test-Path $file -PathType Leaf)) { throw 'Installer missing' }
-            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $name" | Set-Content (Join-Path $outputDir 'SHA256SUMS.txt') -Encoding ASCII
-      - persist_to_workspace:
-          root: .
-          paths:
-            - Installer/Output
-
-  test-windows:
-    executor: windows-x64
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - prepare-dotnet
-      - restore-nuget-cache
+            Write-Host "x64 regression restore and audit: $($timer.Elapsed)"
       - run:
           name: Run regression tests
           no_output_timeout: 15m
@@ -202,7 +119,7 @@ jobs:
             $junit = Join-Path (Get-Location).Path 'artifacts\junit'
             New-Item -ItemType Directory -Force $results, $junit | Out-Null
             $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true -p:Version=$version --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
+            dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --no-restore --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true -p:Version=$version --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             [xml]$report = Get-Content (Join-Path $junit 'junit.xml') -Raw
             if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'JUnit report contains no test cases' }
@@ -229,86 +146,41 @@ jobs:
           path: artifacts/test-results
           destination: test-reports
 
-  package-installer:
-    docker:
-      - image: cimg/python:3.13.16
-    resource_class: small
-    steps:
-      - attach_workspace:
-          at: .
       - run:
-          name: Verify packaged installer integrity
-          command: |
-            python - \<<'PY'
-            import hashlib
-            import json
-            import os
-            from pathlib import Path
-
-            plan = json.loads(Path("artifacts/release-plan.json").read_text())
-            if plan["sha"] != os.environ["CIRCLE_SHA1"] or type(plan["validate_installer"]) is not bool:
-                raise SystemExit("Invalid installer validation plan")
-            if not plan["validate_installer"]:
-                if os.environ["CIRCLE_BRANCH"] == "main":
-                    raise SystemExit("Main requires installer validation")
-                print("Installer validation is not required for these PR paths. See plan-release.")
-                raise SystemExit(0)
-            directory = Path("Installer/Output")
-            name = f"PresetLauncher_Setup_{plan['version']}.exe"
-            with (directory / name).open("rb") as stream:
-                digest = hashlib.file_digest(stream, "sha256").hexdigest()
-            if (directory / "SHA256SUMS.txt").read_text(encoding="ascii").strip() != f"{digest}  {name}":
-                raise SystemExit("Packaged installer checksum mismatch")
-            print(f"Verified {name}")
-            PY
-
-  smoke-installer:
-    executor: windows-x64
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - require-installer-plan
-      - run:
-          name: Smoke test installation and uninstallation
-          no_output_timeout: 10m
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            $name = "PresetLauncher_Setup_$version.exe"
-            $digest = (Get-FileHash (Join-Path 'Installer/Output' $name) -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ((Get-Content Installer/Output/SHA256SUMS.txt -Raw).Trim() -cne "$digest  $name") { throw 'Packaged installer checksum mismatch' }
-            & .\.circleci\smoke-installer.ps1 -PlanPath artifacts/release-plan.json
+          name: Publish, package and smoke test the planned architectures
+          no_output_timeout: 20m
+          command: '& .circleci/validate-windows.ps1'
       - store_artifacts:
           path: artifacts/installer-logs
           destination: installer-logs
-      - run:
-          name: Stage verified CI installer and checksum
-          command: |
-            $ErrorActionPreference = 'Stop'
-            $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
-            $name = "PresetLauncher_Setup_$version.exe"
-            $file = Join-Path 'Installer/Output' $name
-            if (-not (Test-Path $file -PathType Leaf)) { throw "Missing installer: $file" }
-            New-Item -ItemType Directory -Force artifacts/verified-installer | Out-Null
-            Copy-Item $file artifacts/verified-installer/
-            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
-            $sums = (Get-Content Installer/Output/SHA256SUMS.txt -Raw).Trim()
-            if ($sums -cne "$hash  $name") { throw 'Smoke-tested installer checksum mismatch' }
-            Copy-Item Installer/Output/SHA256SUMS.txt artifacts/verified-installer/
-      # Main publishes release installers to GitHub; avoid a second long-lived CI copy.
-      - unless:
+      # Branch jobs can read main's caches, but do not create duplicate archives.
+      - when:
           condition:
             equal: [main, << pipeline.git.branch >>]
           steps:
-            - store_artifacts:
-                path: artifacts/verified-installer
-                destination: verified-ci-installer
+            - save-nuget-cache
+            - save-sdk-cache
 
       - persist_to_workspace:
           root: .
           paths:
-            - artifacts/verified-installer/SHA256SUMS.txt
+            - artifacts/windows-validation.json
+            - Installer/Output
+
+  evidence-gate:
+    parameters:
+      gate:
+        type: string
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Verify Windows validation evidence
+          command: python .circleci/release.py gate << parameters.gate >>
 
   publish-release:
     docker:
@@ -322,7 +194,6 @@ jobs:
           name: Publish verified GitHub release
           no_output_timeout: 15m
           command: |
-            cp Installer/Output/PresetLauncher_Setup_*.exe artifacts/verified-installer/
             python .circleci/release.py publish
 
 workflows:
@@ -334,26 +205,40 @@ workflows:
           requires:
             - validate-pr-title
             - validate-update-label
-      - dependency-audit:
-          serial-group: << pipeline.project.slug >>/nuget/<< pipeline.git.branch >>
-      - build-windows:
+      - validate-windows:
           requires:
             - plan-release
-            - validate-pr-title
-      - test-windows:
+      - evidence-gate:
+          name: dependency-audit
+          gate: dependency-audit
           requires:
-            - plan-release
-            - validate-pr-title
-      - package-installer:
+            - validate-windows
+      - evidence-gate:
+          name: build-windows
+          gate: build-windows
           requires:
-            - build-windows
-            - test-windows
-            - dependency-audit
-      - smoke-installer:
+            - validate-windows
+      - evidence-gate:
+          name: test-windows
+          gate: test-windows
           requires:
-            - package-installer
+            - validate-windows
+      - evidence-gate:
+          name: package-installer
+          gate: package-installer
+          requires:
+            - validate-windows
+      - evidence-gate:
+          name: smoke-installer
+          gate: smoke-installer
+          requires:
+            - validate-windows
       - publish-release:
           requires:
+            - dependency-audit
+            - build-windows
+            - test-windows
+            - package-installer
             - smoke-installer
           context: presetlauncher-release
           serial-group: << pipeline.project.slug >>/github-release
