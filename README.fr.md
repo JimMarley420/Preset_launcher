@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71" alt="Interface de PresetLauncher" width="880">
+  <img src="https://github.com/user-attachments/assets/f793c7ed-9a23-4a1a-a7f7-33bc0f7a3db0" alt="Interface de PresetLauncher" width="880">
 </p>
 
 ## À propos
