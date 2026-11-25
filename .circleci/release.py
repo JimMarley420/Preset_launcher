@@ -261,10 +261,10 @@ def retry_delay(error, attempt):
     if primary:
         try:
             reset = headers.get("X-RateLimit-Reset")
-            if not reset or not reset.isascii() or not reset.isdecimal():
+            if reset is None or not reset.isascii() or not reset.isdecimal():
                 return None
             delay = max(delay, int(reset) - now.timestamp())
-        except (KeyError, ValueError, TypeError, OverflowError):
+        except (ValueError, TypeError, OverflowError):
             return None
     if error.code in (403, 429) and retry_after is None and not primary:
         # GitHub requires at least 60 seconds without explicit rate-limit timing.
