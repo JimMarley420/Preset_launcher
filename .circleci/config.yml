@@ -85,7 +85,7 @@ jobs:
 
   plan-release:
     docker:
-      - image: cimg/python:3.13.16
+      - image: cimg/python:3.13.16-node
     resource_class: small
     steps:
       - checkout
@@ -103,6 +103,12 @@ jobs:
       - run:
           name: Calculate version and update policy
           command: python .circleci/release.py plan
+      - run:
+          name: Validate GitHub label Worker
+          command: |
+            node --version
+            node --check tools/auto-labeler/worker.mjs
+            node --test tools/auto-labeler/worker.test.mjs
       - persist_to_workspace:
           root: .
           paths:
