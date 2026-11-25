@@ -35,13 +35,13 @@ PresetLauncher permet de regrouper des programmes dans des presets. Créez un pr
 
 Téléchargez le programme d’installation adapté depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 
-| Processeur Windows | Programme d’installation |
-| --- | --- |
-| x64 | `PresetLauncher_Setup_<version>.exe` |
-| x86 32 bits | `PresetLauncher_Setup_<version>_x86.exe` |
-| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` |
+| Processeur Windows | Programme d’installation | Validation |
+| --- | --- | --- |
+| x64 | `PresetLauncher_Setup_<version>.exe` | ✅ Testé nativement |
+| x86 32 bits | `PresetLauncher_Setup_<version>_x86.exe` | ✅ Testé sous WOW64 |
+| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` | ⚠️ Tests natifs en attente |
 
-Consultez **Paramètres → Système → Informations système → Type du système**. Utilisez une version de Windows prise en charge par Microsoft. 
+Consultez **Paramètres → Système → Informations système → Type du système**. Utilisez une version de Windows prise en charge par Microsoft.
 
 ## Documentation
 
