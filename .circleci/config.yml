@@ -70,11 +70,18 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Test PR metadata validator
-          command: python -m unittest discover -s .circleci -p 'test_check_pr.py'
+          name: Validate pull request title
+          command: python .circleci/check_pr.py title
+
+  validate-update-label:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
       - run:
-          name: Validate pull request title and update label
-          command: python .circleci/check_pr.py
+          name: Validate update policy label
+          command: python .circleci/check_pr.py update-label
 
   plan-release:
     docker:
@@ -82,6 +89,9 @@ jobs:
     resource_class: small
     steps:
       - checkout
+      - run:
+          name: Test PR metadata validator
+          command: python -m unittest discover -s .circleci -p 'test_check_pr.py'
       - run:
           name: Test release planning
           command: python -m unittest discover -s .circleci -p 'test_release.py'
@@ -314,9 +324,11 @@ workflows:
   ci:
     jobs:
       - validate-pr-title
+      - validate-update-label
       - plan-release:
           requires:
             - validate-pr-title
+            - validate-update-label
       - dependency-audit:
           serial-group: << pipeline.project.slug >>/nuget/<< pipeline.git.branch >>
       - build-windows:

@@ -48,3 +48,56 @@ class PullRequestPolicyTests(unittest.TestCase):
             branch_decision({**metadata, **pr("build: migrate runtime", ["update: optional"])})
         with self.assertRaises(ValueError):
             branch_decision({**metadata, "head": {"repo": {"full_name": "example/fork"}}})
+
+
+class IndependentChecksTests(unittest.TestCase):
+    def metadata(self, title, labels=(), body=""):
+        return {**pr(title, labels, body), "base": {"ref": "main"},
+                "head": {"repo": {"full_name": REPO}}}
+
+    def test_missing_label_does_not_fail_title(self):
+        from check_pr import validate
+        item = self.metadata("feat: add presets")
+        validate(item, "title")
+        with self.assertRaisesRegex(ValueError, "Select exactly one label"):
+            validate(item, "update-label")
+
+    def test_bad_title_owned_by_title_check(self):
+        from check_pr import validate
+        item = self.metadata("Invalid title")
+        with self.assertRaisesRegex(ValueError, "Conventional Commit"):
+            validate(item, "title")
+        validate(item, "update-label")
+
+    def test_conflicting_or_unexpected_update_label(self):
+        from check_pr import validate
+        for title, labels in (("fix: repair", ["update: optional", "update: required"]),
+                              ("ci: optimize", ["update: optional"]),
+                              ("fix: repair", ["update: typo"])):
+            with self.subTest(title=title, labels=labels):
+                item = self.metadata(title, labels)
+                validate(item, "title")
+                with self.assertRaises(ValueError):
+                    validate(item, "update-label")
+
+    def test_breaking_footer_requires_policy(self):
+        from check_pr import validate
+        item = self.metadata("refactor: change format", body="BREAKING CHANGE: incompatible")
+        validate(item, "title")
+        with self.assertRaisesRegex(ValueError, "Select exactly one label"):
+            validate(item, "update-label")
+        validate(self.metadata("refactor: change format", ["update: required"],
+                               "BREAKING CHANGE: incompatible"), "update-label")
+
+    def test_non_releasing_and_valid_releasing_pr(self):
+        from check_pr import validate
+        for item in (self.metadata("ci: optimize"), self.metadata("fix: repair", ["update: optional"])):
+            validate(item, "title")
+            validate(item, "update-label")
+
+    def test_stacked_releasing_pr_remains_invalid(self):
+        from check_pr import validate
+        item = self.metadata("feat: add presets", ["update: optional"])
+        item["base"]["ref"] = "other-branch"
+        with self.assertRaisesRegex(ValueError, "Stacked validation"):
+            validate(item, "title")

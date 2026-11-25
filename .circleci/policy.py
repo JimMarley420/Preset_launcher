@@ -15,8 +15,7 @@ def bump(title, body=""):
     return {"feat": 2, "fix": 1, "perf": 1}.get(kind, 0)
 
 
-def pr_decision(pr):
-    rank = bump(pr["title"], pr.get("body"))
+def update_decision(pr, rank):
     labels = [label["name"] for label in pr["labels"] if label["name"].startswith("update:")]
     if not rank:
         if labels:
@@ -25,3 +24,7 @@ def pr_decision(pr):
     if len(labels) != 1 or labels[0] not in [f"update: {level}" for level in LEVELS]:
         raise ValueError("Select exactly one label: update: optional, update: recommended, or update: required")
     return {"number": pr["number"], "rank": rank, "policy": labels[0].split(": ")[1]}
+
+
+def pr_decision(pr):
+    return update_decision(pr, bump(pr["title"], pr.get("body")))
