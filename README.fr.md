@@ -33,9 +33,17 @@ PresetLauncher permet de regrouper des programmes dans des presets. Créez un pr
 
 ## Installation
 
-Téléchargez `PresetLauncher_Setup_<version>.exe` depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest), puis lancez le fichier. L'installeur contient tout le nécessaire.
+Téléchargez le programme d’installation adapté depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 
-Windows 10 ou 11 (x64). Les mises à jour sont disponibles dans les paramètres. Si vous utilisez encore la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien système de mise à jour ne la trouve pas.
+| Processeur Windows | Programme d’installation |
+| --- | --- |
+| x64 | `PresetLauncher_Setup_<version>.exe` |
+| x86 32 bits | `PresetLauncher_Setup_<version>_x86.exe` |
+| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` |
+
+Consultez **Paramètres → Système → Informations système → Type du système**. Utilisez une version de Windows prise en charge par Microsoft. Les paquets ARM64 sont compilés et inspectés par la CI x64. L’installation et le démarrage natifs ARM64 restent à valider sur du matériel ARM64. Les installations existantes conservent leur architecture lors des mises à jour, y compris en émulation. Pour changer d’architecture, désinstallez d’abord la version actuelle. La désinstallation conserve les préréglages, l’historique, les statistiques, les paramètres et la politique de mise à jour protégée.
+
+Si l’ancien système de mise à jour (version 1.2.6 ou antérieure) ne trouve pas la dernière version, installez-la manuellement.
 
 ## Documentation
 

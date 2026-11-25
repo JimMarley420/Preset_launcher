@@ -4,7 +4,17 @@
 
 ## Getting started
 
-Install the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest) on Windows x64. The installer declares Windows 10 build 17763 as its minimum. The project targets build 19041 and compatibility with older builds has not been verified. The installer includes the .NET and Windows App SDK runtimes.
+Choose the appropriate installer from the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest). The package includes .NET and the Windows App SDK.
+
+| Windows processor | Installer |
+| --- | --- |
+| x64 | `PresetLauncher_Setup_<version>.exe` |
+| 32-bit x86 | `PresetLauncher_Setup_<version>_x86.exe` |
+| ARM64 | `PresetLauncher_Setup_<version>_arm64.exe` |
+
+Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version. ARM64 packages are cross-compiled and inspected on x64 CI. Native ARM64 installation and startup still require validation on ARM64 hardware. Existing installations update in their current architecture, including under emulation. To switch architectures, uninstall the current copy first. Your presets, history, statistics, settings and protected update policy survive uninstallation.
+
+The installer minimum is build 17763. The application targets build 19041. Supported Windows versions also depend on architecture and Microsoft's lifecycle.
 
 The navigation pane starts collapsed. The icons open Presets, History, Statistics and Settings. Use the menu button to show their labels.
 
