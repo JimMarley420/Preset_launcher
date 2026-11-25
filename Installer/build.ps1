@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $mapping = Get-Content (Join-Path $PSScriptRoot architectures.json) -Raw | ConvertFrom-Json
 $targets = if ($Architecture -eq 'all') { $mapping.PSObject.Properties.Name } else { $Architecture.ToLowerInvariant() }
+$temp = $null
 
 if (-not $PublishOnly) {
     if ($UsePinnedCompiler) {
@@ -18,8 +19,9 @@ if (-not $PublishOnly) {
         $compiler = Join-Path $targetCompiler 'ISCC.exe'
     } else {
         $found = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+        $pathCompiler = if ($found) { $found.Source }
         $compiler = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-            "$env:ProgramFiles\Inno Setup 6\ISCC.exe", $found.Source) |
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe", $pathCompiler) |
             Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
         if (-not $compiler) { throw 'Install Inno Setup 6 or use -UsePinnedCompiler.' }
     }

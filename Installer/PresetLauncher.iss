@@ -108,8 +108,13 @@ end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  Result := '';
   if Conflicts(HKCU32, not IsAdminInstallMode) or
-     Conflicts(HKLM32, IsAdminInstallMode and not Is64BitInstallMode) or
-     (IsWin64 and Conflicts(HKLM64, IsAdminInstallMode and Is64BitInstallMode)) then
+     Conflicts(HKLM32, IsAdminInstallMode and not Is64BitInstallMode) then begin
     Result := CustomMessage('ArchitectureConflict');
+    Exit;
+  end;
+  if IsWin64 then
+    if Conflicts(HKLM64, IsAdminInstallMode and Is64BitInstallMode) then
+      Result := CustomMessage('ArchitectureConflict');
 end;
