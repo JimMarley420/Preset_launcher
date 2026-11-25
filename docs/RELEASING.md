@@ -2,7 +2,7 @@
 
 ## Versioning
 
-GitHub's latest published stable release is the baseline. The existing 1.2.6 tag has no v prefix; new tags use vMAJOR.MINOR.PATCH. CircleCI reads merged PR titles and labels after the baseline tag and selects the highest required bump. On the initial migration from 1.2.6, commits through 8535d8e943a6503d4982ff9a5164ef66392ba3ea are grandfathered; later commits must map to a merged PR.
+GitHub's latest published stable release is the baseline. The existing 1.2.6 tag has no v prefix. New tags use vMAJOR.MINOR.PATCH. CircleCI reads merged PR titles and labels after the baseline tag and selects the highest required bump. On the initial migration from 1.2.6, commits through 8535d8e943a6503d4982ff9a5164ef66392ba3ea are grandfathered. Later commits must map to a merged PR.
 
 | Commit | Bump | Example from 1.2.6 |
 | --- | --- | --- |
@@ -17,21 +17,21 @@ The release plan in artifacts/release-plan.json is the source of the published a
 
 ## Pull request validation
 
-The validate-pr-title job checks the actual open PR title and stacked-PR eligibility; validate-update-label independently checks the maintainer-selected update policy via the public GitHub API. Both must succeed before plan-release. If the title is invalid, the label check explicitly defers classification to the title check. Open a PR before running it. A stacked PR from this repository can validate against another branch when its title is non-releasing. Production versioning still uses PRs merged into main. A releasing PR must have exactly one of the three update labels below; non-releasing PRs must have none. Only the maintainer selects labels.
+The validate-pr-title job checks the actual open PR title and stacked-PR eligibility. Validate-update-label independently checks the maintainer-selected update policy via the public GitHub API. Both must succeed before plan-release. If the title is invalid, the label check explicitly defers classification to the title check. Open a PR before running it. A stacked PR from this repository can validate against another branch when its title is non-releasing. Production versioning still uses PRs merged into main. A releasing PR must have exactly one of the three update labels below. Non-releasing PRs must have none. Only the maintainer selects labels.
 
-After changing a title or label, rerun the workflow: metadata changes do not change the commit SHA and may not trigger CircleCI automatically. A successful commit status cannot guarantee that subsequently edited metadata remains valid at merge time. Release planning on main resolves merged PRs by their squash commit; publication recomputes the plan before creating a draft and again before publishing. A changed decision blocks publication until a fresh pipeline validates it. Do not change labels on merged PRs pending publication unless intentionally correcting a release decision.
+After changing a title or label, rerun the workflow: metadata changes do not change the commit SHA and may not trigger CircleCI automatically. A successful commit status cannot guarantee that subsequently edited metadata remains valid at merge time. Release planning on main resolves merged PRs by their squash commit. Publication recomputes the plan before creating a draft and again before publishing. A changed decision blocks publication until a fresh pipeline validates it. Do not change labels on merged PRs pending publication unless intentionally correcting a release decision.
 
 ## Update policy
 
 | GitHub label | Behavior |
 | --- | --- |
 | update: optional | Install, later, or skip this version. |
-| update: recommended | Install or remind in 24 hours; no permanent skip. |
+| update: recommended | Install or remind in 24 hours. No permanent skip. |
 | update: required | Install or exit. |
 
-There are no policy footers in commits. The generated release notes include two machine-readable comments: presetlauncher:min-supported and presetlauncher:update-policy. The strongest selected policy wins if multiple PRs are included in one release. Required releases advance the minimum supported version; later optional or recommended releases preserve that floor. Users below it must still update.
+There are no policy footers in commits. The generated release notes include two machine-readable comments: presetlauncher:min-supported and presetlauncher:update-policy. The strongest selected policy wins if multiple PRs are included in one release. Required releases advance the minimum supported version. Later optional or recommended releases preserve that floor. Users below it must still update.
 
-Recommended reminders are version-specific and stored in settings. Automatic checks at startup respect the 24-hour delay; manual checks and mandatory updates bypass it. A newer release is not suppressed by an old reminder. There is no background reminder while the application stays open.
+Recommended reminders are version-specific and stored in settings. Automatic checks at startup respect the 24-hour delay. Manual checks and mandatory updates bypass it. A newer release is not suppressed by an old reminder. There is no background reminder while the application stays open.
 
 Known mandatory floors survive settings reset and remain enforced when GitHub cannot be reached. If no mandatory floor is known and GitHub is unavailable, the offline app remains usable. This is application policy, not a tamper-resistant security boundary.
 
@@ -56,21 +56,24 @@ If publication fails after creating a draft, inspect the draft and its target co
 
 ### PROD ruleset
 
-The active PROD ruleset for the default branch requires these CircleCI checks. The optimized workflow keeps all five names and the same CircleCI integration, so the ruleset needs no change.
+Require these eight CircleCI status checks in the PROD ruleset.
 
 - `ci/circleci: plan-release`
 - `ci/circleci: dependency-audit`
 - `ci/circleci: build-windows`
 - `ci/circleci: test-windows`
 - `ci/circleci: package-installer`
+- `ci/circleci: validate-pr-title`
+- `ci/circleci: validate-update-label`
+- `ci/circleci: smoke-installer`
 
-CircleCI also reports `validate-pr-title`, `validate-update-label` and `smoke-installer` individually. Add the new `ci/circleci: validate-update-label` status to PROD after its first successful run. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
+The serial-group markers are internal to CircleCI and should not be required. The installer jobs report success on fast PRs after checking and logging the lane decision. Windows application compilation still runs in `test-windows`. The main workflow requires a real self-contained build, package integrity verification, and smoke testing before GitHub release publication. Keep `publish-release` outside the required PR checks because it runs only on main.
 
 ### Storage and cache policy
 
-The dependency-audit job saves SDK and NuGet caches only on main, with seven-day retention for new objects. PR jobs can restore matching main caches (or existing branch caches until they expire). A new SDK or dependency fingerprint on a PR can require a cold download; cache misses do not bypass the pinned SDK digest or dependency audit. Cache keys remain branch-scoped, with main fallback and exact input checksums. Existing objects keep their original retention.
+The dependency-audit job saves SDK and NuGet caches only on main, with seven-day retention for new objects. PR jobs can restore matching main caches (or existing branch caches until they expire). A new SDK or dependency fingerprint on a PR can require a cold download. Cache misses do not bypass the pinned SDK digest or dependency audit. Cache keys remain branch-scoped, with main fallback and exact input checksums. Existing objects keep their original retention.
 
-Full-lane PRs still expose the verified installer in CircleCI artifacts. Main keeps the installer and smoke-tested checksum in the workflow workspace for publication, but does not upload a second copy as a CircleCI artifact. Published installers remain on GitHub Releases; non-releasing main builds do not retain a downloadable installer artifact. Test reports, coverage and smoke logs remain available.
+Full-lane PRs still expose the verified installer in CircleCI artifacts. Main keeps the installer and smoke-tested checksum in the workflow workspace for publication, but does not upload a second copy as a CircleCI artifact. Published installers remain on GitHub Releases. Non-releasing main builds do not retain a downloadable installer artifact. Test reports, coverage and smoke logs remain available.
 
 Compare storage credits, cache hit rates and Windows job duration in Insights after rollout. Reconsider the seven-day retention if frequent cache misses outweigh the storage savings.
 
@@ -87,6 +90,6 @@ CI does not change the old host. Do not shut it down prematurely. Older clients 
 
 ## Verification and security
 
-The smoke test installs and removes the new package. On full-lane PR branches and for a planned release on main it also verifies the previous public installer digest, installs it, upgrades in place, and checks application version, registry and preservation of disposable user data. It verifies the bundled .NET 10 runtime and the executable and assembly file versions. The smoke test also waits for the installed WinUI main window to initialize after each installation. Before the first release, manually test both languages, optional skip, the 24-hour recommended reminder, mandatory update, offline retry, download errors, canceled installation and the legacy bridge in a disposable Windows VM.
+The smoke test installs and removes the new package. On full-lane PR branches and for a planned release on main it also verifies the previous public installer digest, installs it, upgrades in place, and checks application version, registry and preservation of disposable user data. It verifies the bundled .NET 10 runtime and the executable and assembly file versions. The smoke test also waits for the installed WinUI main window to initialize after each installation. For changes to the updater, manually test both languages, optional skip, the 24-hour recommended reminder, mandatory update, offline retry, download errors, canceled installation and the legacy bridge in a disposable Windows VM.
 
 The new updater checks GitHub's HTTPS metadata and verifies downloaded bytes. A checksum is not independent code signing: configure Authenticode signing before claiming publisher verification or SmartScreen trust. Limit repository and publication access.

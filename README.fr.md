@@ -1,84 +1,44 @@
-# PresetLauncher
+<h1 align="center">PresetLauncher</h1>
 
-Lancez ensemble les applications Windows que vous utilisez régulièrement, sans les ouvrir une par une.
+<p align="center">Ouvrez vos applications Windows en un clic.</p>
 
-[English](README.md) · **Français**
+<p align="center">
+  <a href="README.md">English</a> · <strong>Français</strong>
+</p>
 
-[![Version](https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases/latest) [![Licence MIT](https://img.shields.io/badge/licence-MIT-lightgrey?style=flat-square)](LICENSE) [![Downloads](https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square)](https://github.com/JimMarley420/Preset_launcher/releases) [![CircleCI](https://dl.circleci.com/status-badge/img/gh/JimMarley420/Preset_launcher/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/JimMarley420/Preset_launcher/tree/main)
+<p align="center">
+  <a href="https://github.com/JimMarley420/Preset_launcher/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square"></a>
+  <a href="https://github.com/JimMarley420/Preset_launcher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square"></a>
+</p>
 
-[![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?style=flat-square)](https://www.microsoft.com/windows/) [![C#](https://img.shields.io/badge/C%23-239120?style=flat-square)](https://learn.microsoft.com/dotnet/csharp/) [![.NET 10 LTS](https://img.shields.io/badge/.NET-10%20LTS-512BD4?style=flat-square&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0) [![WinUI 3](https://img.shields.io/badge/WinUI-3-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/winui/winui3/) [![Windows App SDK](https://img.shields.io/badge/Windows%20App%20SDK-2.7-0078D4?style=flat-square)](https://learn.microsoft.com/windows/apps/windows-app-sdk/) [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6-555555?style=flat-square)](https://jrsoftware.org/isinfo.php)
+<p align="center">
+  <strong><a href="https://github.com/JimMarley420/Preset_launcher/releases/latest">Télécharger pour Windows</a></strong> ·
+  <a href="https://github.com/JimMarley420/Preset_launcher/releases">Versions</a> ·
+  <a href="https://github.com/JimMarley420/Preset_launcher/issues">Assistance et suggestions</a>
+</p>
 
-[Télécharger pour Windows](https://github.com/JimMarley420/Preset_launcher/releases/latest) · [Signaler un problème](https://github.com/JimMarley420/Preset_launcher/issues/new/choose) · [Compiler le projet](#compiler-le-projet)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71" alt="Interface de PresetLauncher" width="880">
+</p>
 
-![Fenêtre de PresetLauncher](https://github.com/user-attachments/assets/4bc92444-c889-46ad-932b-5ef402787a71)
+## À propos
 
-## Un preset, plusieurs applications
+PresetLauncher permet de regrouper des programmes dans des presets. Créez un preset pour le travail, les jeux ou les applications que vous ouvrez régulièrement.
 
-Un preset est une liste de programmes nommée. Créez-en un pour le travail, un autre pour jouer ou pour les outils que vous ouvrez chaque matin.
-
-- Ajoutez des programmes via le sélecteur de fichiers ou en choisissant un processus Windows existant. Le sélecteur accepte les exécutables, scripts et raccourcis ; Windows détermine comment ouvrir le fichier.
-- Recherchez les presets par nom ou description, modifiez leur contenu, importez un preset JSON ou supprimez-le.
-- Choisissez un délai et une demande éventuelle de droits administrateur pour chaque entrée.
-
-### Options de lancement
-
-| Action | Comportement |
-| --- | --- |
-| Lancer tout | Lance les entrées dans leur ordre enregistré, applique chaque délai avant le lancement et enregistre le résultat. |
-| Lancer les manquants | Ignore les programmes détectés par leur chemin ou nom de fichier. Ce mode n'applique pas les délais et ne crée pas d'entrée dans l'historique. |
-| Fermer les processus | Après confirmation, tente de fermer les processus correspondants, puis peut les arrêter de force. Enregistrez votre travail : cela peut aussi fermer des programmes ouverts hors de PresetLauncher. |
-
-### Historique et réglages
-
-L'historique affiche les dates, durées et nombres de démarrages réussis des lancements complets. Il peut être effacé. Un démarrage réussi signifie que Windows a accepté la demande, pas que l'application a fini de charger.
-
-Les statistiques indiquent le nombre de presets, les lancements complets enregistrés et les dix chemins de programmes les plus utilisés. Les réglages proposent le français et l'anglais, les thèmes clair/sombre/système, Mica ou Acrylique selon la compatibilité, le nettoyage des entrées invalides, la réinitialisation et la recherche de mises à jour.
-
-### Limitations actuelles
-
-Les filtres d'historique et la préférence de confirmation de lancement sont présents mais ne modifient pas encore le comportement. La duplication, l'export individuel, la modification des arguments et le verrouillage par mot de passe ne sont pas accessibles via des commandes fonctionnelles dans cette version. Un preset JSON importé peut contenir des arguments transmis à Windows lors du lancement.
+* Lancez tous les programmes d'un preset ou seulement ceux qui ne sont pas déjà ouverts.
+* Ajoutez des applications, des raccourcis et des scripts, avec un délai de lancement et des droits administrateur au choix.
+* Importez des presets au format JSON et consultez l'historique des lancements.
+* Choisissez un thème clair ou sombre et utilisez l'application en français ou en anglais.
 
 ## Installation
 
-Utilisez un PC Windows 10 ou 11 compatible avec l'installeur x64. L'installeur déclare Windows 10 build 17763 comme minimum ; le projet cible le build 19041. La compatibilité avec les anciens builds n'a pas été vérifiée. L'installeur inclut .NET 10 et le Windows App SDK.
+Téléchargez `PresetLauncher_Setup_<version>.exe` depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest), puis lancez le fichier. L'installeur contient tout le nécessaire.
 
-1. Ouvrez la page de la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
-2. Téléchargez `PresetLauncher_Setup_<version>.exe` et exécutez-le.
-3. Ouvrez PresetLauncher, créez un preset et ajoutez les exécutables souhaités.
+Windows 10 ou 11 (x64). Les mises à jour sont disponibles dans les paramètres. Si vous utilisez encore la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien système de mise à jour ne la trouve pas.
 
-L'installeur inclut l'environnement d'exécution. Le nouvel updater recherche les mises à jour sur GitHub Releases au démarrage et dans les réglages, vérifie la taille et l'empreinte SHA-256 de l'installeur avant de l'ouvrir et permet de reporter ou d'ignorer les mises à jour facultatives. Les mises à jour recommandées peuvent être reportées de 24 heures, mais pas ignorées définitivement. Une mise à jour peut être obligatoire si la version installée est inférieure à la version minimale prise en charge.
+## Documentation
 
-Si vous utilisez la version 1.2.6 ou une version antérieure, installez manuellement la dernière version si l'ancien updater ne la propose pas. L'installeur conserve les presets et préférences.
+[Guide d'utilisation](docs/USAGE.fr.md) · [Compiler le projet](docs/DEVELOPMENT.md#build-from-source) · [Contribuer](CONTRIBUTING.md) · [Sécurité](SECURITY.md)
 
-## Données locales
-
-Par défaut, les fichiers se trouvent dans `%LocalAppData%\PresetLauncher\` :
-
-- `data.json` — presets, historique et statistiques.
-- `settings.json` — préférences de l'application.
-
-La désinstallation conserve ces données. Sauvegardez manuellement les deux fichiers, application fermée, avant de changer de PC ou de réinitialiser les données. Le bouton Parcourir tente de copier les données mais ne déplace pas le stockage actif ; ne comptez pas dessus pour une sauvegarde. Avant de lancer un preset importé, vérifiez les chemins, arguments et demandes de droits administrateur.
-
-## Compiler le projet
-
-Sous Windows, installez le SDK .NET 10 LTS (10.0.404 ou un correctif 10.0.4xx ultérieur) et Visual Studio 2026 avec les outils de développement WinUI / Windows App SDK. Dans PowerShell :
-
-```powershell
-git clone https://github.com/JimMarley420/Preset_launcher.git
-cd Preset_launcher
-dotnet build .\PresetLauncherWinUI3\PresetLauncherWinUI3.csproj -c Release -p:Platform=x64
-```
-
-Pour créer l'installeur autonome x64, installez Inno Setup 6 puis lancez :
-
-```powershell
-.\Installer\build.ps1
-```
-
-L'installeur est généré dans `Installer/Output/`. Les builds locaux utilisent par défaut la version `0.0.0` et ne recherchent pas les mises à jour de production. CircleCI calcule automatiquement les versions publiées. Voir la [documentation des releases](docs/RELEASING.md). Les [notes de développement](docs/DEVELOPMENT.md) décrivent l'organisation du code et les vérifications manuelles.
-
-## Contribuer
-
-Pour signaler un bug ou proposer une modification, consultez [CONTRIBUTING.md](CONTRIBUTING.md). Pour une vulnérabilité, suivez plutôt les instructions de [SECURITY.md](SECURITY.md).
-
-PresetLauncher est distribué sous [licence MIT](LICENSE).
+Développé en C# avec .NET et WinUI 3. Distribué sous [licence MIT](LICENSE).
