@@ -23,7 +23,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        NativeWindow.ResizeClient(this, 900, 640);
+        NativeWindow.ResizeClient(this, 880, 620);
         App.Theme.Attach(this, Root, OpaqueBackground);
         ApplyPreferences();
         AppWindow.Closing += HandleClosing;
