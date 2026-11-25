@@ -10,12 +10,13 @@ namespace PresetLauncher;
 
 public sealed partial class MainWindow : Window
 {
-    private readonly Dictionary<object, DesktopPage> _pages = [];
-    private object? _destination;
+    private readonly Dictionary<NavigationViewItemBase, DesktopPage> _pages = [];
+    private NavigationViewItemBase? _destination;
     private bool _navigating;
     private bool _busy = true;
     private bool _updateBlocked;
     private bool _closing;
+    private bool _closed;
 
     public MainWindow()
     {
@@ -26,6 +27,7 @@ public sealed partial class MainWindow : Window
         App.Theme.Attach(this, Root, OpaqueBackground);
         ApplyPreferences();
         AppWindow.Closing += HandleClosing;
+        Closed += (_, _) => _closed = true;
     }
 
     private void NavView_Loaded(object sender, RoutedEventArgs e)
@@ -75,7 +77,7 @@ public sealed partial class MainWindow : Window
         finally { _navigating = false; }
     }
 
-    private void ShowDestination(object destination)
+    private void ShowDestination(NavigationViewItemBase destination)
     {
         if (!_pages.TryGetValue(destination, out var page))
         {
@@ -166,6 +168,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateInput(bool pageEnabled = false)
     {
+        if (_closed) return;
         NavView.IsEnabled = !_updateBlocked;
         foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
             item.IsEnabled = !_busy;
