@@ -1,4 +1,6 @@
+import json
 import tempfile
+import xml.etree.ElementTree as ET
 import unittest
 from pathlib import Path
 from html.parser import HTMLParser
@@ -21,14 +23,35 @@ class Links(HTMLParser):
         super().__init__()
         self.links = []
         self.launch = []
+        self.canonical = []
+        self.alternates = {}
+        self.meta = {}
+        self.schema = []
+        self.in_schema = False
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == 'link' and attrs.get('rel') == 'canonical':
+            self.canonical.append(attrs['href'])
+        if tag == 'link' and attrs.get('rel') == 'alternate':
+            self.alternates[attrs['hreflang']] = attrs['href']
+        if tag == 'meta':
+            self.meta[attrs.get('name') or attrs.get('property')] = attrs.get('content')
+        if tag == 'script' and attrs.get('type') == 'application/ld+json':
+            self.in_schema = True
         if attrs.get('id') == 'demo-launch':
             self.launch.append((tag, attrs))
         for key in ('href', 'src'):
             if key in attrs:
                 self.links.append(attrs[key])
+
+    def handle_data(self, data):
+        if self.in_schema:
+            self.schema.append(json.loads(data))
+
+    def handle_endtag(self, tag):
+        if tag == 'script':
+            self.in_schema = False
 
 
 class WebsiteTests(unittest.TestCase):
@@ -70,6 +93,81 @@ class WebsiteTests(unittest.TestCase):
                         self.assertNotIn('signature=secret', body)
                         self.assertNotIn('<script>bad()', body)
                         self.assertIn('&lt;script&gt;bad()', body)
+
+    def test_discovery_metadata_matches_published_pages(self):
+        base = 'https://jimmarley420.github.io/Preset_launcher/'
+        ns = {'s': 'http://www.sitemaps.org/schemas/sitemap/0.9',
+              'x': 'http://www.w3.org/1999/xhtml'}
+        latest = fixture('v7.2.3')
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'site'
+            render(SOURCE, output, latest, [latest])
+            entries = ET.parse(output / 'sitemap.xml').getroot().findall('s:url', ns)
+            locations = [entry.findtext('s:loc', namespaces=ns) for entry in entries]
+            self.assertEqual(len(locations), len(set(locations)))
+            expected = set()
+            descriptions = set()
+            for page in output.rglob('*.html'):
+                suffix = '' if page.name == 'index.html' else page.name
+                en, fr = base + suffix, base + 'fr/' + suffix
+                canonical = fr if page.parent.name == 'fr' else en
+                expected.add(canonical)
+                alternates = {'en': en, 'fr': fr, 'x-default': en}
+                parsed = Links()
+                parsed.feed(page.read_text(encoding='utf-8'))
+                self.assertEqual(parsed.canonical, [canonical])
+                self.assertEqual(parsed.alternates, alternates)
+                self.assertEqual(parsed.meta['og:url'], canonical)
+                self.assertEqual(parsed.meta['og:description'], parsed.meta['description'])
+                self.assertNotIn(parsed.meta['description'], descriptions)
+                descriptions.add(parsed.meta['description'])
+                self.assertEqual(parsed.meta['twitter:card'], 'summary_large_image')
+                if page.name == 'index.html':
+                    self.assertEqual(len(parsed.schema), 1)
+                    self.assertEqual(parsed.schema[0]['@type'], 'SoftwareApplication')
+                    self.assertEqual(parsed.schema[0]['url'], canonical)
+                    self.assertEqual(parsed.schema[0]['offers']['price'], 0)
+                else:
+                    self.assertEqual(parsed.schema, [])
+                entry = next(item for item in entries
+                             if item.findtext('s:loc', namespaces=ns) == canonical)
+                self.assertEqual({link.attrib['hreflang']: link.attrib['href']
+                                  for link in entry.findall('x:link', ns)}, alternates)
+            self.assertEqual(set(locations), expected)
+            self.assertIn(base + 'download.html', (output / 'llms.txt').read_text(encoding='utf-8'))
+
+    def test_screenshots_use_localized_assets(self):
+        expected = {'en': ('presets', 'history', 'statistics', 'settings'),
+                    'fr': ('presets', 'history', 'settings')}
+        base = 'https://jimmarley420.github.io/Preset_launcher/'
+        latest = fixture('v7.2.3')
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'site'
+            render(SOURCE, output, latest, [latest])
+            for lang, names in expected.items():
+                folder = output / 'fr' if lang == 'fr' else output
+                prefix = '../' if lang == 'fr' else ''
+                for name in ('index', 'features', 'screenshots'):
+                    with self.subTest(lang=lang, page=name):
+                        body = (folder / (name + '.html')).read_text(encoding='utf-8')
+                        parsed = Links()
+                        parsed.feed(body)
+                        files = [link for link in parsed.links if '/screenshots/' in link]
+                        shown = names if name == 'screenshots' else ('presets',)
+                        expected_links = [prefix + 'assets/screenshots/' + item + '-' + lang + '.png'
+                                          for item in shown]
+                        self.assertEqual(files, [link for url in expected_links for link in (url, url)])
+                        for link in expected_links:
+                            asset = folder / link
+                            self.assertEqual(asset.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
+                        self.assertNotIn('github.com/user-attachments/assets/', body)
+                        preview = base + 'assets/screenshots/presets-' + lang + '.png'
+                        self.assertEqual(parsed.meta['og:image'], preview)
+                        if name == 'index':
+                            self.assertEqual(parsed.schema[0]['screenshot'], preview)
+                        if name == 'screenshots':
+                            self.assertEqual(body.count('gallery-entry--portrait'), 1)
+                            self.assertIn('loading="lazy"', body)
 
     def test_only_available_architectures_linked(self):
         text = release_downloads(fixture('v7.2.3', ('',)), False)

@@ -13,13 +13,14 @@
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/JimMarley420/Preset_launcher/releases/latest">Download for Windows</a></strong> ·
+  <strong><a href="https://jimmarley420.github.io/Preset_launcher/download.html">Download for Windows</a></strong> ·
+  <a href="https://jimmarley420.github.io/Preset_launcher/">Website</a> ·
   <a href="https://github.com/JimMarley420/Preset_launcher/releases">Releases</a> ·
   <a href="https://github.com/JimMarley420/Preset_launcher/issues">Issues and suggestions</a>
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d874f101-7f59-45f0-b0a0-7ce8702f2735" alt="PresetLauncher application" width="880">
+  <img src="website/assets/screenshots/presets-en.png" alt="PresetLauncher application" width="880">
 </p>
 
 ## About

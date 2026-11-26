@@ -1,0 +1,25 @@
+# PresetLauncher
+
+> Free, MIT-licensed Windows application group launcher built with C# and WinUI 3. Create presets and launch multiple programs in one click.
+
+PresetLauncher supports ordered launches, per-program delays and elevation requests, launching missing programs, local history and statistics, JSON preset import and data backup. It does not restore window positions. Consult the download page for available architectures and validation status. Consult the security documentation before importing presets or closing processes.
+
+## Product
+
+- [Official website](https://jimmarley420.github.io/Preset_launcher/): Overview and examples.
+- [Download](https://jimmarley420.github.io/Preset_launcher/download.html): Current stable installers and checksums.
+- [Features](https://jimmarley420.github.io/Preset_launcher/features.html): Supported capabilities.
+- [User guide](https://github.com/JimMarley420/Preset_launcher/blob/main/docs/USAGE.md): Installation and usage details.
+- [Security](https://github.com/JimMarley420/Preset_launcher/blob/main/SECURITY.md): Update verification, local data and reporting.
+- [Releases](https://github.com/JimMarley420/Preset_launcher/releases): Release history and assets.
+
+## Source and contributions
+
+- [Source code](https://github.com/JimMarley420/Preset_launcher): MIT-licensed repository.
+- [Contributing](https://github.com/JimMarley420/Preset_launcher/blob/main/CONTRIBUTING.md): Contribution instructions.
+- [Issues](https://github.com/JimMarley420/Preset_launcher/issues): Bugs and feature requests.
+
+## French
+
+- [Site français](https://jimmarley420.github.io/Preset_launcher/fr/): Présentation et téléchargement.
+- [Guide utilisateur](https://github.com/JimMarley420/Preset_launcher/blob/main/docs/USAGE.fr.md): Installation et utilisation.
