@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -49,6 +48,7 @@ class DiffTests(unittest.TestCase):
         self.assertFalse(ci_scope.non_application_diff(self.diff()))
 
     def test_rename_out_of_application_cannot_skip(self):
+        (self.root / "docs").mkdir()
         self.git("mv", "PresetLauncherWinUI3/App.xaml.cs", "docs/moved.md")
         self.assertFalse(ci_scope.non_application_diff(self.diff()))
 
