@@ -1,4 +1,5 @@
 """Submit a verified stable release to the WinGet community catalog."""
+import base64
 import hashlib
 import json
 import os
@@ -46,7 +47,7 @@ def catalog(token):
 
 
 def branch_name(value):
-    return f"presetlauncher-winget/{value}"
+    return f"presetlauncher-winget-{value}"
 
 
 def existing_submission(value, token):
@@ -155,10 +156,28 @@ def verify_manifests(documents, value, assets, notes_url):
                 or effective.get("ElevationRequirement") != "elevatesSelf"):
             raise ValueError(f"Installer identity or metadata mismatch: {arch}")
         entries = effective.get("AppsAndFeaturesEntries", [])
-        if not any(entry.get("ProductCode") == PRODUCT_CODE
-                   and str(entry.get("DisplayVersion", value)) == value
-                   for entry in entries):
+        codes = {entry["ProductCode"] for entry in entries if entry.get("ProductCode")}
+        if effective.get("ProductCode"):
+            codes.add(effective["ProductCode"])
+        if (codes != {PRODUCT_CODE}
+                or any(str(entry.get("DisplayVersion", value)) != value
+                       or entry.get("DisplayName", "PresetLauncher") != "PresetLauncher"
+                       or entry.get("Publisher", "JimmyMarley") != "JimmyMarley"
+                       for entry in entries)):
             raise ValueError(f"Installer registration mismatch: {arch}")
+
+
+def user_scope_only(manifest):
+    # Inno Setup exposes an optional elevation dialog. Komac detects both
+    # scopes, but the catalog package deliberately supports only user installs.
+    selected = []
+    for entry in manifest["Installers"]:
+        scope = entry.get("Scope", manifest.get("Scope"))
+        if scope not in ("user", "machine"):
+            raise ValueError("Unknown generated installer scope")
+        if scope == "user":
+            selected.append({key: value for key, value in entry.items() if key != "Scope"})
+    return manifest | {"Scope": "user", "Installers": selected}
 
 
 def generate(directory, value, assets, notes_url, token):
@@ -180,8 +199,15 @@ def generate(directory, value, assets, notes_url, token):
                    timeout=600, check=True)
     root = output / ROOT / value
     files = {p.name: p.read_text(encoding="utf-8") for p in root.glob("*.yaml")}
-    verify_manifests({name: yaml.safe_load(data) for name, data in files.items()},
-                     value, assets, notes_url)
+    documents = {name: yaml.safe_load(data) for name, data in files.items()}
+    installer_name = f"{PACKAGE}.installer.yaml"
+    documents[installer_name] = user_scope_only(documents[installer_name])
+    verify_manifests(documents, value, assets, notes_url)
+    # Keep the schema/tool headers while serializing the filtered installer.
+    original = files[installer_name]
+    header = "\n".join(line for line in original.splitlines() if line.startswith("#"))
+    files[installer_name] = header + "\n\n" + yaml.safe_dump(
+        documents[installer_name], sort_keys=False, allow_unicode=True)
     return files
 
 
@@ -215,7 +241,6 @@ def submit(value, files, token):
             or any(item["status"] != "added" for item in changed)
             or comparison["ahead_by"] != 1):
         raise ValueError("Existing WinGet branch contains unexpected changes")
-    import base64
     for name, data in files.items():
         url = f"{FORK}/contents/{ROOT}/{value}/{name}?" + urlencode({"ref": ref})
         blob = read(url, token)

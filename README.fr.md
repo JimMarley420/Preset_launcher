@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/JimMarley420/Preset_launcher/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square"></a>
   <a href="https://github.com/JimMarley420/Preset_launcher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square"></a>
+  <a href="https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/JimmyMarley/PresetLauncher"><img alt="WinGet" src="https://img.shields.io/badge/WinGet-JimmyMarley.PresetLauncher-0078D4?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square"></a>
 </p>
 
@@ -33,6 +34,20 @@ PresetLauncher permet de regrouper des programmes dans des presets. Créez un pr
 * Choisissez un thème clair ou sombre et utilisez l'application en français ou en anglais.
 
 ## Installation
+
+### WinGet
+
+```powershell
+winget install --id JimmyMarley.PresetLauncher --exact --source winget
+```
+
+Pour mettre à jour une installation existante :
+
+```powershell
+winget upgrade --id JimmyMarley.PresetLauncher --exact --source winget
+```
+
+### Installation manuelle
 
 Téléchargez le programme d’installation adapté depuis la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 

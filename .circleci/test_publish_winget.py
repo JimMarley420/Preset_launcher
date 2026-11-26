@@ -35,6 +35,21 @@ class ManifestTests(unittest.TestCase):
     def test_signed_assets_and_registration_match(self):
         self.verify(self.docs)
 
+    def test_inno_override_scope_is_not_published(self):
+        docs = copy.deepcopy(self.docs)
+        manifest = docs[winget.PACKAGE + ".installer.yaml"]
+        manifest["Installers"] += [entry | {"Scope": "machine"} for entry in manifest["Installers"]]
+        docs[winget.PACKAGE + ".installer.yaml"] = winget.user_scope_only(manifest)
+        self.assertEqual(len(docs[winget.PACKAGE + ".installer.yaml"]["Installers"]), 3)
+        self.verify(docs)
+
+    def test_product_code_can_be_optimized_to_common_field(self):
+        docs = copy.deepcopy(self.docs)
+        manifest = docs[winget.PACKAGE + ".installer.yaml"]
+        manifest["ProductCode"] = winget.PRODUCT_CODE
+        del manifest["AppsAndFeaturesEntries"]
+        self.verify(docs)
+
     def test_wrong_hash_url_architecture_or_scope_fails(self):
         for key, value in (("InstallerSha256", "0" * 64), ("InstallerUrl", "https://evil.invalid"),
                            ("Architecture", "x86"), ("Scope", "machine"),
