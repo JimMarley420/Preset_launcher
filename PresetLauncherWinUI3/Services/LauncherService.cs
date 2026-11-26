@@ -222,6 +222,7 @@ public class LauncherService
                     await Task.Delay(exe.DelaySeconds * 1000);
                 }
 
+                detail.StartedAt = DateTime.Now;
                 var startInfo = new ProcessStartInfo
                 {
                     FileName = exe.Path,
@@ -246,8 +247,7 @@ public class LauncherService
             }
             catch (Exception ex)
             {
-                detail.Success = false;
-                detail.ErrorMessage = ex.Message;
+                detail.RecordFailure(ex);
                 history.FailedCount++;
             }
 

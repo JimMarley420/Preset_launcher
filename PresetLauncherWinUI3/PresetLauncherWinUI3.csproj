@@ -30,6 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+    <InternalsVisibleTo Include="PresetLauncher.Tests" />
     <EmbeddedResource Include="../Installer/architectures.json" LogicalName="PresetLauncher.Architectures" />
     <EmbeddedResource Include="../.circleci/update-policy-public.pem" LogicalName="PresetLauncher.UpdatePolicyPublicKey" />
   </ItemGroup>

@@ -92,6 +92,8 @@ public sealed partial class MainWindow : Window
 
     internal void EditPreset(Preset? preset) => PageHost.Content = new PresetEditorPage(preset);
 
+    internal bool UsesMinimalNavigation => NavView.PaneDisplayMode == NavigationViewPaneDisplayMode.LeftMinimal;
+
     internal void ReturnToPresets()
     {
         _navigating = true;

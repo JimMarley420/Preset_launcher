@@ -36,7 +36,9 @@ Windows accepting a start request does not mean the program has finished loading
 
 ## History, statistics and appearance
 
-History shows full launches, their duration and results. Filter by **All**, **Successful**, **Failed** or **Today**. Failed includes runs with both accepted and failed requests. Today follows the local calendar. **Clear history** keeps presets and usage statistics.
+History groups full launches by local date and shows their duration and launch request outcomes. Search by preset or program name and combine the search with **All**, **Successful**, **Partial failures**, **Failed** or **Today**. A partial failure has both accepted and failed requests. An accepted request means Windows accepted the launch request. Application initialization and continued operation are outside the scope of that result.
+
+Expand a launch to see each recorded program result. Failure diagnostics include the original technical error and the Windows error code when available. Execution actions let you copy diagnostics, edit the associated preset if it still exists, or delete the entry after confirmation. Copied diagnostics may contain executable paths. Deleting individual entries or clearing the history keeps presets and usage statistics.
 
 Statistics show the number of presets, recorded launches for current presets, distinct program paths with recorded usage and the ten most-used program paths.
 

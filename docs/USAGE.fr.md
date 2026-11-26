@@ -36,7 +36,9 @@ L’acceptation d’une demande par Windows ne signifie pas que le programme a f
 
 ## Historique, statistiques et apparence
 
-L’historique affiche les lancements complets, leur durée et leur résultat. Les filtres sont **Tous**, **Réussites**, **Échecs** et **Aujourd’hui**. Le filtre **Échecs** inclut les lancements partiellement réussis. **Aujourd’hui** suit la date locale. **Effacer l’historique** conserve les presets et les statistiques.
+L’historique regroupe les lancements complets par date locale et affiche leur durée et le résultat des demandes. Recherchez un preset ou un programme par son nom et combinez la recherche avec les filtres **Tous**, **Réussites**, **Échecs partiels**, **Échecs** ou **Aujourd’hui**. Un échec partiel combine des demandes acceptées et des demandes en échec. Une demande acceptée signifie que Windows a accepté de lancer le programme. Ce résultat ne renseigne ni sur son initialisation ni sur la poursuite de son exécution.
+
+Développez un lancement pour consulter le résultat enregistré pour chaque programme. Le diagnostic d’un échec présente l’erreur technique d’origine et le code d’erreur Windows lorsqu’ils sont disponibles. Les actions du lancement permettent de copier le diagnostic, de modifier le preset associé s’il existe encore ou de supprimer l’entrée après confirmation. Le diagnostic copié peut contenir des chemins d’exécutables. La suppression d’entrées ou l’effacement de l’historique conserve les presets et les statistiques.
 
 Les statistiques affichent le nombre de presets, les lancements enregistrés pour les presets actuels, les chemins de programmes distincts ayant été utilisés et les dix chemins les plus utilisés.
 
