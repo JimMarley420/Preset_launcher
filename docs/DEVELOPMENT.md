@@ -67,15 +67,16 @@ The CircleCI `plan-release` job checks Worker syntax and runs the regression sui
 
 ## Continuous integration
 
-CircleCI retains the eight named required checks. Linux checks PR metadata, tests the Python release contracts and plans validation using the actual PR head and base SHA. A single Windows Medium VM restores and audits the x64 test graph, runs the full x64 regression suite and retains JUnit, TRX and Cobertura. Linux gates verify the Windows evidence for the same commit, version and lane.
+CircleCI retains the nine named required checks. A lightweight setup job selects the executor, and Linux checks PR metadata, tests the Python release contracts and plans validation using the actual PR head and base SHA. Eligible non-application, non-releasing changes do not allocate a Windows VM. All other changes retain the existing validation lanes. When Windows runs, the Medium VM restores and audits the x64 test graph, runs the full x64 regression suite and retains JUnit, TRX and Cobertura. Linux gates verify genuine Windows evidence for the same commit, version and lane, or explicitly report that Windows validation is not applicable after the Linux scope check.
 
 | Lane | Windows work |
 | --- | --- |
-| Documentation and ordinary application PRs | Audited x64 test restore and x64 compile/regression. Documentation retains the same regression guarantee. |
+| Non-releasing documentation, website, issue/PR template and allowlisted label Worker changes | No Windows VM when the diff is proven eligible; Linux release-policy and JavaScript checks still run. |
+| Ordinary application PRs | Audited x64 test restore and x64 compile/regression. |
 | Architecture-sensitive PRs | x64 regression, three isolated publish restores, three PE checks and installers, x64 and WOW64 x86 smoke, and ARM64-setup rejection on x64. |
-| Every main commit | Full validation. A planned production release also verifies a historical installer for each architecture previously released and stages the complete release for Linux publication. |
+| Main commits outside the Linux-only lane, including every planned release | Full validation. A planned production release also verifies a historical installer for each architecture previously released and stages the complete release for Linux publication. |
 
-Installer, updater, startup, interop, project, dependency, publish, and CI changes take the full lane. New and renamed C# or XAML files, unknown paths, ambiguous change records, and a mismatched base/head also take the full lane. Deleted paths keep their previous classification. Known platform API changes are checked in existing application sources. Ordinary edits with no platform indicators keep the x64 lane, whose regression compile satisfies the build check. Full-lane reports distinguish PE inspection, native x64 startup and WOW64 x86 startup. Use a disposable Windows ARM64 environment for native application smoke and for x64 emulation verification. Use suitable 32-bit Windows hardware or a VM for native x86 verification.
+The Linux-only lane requires a regular-file-only diff against the PR's current main base or the main commit's sole parent, plus a non-releasing release plan. Mixed, stale, stacked, unknown or uncertain changes retain the existing Windows lane. Renames count both paths. Installer, updater, startup, interop, project, dependency, publish, and CI changes take the full lane. New and renamed C# or XAML files, unknown paths, ambiguous change records, and a mismatched base/head also take the full lane. Deleted paths keep their previous classification. Known platform API changes are checked in existing application sources. Ordinary edits with no platform indicators keep the x64 lane, whose regression compile satisfies the build check. Full-lane reports distinguish PE inspection, native x64 startup and WOW64 x86 startup. Use a disposable Windows ARM64 environment for native application smoke and for x64 emulation verification. Use suitable 32-bit Windows hardware or a VM for native x86 verification.
 
 The x64 host uses the SDK pinned in `global.json`. The SDK archive is checked against Microsoft's SHA-512 before extraction. Exact input NuGet and SDK caches are restored once and saved only on main with seven-day retention. NuGet audit still queries the advisory feeds. Full validation restores the publish targets separately with a shared package cache. Trimming and ReadyToRun remain disabled. Release packaging uses solid `lzma2/fast`. Publish directories stay on the worker. The workspace retains one copy of the installers, checksums and evidence. Downstream jobs may download the same workspace layer independently. Only reports and diagnostics are stored as CircleCI artifacts.
 
@@ -100,6 +101,7 @@ CircleCI advertises 30,000 monthly Free credits for Windows/macOS and up to 400,
 | Original x64 fast, pipeline 72 | 4 / 2 / 2 / 0 | 3.33 | 1.05 | 133 + 5 | 3.76 |
 | Original x64 full PR, pipeline 67 | 4 / 3 / 3 / 1 | 7.82 | 1.22 | 313 + 6 | 6.31 |
 | Original x64 release, pipeline 68 | 4 / 3 / 3 / 1 | 6.89 | 1.22 | 276 + 6 | 6.17 |
+| Linux-only non-application | 0 / 0 / 0 / 0 | 0 | NOT RUN | 5 × Linux min | NOT RUN |
 | Consolidated ordinary | 1 / 1 / 1 / 0 | NOT RUN | NOT RUN | 40 × Windows min + 5 × Linux min | NOT RUN |
 | Consolidated full | 1 / 1 / 4 / 1 | NOT RUN | NOT RUN | 40 × Windows min + 5 × Linux min | NOT RUN |
 | Consolidated production | 1 / 1 / 4 / 1 | NOT RUN | NOT RUN | Full lane plus Linux publication | NOT RUN |
