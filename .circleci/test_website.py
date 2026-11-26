@@ -147,13 +147,13 @@ class WebsiteTests(unittest.TestCase):
             for lang, names in expected.items():
                 folder = output / 'fr' if lang == 'fr' else output
                 prefix = '../' if lang == 'fr' else ''
-                for name in ('index', 'features', 'screenshots'):
+                for name in ('index', 'features', 'screenshots', 'download'):
                     with self.subTest(lang=lang, page=name):
                         body = (folder / (name + '.html')).read_text(encoding='utf-8')
                         parsed = Links()
                         parsed.feed(body)
                         files = [link for link in parsed.links if '/screenshots/' in link]
-                        shown = names if name == 'screenshots' else ('presets',)
+                        shown = ('presets',) if name == 'download' else names
                         expected_links = [prefix + 'assets/screenshots/' + item + '-' + lang + '.png'
                                           for item in shown]
                         self.assertEqual(files, [link for url in expected_links for link in (url, url)])
