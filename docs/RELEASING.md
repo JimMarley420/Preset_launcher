@@ -83,6 +83,14 @@ CircleCI uses dynamic configuration (`.circleci/config.yml` continues into `.cir
 
 Main alone writes verified SDK and dependency caches, with seven-day cache retention. Workspace retention covers workflow retries. The pipeline retains a workspace copy for validation/publication and keeps test reports and smoke logs. GitHub Releases is the permanent distribution location.
 
+## WinGet distribution
+
+The Windows Package Manager community package identifier is `JimmyMarley.PresetLauncher`. The independent `publish-winget` job follows successful GitHub publication; it does not block GitHub Pages deployment and is not a required PR check. It also checks the latest stable release on non-releasing main pipelines to recover missed submissions.
+
+The publisher requires an established package in the upstream catalog and verifies the signed architecture manifest for all three installers. Komac generates version-specific manifests from the upstream package metadata. The generated installer identities, registration, URLs and SHA-256 digests must match the supported installer contract and the signed release. A deterministic fork branch identifies each submission; existing catalog versions and open submissions are not duplicated. A closed unmerged submission or unexpected fork branch requires maintainer review. WinGet's own validation and approval remain external to CircleCI.
+
+The `presetlauncher-winget` context is restricted to this project and main pipelines without SSH debugging. Its only credential is `WINGET_GITHUB_TOKEN`, a GitHub classic personal access token with the `public_repo` scope, belonging to the owner of the existing `JimMarley420/winget-pkgs` fork. It cannot access private repositories via that scope, but it can modify public repositories accessible to the account. No release signing or website credentials are shared with the job. The token is expiring and stored only in the restricted context.
+
 ## Migration from the legacy update server
 
 Installed versions through 1.2.6 cannot discover GitHub updates on their own. After the first verified release is published:
