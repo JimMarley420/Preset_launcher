@@ -106,6 +106,9 @@ internal static class DataBackup
             Field(detail, "ExecutablePath", JsonValueKind.String);
             Boolean(detail, "Success");
             Field(detail, "ErrorMessage", JsonValueKind.String, nullable: true);
+            var code = Field(detail, "NativeErrorCode", JsonValueKind.Number, nullable: true);
+            if (code.ValueKind == JsonValueKind.Number && !code.TryGetInt32(out _))
+                throw new InvalidDataException("Invalid native error code.");
             Date(detail, "StartedAt");
         }, uniqueIds: false);
     }

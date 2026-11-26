@@ -18,7 +18,7 @@ public abstract class DesktopPage : Page
     private object[] _statusArgs = [];
     protected MainWindow Shell => App.Current.MainWindow;
 
-    protected DesktopPage()
+    protected DesktopPage(FrameworkElement? scrollingContent = null)
     {
         var layout = new Grid { Margin = new Thickness(20, 12, 20, 12), MaxWidth = 1060, RowSpacing = 8 };
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -28,7 +28,7 @@ public abstract class DesktopPage : Page
         Scroller = DesktopUi.Scroll(Body);
         layout.Children.Add(Header);
         DesktopUi.Place(layout, _status, 1, 0);
-        DesktopUi.Place(layout, Scroller, 2, 0);
+        DesktopUi.Place(layout, scrollingContent ?? Scroller, 2, 0);
         DesktopUi.Place(layout, Footer, 3, 0);
         Content = layout;
     }

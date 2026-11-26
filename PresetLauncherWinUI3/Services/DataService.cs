@@ -101,6 +101,13 @@ public class DataService
 
     public void ClearHistory() => Change(next => next.History.Clear());
 
+    public void RemoveHistoryEntry(string id) => Change(next => next.History.RemoveAll(item => item.Id == id));
+
+    internal Preset? FindHistoryPreset(ExecutionHistory entry) =>
+        Guid.TryParse(entry.PresetId, out var id) && id != Guid.Empty
+            ? Data.Presets.FirstOrDefault(preset => Guid.TryParse(preset.Id, out var presetId) && presetId == id)
+            : null;
+
     public void UpdateUsageStats(string exePath) => Change(next => IncrementUsage(next, exePath));
 
     private static void IncrementUsage(AppData next, string path)

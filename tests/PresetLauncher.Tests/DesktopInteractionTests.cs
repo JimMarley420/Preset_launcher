@@ -59,7 +59,8 @@ public sealed class DesktopInteractionTests
 
         CollectionAssert.AreEqual(history, HistoryQuery.Apply(history, HistoryFilter.All, today).ToArray());
         CollectionAssert.AreEqual(new[] { success }, HistoryQuery.Apply(history, HistoryFilter.Successful, today).ToArray());
-        CollectionAssert.AreEqual(new[] { partial, failure }, HistoryQuery.Apply(history, HistoryFilter.Failed, today).ToArray());
+        CollectionAssert.AreEqual(new[] { failure }, HistoryQuery.Apply(history, HistoryFilter.Failed, today).ToArray());
+        CollectionAssert.AreEqual(new[] { partial }, HistoryQuery.Apply(history, HistoryFilter.PartialFailure, today).ToArray());
         CollectionAssert.AreEqual(new[] { partial }, HistoryQuery.Apply(history, HistoryFilter.Today, today).ToArray());
         Assert.IsEmpty(HistoryQuery.Apply([success], HistoryFilter.Failed, today));
         Assert.IsEmpty(HistoryQuery.Apply([], HistoryFilter.All, today));

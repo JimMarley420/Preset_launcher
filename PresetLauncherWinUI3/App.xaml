@@ -1,6 +1,7 @@
 <Application x:Class="PresetLauncher.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:pages="using:PresetLauncher.Views.Pages">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -31,6 +32,23 @@
                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
                 <Setter Property="Padding" Value="0,8"/>
             </Style>
+            <Style x:Key="HistorySuccessIcon" TargetType="FontIcon">
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}"/>
+            </Style>
+            <Style x:Key="HistoryPartialIcon" TargetType="FontIcon">
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}"/>
+            </Style>
+            <Style x:Key="HistoryFailureIcon" TargetType="FontIcon">
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}"/>
+            </Style>
+            <Style x:Key="HistoryDiagnosticRule" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                <Setter Property="BorderThickness" Value="1,0,0,0"/>
+                <Setter Property="Padding" Value="10,0,0,0"/>
+            </Style>
+            <DataTemplate x:Key="HistoryRowTemplate">
+                <pages:HistoryRow/>
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
