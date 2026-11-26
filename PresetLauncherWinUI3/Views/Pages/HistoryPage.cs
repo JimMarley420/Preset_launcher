@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using PresetLauncher.Models;
 using PresetLauncher.Services;
@@ -15,13 +16,20 @@ public sealed class HistoryPage : DesktopPage
         (HistoryFilter.Successful, "history.filter.success"),
         (HistoryFilter.PartialFailure, "history.filter.partial"),
         (HistoryFilter.Failed, "history.filter.failures"),
+        (HistoryFilter.Incomplete, "history.filter.incomplete"),
         (HistoryFilter.Today, "history.filter.today")
     ];
 
     private readonly TextBox _search = new();
     private readonly ComboBox _filter = new() { MinWidth = 148 };
     private readonly ListView _list = new() { SelectionMode = ListViewSelectionMode.None };
-    private readonly TextBlock _empty = Text("", "DesktopSecondaryText");
+    private readonly TextBlock _emptyTitle = Text("", "DesktopSectionTitle");
+    private readonly TextBlock _emptyDescription = Text("", "DesktopSecondaryText");
+    private readonly StackPanel _empty = new()
+    {
+        Spacing = 4, Margin = new Thickness(0, 24, 0, 0), MaxWidth = 460,
+        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top
+    };
     private readonly TextBlock _title;
     private readonly Button _clear;
     private bool _refreshing;
@@ -32,8 +40,14 @@ public sealed class HistoryPage : DesktopPage
     {
         _title = Heading("history.title", page: true);
         _clear = Button("history.clear", ClearHistory, glyph: "\uE74D");
-        Header.Children.Add(_title);
-        Header.Children.Add(AdaptivePair(_search, Actions(_filter, _clear), 520));
+        _clear.VerticalAlignment = VerticalAlignment.Center;
+        var titleBar = new Grid { ColumnSpacing = 12 };
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        titleBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Place(titleBar, _title, 0, 0);
+        Place(titleBar, _clear, 0, 1);
+        Header.Children.Add(titleBar);
+        Header.Children.Add(AdaptivePair(_search, _filter, 500));
 
         _list.ItemTemplate = (DataTemplate)Application.Current.Resources["HistoryRowTemplate"];
         var containerStyle = new Style(typeof(ListViewItem));
@@ -42,7 +56,10 @@ public sealed class HistoryPage : DesktopPage
         _list.ItemContainerStyle = containerStyle;
         ScrollViewer.SetHorizontalScrollMode(_list, ScrollMode.Disabled);
         ScrollViewer.SetHorizontalScrollBarVisibility(_list, ScrollBarVisibility.Disabled);
-        _empty.Margin = new Thickness(0, 20, 0, 0);
+        AutomationProperties.SetHeadingLevel(_emptyTitle, AutomationHeadingLevel.Level2);
+        AutomationProperties.SetLiveSetting(_emptyTitle, AutomationLiveSetting.Polite);
+        _empty.Children.Add(_emptyTitle);
+        _empty.Children.Add(_emptyDescription);
         content.Children.Add(_list);
         content.Children.Add(_empty);
 
@@ -76,7 +93,7 @@ public sealed class HistoryPage : DesktopPage
         if (_refreshing) return;
 
         var history = App.Data.Data.History;
-        _clear.IsEnabled = history.Count > 0;
+        _clear.Visibility = history.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         var filter = Filters[Math.Max(0, _filter.SelectedIndex)].Filter;
         var today = DateTime.Today;
         var matches = HistoryQuery.Apply(history, filter, today, _search.Text, App.Localization.Culture);
@@ -89,8 +106,12 @@ public sealed class HistoryPage : DesktopPage
         _list.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         _empty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (rows.Count == 0)
-            _empty.Text = T(history.Count == 0 ? "history.empty" :
+        {
+            _emptyTitle.Text = T(history.Count == 0 ? "history.empty" :
                 string.IsNullOrWhiteSpace(_search.Text) ? "history.noMatches" : "history.noSearchMatches");
+            _emptyDescription.Visibility = history.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            _emptyDescription.Text = T("history.emptyHelp");
+        }
     }
 
     internal void OpenPreset(ExecutionHistory entry)
@@ -102,10 +123,15 @@ public sealed class HistoryPage : DesktopPage
     internal async void CopyDiagnostics(string contents) =>
         await Shell.RunOperationAsync(async () =>
         {
-            if (await ClipboardText.CopyAsync(contents))
-                Report("history.copied", InfoBarSeverity.Success);
-            else
-                Report("history.copyFailed", InfoBarSeverity.Error);
+            var result = await ClipboardText.CopyAsync(WinRT.Interop.WindowNative.GetWindowHandle(Shell), contents);
+            var (key, severity) = result switch
+            {
+                ClipboardCopyResult.Persisted => ("history.copied", InfoBarSeverity.Success),
+                ClipboardCopyResult.Changed => ("history.copyChanged", InfoBarSeverity.Warning),
+                ClipboardCopyResult.Busy => ("history.copyBusy", InfoBarSeverity.Warning),
+                _ => ("history.copyFailed", InfoBarSeverity.Error)
+            };
+            Report(key, severity);
         }, "history.copyFailed", pageEnabled: true);
 
     internal async Task DeleteEntryAsync(ExecutionHistory entry, string name)

@@ -41,6 +41,11 @@
             <Style x:Key="HistoryFailureIcon" TargetType="FontIcon">
                 <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}"/>
             </Style>
+            <Style x:Key="HistoryDiagnosticRule" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}"/>
+                <Setter Property="BorderThickness" Value="1,0,0,0"/>
+                <Setter Property="Padding" Value="10,0,0,0"/>
+            </Style>
             <DataTemplate x:Key="HistoryRowTemplate">
                 <pages:HistoryRow/>
             </DataTemplate>

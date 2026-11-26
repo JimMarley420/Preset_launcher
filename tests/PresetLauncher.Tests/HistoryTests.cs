@@ -16,7 +16,9 @@ public sealed class HistoryTests
     [DataRow(1, 2, "PartialFailure")]
     [DataRow(0, 3, "Failed")]
     [DataRow(0, 0, "Unavailable")]
-    [DataRow(1, 0, "Successful")]
+    [DataRow(1, 0, "Incomplete")]
+    [DataRow(0, 1, "Incomplete")]
+    [DataRow(1, 1, "Incomplete")]
     public void ClassifiesRecordedRequests(int accepted, int failed, string status)
     {
         var entry = new ExecutionHistory { SuccessCount = accepted, FailedCount = failed, ExecutablesCount = 3 };
@@ -26,6 +28,39 @@ public sealed class HistoryTests
         Assert.AreEqual(accepted, result.Accepted);
         Assert.AreEqual(failed, result.Failed);
         Assert.AreEqual(3 - accepted - failed, result.Unrecorded);
+    }
+
+    [TestMethod]
+    public void ConflictingResultsPreserveTheStoredCountsWithoutFillingGaps()
+    {
+        var entry = new ExecutionHistory
+        {
+            ExecutablesCount = 3, SuccessCount = 3,
+            Details = [new() { Success = true }, new() { Success = false }, new()]
+        };
+        var result = ExecutionResult.From(entry);
+
+        Assert.AreEqual(ExecutionStatus.Incomplete, result.Status);
+        Assert.IsTrue(result.CountsConflict);
+        Assert.AreEqual(3, result.Accepted);
+        Assert.AreEqual(0, result.Failed);
+        Assert.AreEqual(false, entry.Details[1].RecordedResult);
+        Assert.IsNull(entry.Details[2].RecordedResult);
+    }
+
+    [TestMethod]
+    public void AggregateCountsCanCoverMissingDetailsButCannotExceedAKnownTotal()
+    {
+        var entry = new ExecutionHistory
+        {
+            ExecutablesCount = 2, FailedCount = 2, Details = [new() { Success = false }, new()]
+        };
+
+        Assert.AreEqual(ExecutionStatus.Failed, ExecutionResult.From(entry).Status);
+        Assert.IsNull(entry.Details[1].RecordedResult);
+        entry.FailedCount = 3;
+        Assert.AreEqual(ExecutionStatus.Incomplete, ExecutionResult.From(entry).Status);
+        Assert.IsTrue(ExecutionResult.From(entry).CountsConflict);
     }
 
     [TestMethod]
@@ -91,9 +126,29 @@ public sealed class HistoryTests
     public async Task ClipboardRetriesAndStopsAfterSuccessOrFiveAttempts(int successOnAttempt)
     {
         int calls = 0;
-        bool copied = await ClipboardText.TrySetAsync(() => ++calls == successOnAttempt);
+        var result = await ClipboardText.TrySetAsync(() => ++calls == successOnAttempt
+            ? ClipboardCopyResult.Persisted : ClipboardCopyResult.Busy);
+        bool copied = result == ClipboardCopyResult.Persisted;
         Assert.AreEqual(successOnAttempt <= 5, copied);
         Assert.AreEqual(Math.Min(successOnAttempt, 5), calls);
+    }
+
+    [TestMethod]
+    [DataRow("Changed")]
+    [DataRow("Failed")]
+    public async Task ClipboardRecoveryStopsWithoutPublishingAfterAChangeOrFailure(string terminalResult)
+    {
+        var expected = Enum.Parse<ClipboardCopyResult>(terminalResult);
+        int calls = 0;
+        var result = await ClipboardText.TrySetAsync(() => ++calls switch
+        {
+            1 => ClipboardCopyResult.Busy,
+            2 => expected,
+            _ => ClipboardCopyResult.Persisted
+        });
+
+        Assert.AreEqual(expected, result);
+        Assert.AreEqual(2, calls);
     }
 
     [TestMethod]
@@ -124,8 +179,12 @@ public sealed class HistoryTests
             Details = [new() { ExecutableName = "Édition sonore" }]
         };
         var failed = new ExecutionHistory { PresetName = "Édition vidéo", ExecutedAt = today, FailedCount = 1 };
-        var incomplete = new ExecutionHistory { PresetName = "Édition" };
-        ExecutionHistory[] history = [successful, partial, failed, incomplete];
+        var incomplete = new ExecutionHistory
+        {
+            PresetName = "Édition ancienne", ExecutedAt = today.AddDays(-1), ExecutablesCount = 3, SuccessCount = 1
+        };
+        var unavailable = new ExecutionHistory { PresetName = "Édition" };
+        ExecutionHistory[] history = [successful, partial, failed, incomplete, unavailable];
         ExecutionHistory[] Results(HistoryFilter filter) =>
             HistoryQuery.Apply(history, filter, today, "  EDITION  ", CultureInfo.GetCultureInfo("fr-FR")).ToArray();
 
@@ -133,6 +192,7 @@ public sealed class HistoryTests
         CollectionAssert.AreEqual(new[] { successful }, Results(HistoryFilter.Successful));
         CollectionAssert.AreEqual(new[] { partial }, Results(HistoryFilter.PartialFailure));
         CollectionAssert.AreEqual(new[] { failed }, Results(HistoryFilter.Failed));
+        CollectionAssert.AreEqual(new[] { incomplete }, Results(HistoryFilter.Incomplete));
         CollectionAssert.AreEqual(new[] { partial, failed }, Results(HistoryFilter.Today));
         Assert.IsEmpty(HistoryQuery.Apply(history, HistoryFilter.All, today, "missing"));
     }
@@ -180,7 +240,10 @@ public sealed class HistoryTests
             data.Load();
             Assert.IsFalse(data.LoadFailed);
             var legacy = data.Data.History.Single();
-            Assert.AreEqual(ExecutionStatus.Failed, ExecutionResult.From(legacy).Status);
+            var legacyResult = ExecutionResult.From(legacy);
+            Assert.AreEqual(ExecutionStatus.Incomplete, legacyResult.Status);
+            Assert.AreEqual(1, legacyResult.Failed);
+            Assert.AreEqual(1, legacyResult.Unrecorded);
             Assert.IsNull(HistoryQuery.LocalDate(legacy.ExecutedAt));
             Assert.IsNull(legacy.Duration);
             Assert.IsNull(legacy.Details[1].RecordedResult);

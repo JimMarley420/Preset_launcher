@@ -9,35 +9,47 @@ public enum HistoryFilter
     Successful,
     Failed,
     Today,
-    PartialFailure
+    PartialFailure,
+    Incomplete
 }
 
-internal enum ExecutionStatus { Unavailable, Successful, PartialFailure, Failed }
+internal enum ExecutionStatus { Unavailable, Successful, PartialFailure, Failed, Incomplete }
 
-internal readonly record struct ExecutionResult(int Accepted, int Failed, int Unrecorded)
+internal readonly record struct ExecutionResult(int Accepted, int Failed, int Unrecorded, bool CountsConflict)
 {
-    public ExecutionStatus Status => (Accepted, Failed) switch
+    public ExecutionStatus Status => (Accepted, Failed, Unrecorded, CountsConflict) switch
     {
-        (> 0, 0) => ExecutionStatus.Successful,
-        (> 0, > 0) => ExecutionStatus.PartialFailure,
-        (0, > 0) => ExecutionStatus.Failed,
-        _ => ExecutionStatus.Unavailable
+        (_, _, _, true) => ExecutionStatus.Incomplete,
+        (0, 0, _, _) => ExecutionStatus.Unavailable,
+        (_, _, > 0, _) => ExecutionStatus.Incomplete,
+        (_, 0, _, _) => ExecutionStatus.Successful,
+        (0, _, _, _) => ExecutionStatus.Failed,
+        _ => ExecutionStatus.PartialFailure
     };
 
     public static ExecutionResult From(ExecutionHistory entry)
     {
-        int accepted = entry.SuccessCount, failed = entry.FailedCount;
-        if (accepted == 0 && failed == 0)
+        int detailAccepted = 0, detailFailed = 0;
+        foreach (var detail in entry.Details)
         {
-            foreach (var detail in entry.Details)
-            {
-                if (detail.RecordedResult is true) accepted++;
-                if (detail.RecordedResult is false) failed++;
-            }
+            if (detail.RecordedResult is true) detailAccepted++;
+            if (detail.RecordedResult is false) detailFailed++;
         }
 
+        int accepted = Math.Max(0, entry.SuccessCount), failed = Math.Max(0, entry.FailedCount);
+        // Legacy records can omit both totals. Never add individual results to a reported total.
+        if (accepted == 0 && failed == 0)
+        {
+            accepted = detailAccepted;
+            failed = detailFailed;
+        }
+
+        long recorded = (long)accepted + failed;
         int expected = Math.Max(entry.ExecutablesCount, entry.Details.Count);
-        return new(accepted, failed, (int)Math.Max(0, expected - (long)accepted - failed));
+        bool conflict = entry.SuccessCount < 0 || entry.FailedCount < 0 || entry.ExecutablesCount < 0 ||
+            detailAccepted > accepted || detailFailed > failed ||
+            (entry.ExecutablesCount > 0 && (recorded > entry.ExecutablesCount || entry.Details.Count > entry.ExecutablesCount));
+        return new(accepted, failed, (int)Math.Max(0, expected - recorded), conflict);
     }
 }
 
@@ -55,6 +67,7 @@ public static class HistoryQuery
             HistoryFilter.Successful => ExecutionResult.From(item).Status == ExecutionStatus.Successful,
             HistoryFilter.PartialFailure => ExecutionResult.From(item).Status == ExecutionStatus.PartialFailure,
             HistoryFilter.Failed => ExecutionResult.From(item).Status == ExecutionStatus.Failed,
+            HistoryFilter.Incomplete => ExecutionResult.From(item).Status == ExecutionStatus.Incomplete,
             HistoryFilter.Today => LocalDate(item.ExecutedAt) == today.Date,
             _ => true
         }) && (string.IsNullOrEmpty(term) || Matches(item.PresetName) ||

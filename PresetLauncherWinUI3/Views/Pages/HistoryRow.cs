@@ -56,16 +56,7 @@ public sealed class HistoryRow : UserControl
         heading.Children.Add(Text(name, "DesktopSectionTitle"));
         heading.Children.Add(Text(timing, "DesktopSecondaryText"));
 
-        var (glyph, style) = result.Status switch
-        {
-            ExecutionStatus.Successful => ("\uE73E", "HistorySuccessIcon"),
-            ExecutionStatus.PartialFailure => ("\uE7BA", "HistoryPartialIcon"),
-            ExecutionStatus.Failed => ("\uE711", "HistoryFailureIcon"),
-            _ => ("\uE946", null)
-        };
-        var icon = Icon(glyph);
-        if (style is not null)
-            icon.Style = (Style)Application.Current.Resources[style];
+        var icon = OutcomeIcon(result.Status);
         var outcome = new StackPanel { Spacing = 2, MinWidth = 168, MaxWidth = 260, HorizontalAlignment = HorizontalAlignment.Left };
         outcome.Children.Add(Text(status));
         outcome.Children.Add(Text(counts, "DesktopSecondaryText"));
@@ -85,13 +76,10 @@ public sealed class HistoryRow : UserControl
     {
         if (_row is not { } row) return;
 
-        var details = new StackPanel { Spacing = 8 };
-        var actions = new DropDownButton
-        {
-            Content = T("history.actions"),
-            Flyout = BuildActions(row)
-        };
-        details.Children.Add(actions);
+        var details = new StackPanel { Spacing = 10 };
+        details.Children.Add(BuildDetailActions(row));
+        if (ExecutionResult.From(row.Entry).CountsConflict)
+            details.Children.Add(Text(T("history.countsConflict"), "DesktopSecondaryText"));
         var programs = row.Entry.Details;
         if (programs.Count == 0)
             details.Children.Add(Text(T("history.noPrograms"), "DesktopSecondaryText"));
@@ -141,21 +129,119 @@ public sealed class HistoryRow : UserControl
         page.Children.Clear();
         for (int index = start; index < end; index++)
         {
-            var block = new StackPanel { Spacing = 3 };
-            var lines = ProgramLines(programs[index], App.Localization).ToArray();
-            block.Children.Add(Text(lines[0], "DesktopSectionTitle"));
-            for (int line = 1; line < lines.Length; line++)
-            {
-                var text = Text(lines[line], line == 1 ? null : "DesktopSecondaryText");
-                text.IsTextSelectionEnabled = true;
-                AutomationProperties.SetName(text, lines[line]);
-                block.Children.Add(text);
-            }
+            var block = BuildProgram(programs[index]);
             page.Children.Add(index + 1 < end ? Row(block) : block);
         }
     }
 
-    private static MenuFlyout BuildActions(HistoryRowItem row)
+    private static Grid BuildProgram(ExecutionDetail detail)
+    {
+        var program = ReadProgram(detail, App.Localization);
+        var status = detail.RecordedResult switch
+        {
+            true => ExecutionStatus.Successful,
+            false => ExecutionStatus.Failed,
+            null => ExecutionStatus.Unavailable
+        };
+        var icon = OutcomeIcon(status);
+        icon.VerticalAlignment = VerticalAlignment.Top;
+        icon.Margin = new Thickness(0, 2, 0, 0);
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Place(grid, icon, 0, 0);
+
+        var body = new StackPanel { Spacing = 4 };
+        var name = Text(program.Name, "DesktopSectionTitle");
+        var category = Text(program.Category, status == ExecutionStatus.Failed ? null : "DesktopSecondaryText");
+        category.MinWidth = 236;
+        category.HorizontalAlignment = HorizontalAlignment.Left;
+        category.MaxWidth = 310;
+        body.Children.Add(AdaptivePair(name, category, 440));
+
+        var path = Text(program.Path, "DesktopSecondaryText");
+        path.MaxLines = 2;
+        path.TextTrimming = TextTrimming.CharacterEllipsis;
+        path.IsTextSelectionEnabled = true;
+        ToolTipService.SetToolTip(path, program.Path);
+        var recordedTime = Text(program.RecordedTime, "DesktopSecondaryText");
+        if (status == ExecutionStatus.Failed)
+        {
+            body.Children.Add(path);
+            AddFailureDetails(body, program, recordedTime);
+        }
+        else
+        {
+            recordedTime.MinWidth = 236;
+            body.Children.Add(AdaptivePair(path, recordedTime, 590));
+        }
+
+        Place(grid, body, 0, 1);
+        return grid;
+    }
+
+    private static void AddFailureDetails(StackPanel body, ProgramPresentation program, TextBlock recordedTime)
+    {
+        if (program.Suggestion is { } suggestion)
+        {
+            var help = Text(suggestion);
+            help.Margin = new Thickness(0, 4, 0, 0);
+            body.Children.Add(help);
+        }
+
+        var diagnostics = new StackPanel { Spacing = 2 };
+        if (program.TechnicalError is { } error)
+        {
+            var message = Text(error, "DesktopSecondaryText");
+            message.IsTextSelectionEnabled = true;
+            diagnostics.Children.Add(message);
+        }
+        if (program.WindowsCode is { } code)
+            diagnostics.Children.Add(Text(code, "DesktopSecondaryText"));
+        diagnostics.Children.Add(recordedTime);
+        body.Children.Add(new Border
+        {
+            Style = (Style)Application.Current.Resources["HistoryDiagnosticRule"],
+            Margin = new Thickness(0, 4, 0, 0), Child = diagnostics
+        });
+    }
+
+    private static FontIcon OutcomeIcon(ExecutionStatus status)
+    {
+        var (glyph, style) = status switch
+        {
+            ExecutionStatus.Successful => ("\uE73E", "HistorySuccessIcon"),
+            ExecutionStatus.PartialFailure => ("\uE7BA", "HistoryPartialIcon"),
+            ExecutionStatus.Failed => ("\uE711", "HistoryFailureIcon"),
+            _ => ("\uE946", null)
+        };
+        var icon = Icon(glyph);
+        if (style is not null)
+            icon.Style = (Style)Application.Current.Resources[style];
+        AutomationProperties.SetAccessibilityView(icon, AccessibilityView.Raw);
+        return icon;
+    }
+
+    private static Grid BuildDetailActions(HistoryRowItem row)
+    {
+        var edit = App.Data.FindHistoryPreset(row.Entry) is not null
+            ? Button("preset.edit", (_, _) => row.Page.OpenPreset(row.Entry), glyph: "\uE70F") : null;
+        var copy = Button("history.copy", (_, _) => row.Page.CopyDiagnostics(Diagnostics(row)), glyph: "\uE8C8");
+        var more = new Button { Content = Icon("\uE712"), Flyout = BuildActions(row, deleteOnly: true) };
+        Label(more, T("history.actions"));
+        var actions = edit is null ? Actions(copy, more) : Actions(edit, copy, more);
+        var layout = new Grid();
+        layout.Children.Add(actions);
+        layout.SizeChanged += (_, args) =>
+        {
+            bool wide = args.NewSize.Width >= 440;
+            if (edit is not null) edit.Content = wide ? T("preset.edit") : Icon("\uE70F");
+            copy.Content = wide ? T("history.copyShort") : Icon("\uE8C8");
+        };
+        return layout;
+    }
+
+    private static MenuFlyout BuildActions(HistoryRowItem row, bool deleteOnly = false)
     {
         var menu = new MenuFlyout();
         void Add(string key, RoutedEventHandler handler)
@@ -166,10 +252,13 @@ public sealed class HistoryRow : UserControl
         }
 
         var entry = row.Entry;
-        if (App.Data.FindHistoryPreset(entry) is not null)
-            Add("preset.edit", (_, _) => row.Page.OpenPreset(entry));
-        Add("history.copy", (_, _) => row.Page.CopyDiagnostics(Diagnostics(row)));
-        menu.Items.Add(new MenuFlyoutSeparator());
+        if (!deleteOnly)
+        {
+            if (App.Data.FindHistoryPreset(entry) is not null)
+                Add("preset.edit", (_, _) => row.Page.OpenPreset(entry));
+            Add("history.copy", (_, _) => row.Page.CopyDiagnostics(Diagnostics(row)));
+            menu.Items.Add(new MenuFlyoutSeparator());
+        }
         Add("history.delete", async (_, _) => await row.Page.DeleteEntryAsync(entry, row.PresetName));
         return menu;
     }
@@ -178,11 +267,13 @@ public sealed class HistoryRow : UserControl
     {
         var entry = row.Entry;
         var result = ExecutionResult.From(entry);
-        var summary = new[]
+        var summary = new List<string>
         {
             row.PresetName, EntryTiming(entry, "g"), T($"history.status.{result.Status}"),
             LaunchCounts(result), T("history.acceptanceHelp")
         };
+        if (result.CountsConflict)
+            summary.Add(T("history.countsConflict"));
         var programs = entry.Details.Select(detail => string.Join(Environment.NewLine, ProgramLines(detail, App.Localization)));
         return string.Join(Environment.NewLine + Environment.NewLine,
             new[] { string.Join(Environment.NewLine, summary) }.Concat(
@@ -191,37 +282,45 @@ public sealed class HistoryRow : UserControl
 
     internal static IEnumerable<string> ProgramLines(ExecutionDetail detail, LocalizationService localization)
     {
-        yield return string.IsNullOrWhiteSpace(detail.ExecutableName)
-            ? localization.Get("history.unnamedProgram")
-            : detail.ExecutableName;
+        var program = ReadProgram(detail, localization);
+        yield return program.Name;
+        bool leadWithError = detail.RecordedResult is false && detail.Failure == LaunchFailure.Unknown &&
+            !string.IsNullOrWhiteSpace(detail.ErrorMessage);
+        yield return leadWithError ? program.TechnicalError! : program.Category;
+        yield return program.Path;
+        yield return program.RecordedTime;
+        if (program.WindowsCode is { } code) yield return code;
+        if (program.TechnicalError is { } error && !leadWithError) yield return error;
+        if (program.Suggestion is { } suggestion) yield return suggestion;
+    }
+
+    private static ProgramPresentation ReadProgram(ExecutionDetail detail, LocalizationService localization)
+    {
         var result = detail.RecordedResult;
         var failure = detail.Failure;
-        var technicalError = string.IsNullOrWhiteSpace(detail.ErrorMessage)
-            ? null
-            : localization.Get("history.technicalError", detail.ErrorMessage);
-        bool leadWithError = result is false && failure == LaunchFailure.Unknown && technicalError is not null;
-        yield return result switch
+        var category = result switch
         {
             true => localization.Get("history.requestAccepted"),
-            false when leadWithError => technicalError!,
             false => localization.Get($"history.error.{failure}"),
             null => localization.Get("history.requestUnknown")
         };
-        yield return string.IsNullOrWhiteSpace(detail.ExecutablePath)
-            ? localization.Get("history.pathUnknown")
-            : detail.ExecutablePath;
-        yield return localization.Get("history.recordedTime", Timestamp(detail.StartedAt, "G", localization));
-
-        if (result is not false) yield break;
-        if (detail.NativeErrorCode is int code)
-            yield return localization.Get("history.windowsCode", code);
-        if (technicalError is not null && !leadWithError)
-            yield return technicalError;
-        else if (technicalError is null && detail.NativeErrorCode is null)
-            yield return localization.Get("history.errorUnavailable");
-        if (failure != LaunchFailure.Unknown)
-            yield return localization.Get($"history.help.{failure}");
+        var recordedTime = HistoryQuery.LocalTime(detail.StartedAt) is { } timestamp
+            ? localization.Get("history.recordedTime", timestamp.ToString("G", localization.Culture))
+            : localization.Get("history.timeUnknown");
+        return new ProgramPresentation(
+            string.IsNullOrWhiteSpace(detail.ExecutableName) ? localization.Get("history.unnamedProgram") : detail.ExecutableName,
+            category,
+            string.IsNullOrWhiteSpace(detail.ExecutablePath) ? localization.Get("history.pathUnknown") : detail.ExecutablePath,
+            recordedTime,
+            result is false && failure != LaunchFailure.Unknown ? localization.Get($"history.help.{failure}") : null,
+            result is false && detail.NativeErrorCode is int code ? localization.Get("history.windowsCode", code) : null,
+            result is not false ? null : !string.IsNullOrWhiteSpace(detail.ErrorMessage)
+                ? localization.Get("history.technicalError", detail.ErrorMessage)
+                : detail.NativeErrorCode is null ? localization.Get("history.errorUnavailable") : null);
     }
+
+    private sealed record ProgramPresentation(string Name, string Category, string Path, string RecordedTime,
+        string? Suggestion, string? WindowsCode, string? TechnicalError);
 
     private static string Timestamp(DateTime timestamp, string format, LocalizationService localization) =>
         HistoryQuery.LocalTime(timestamp)?.ToString(format, localization.Culture) ?? localization.Get("history.timeUnknown");
@@ -230,7 +329,7 @@ public sealed class HistoryRow : UserControl
         Timestamp(entry.ExecutedAt, format, App.Localization),
         entry.Duration is { } duration ? T("history.duration", duration.TotalSeconds) : T("history.durationUnknown"));
 
-    private static string LaunchCounts(ExecutionResult result) => result.Unrecorded > 0
+    private static string LaunchCounts(ExecutionResult result) => result.Unrecorded > 0 && !result.CountsConflict
         ? T("history.countsIncomplete", result.Accepted, result.Failed, result.Unrecorded)
         : T("history.counts", result.Accepted, result.Failed);
 }
