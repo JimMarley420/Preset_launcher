@@ -2,3 +2,15 @@
 [hidden]{display:none!important}.button:disabled,.button:disabled:hover{opacity:.6;cursor:default;background:var(--button)}
 
 .release-entry+.release-entry{margin-top:36px;padding-top:28px;border-top:1px solid var(--line)}.release-notes{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);font:inherit;margin:14px 0}.brand-icon img,.product-icon img{background:transparent}
+/* Screenshot gallery: keep native aspect ratios, including portrait settings. */
+.gallery{max-width:900px;display:grid;gap:36px}
+.gallery-entry{display:grid;gap:14px;min-width:0;align-items:start}
+.gallery-entry+.gallery-entry{padding-top:28px;border-top:1px solid var(--line)}
+.gallery-entry h2{font-size:21px;letter-spacing:-.02em}
+.gallery-entry p{color:var(--muted);margin-top:6px}
+.gallery-entry .preview{width:100%;max-width:809px}
+.gallery-entry--portrait .preview{max-width:644px}
+.gallery-entry .screenshot>img{height:auto;max-width:100%;object-fit:contain}
+@media(min-width:800px){
+  .gallery-entry{grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:26px}
+}
