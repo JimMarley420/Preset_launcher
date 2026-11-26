@@ -35,3 +35,5 @@
   .product-overview-grid{grid-template-columns:minmax(0,1fr);gap:26px}
   .product-detail--portrait .preview,.product-overview-item--portrait .preview{max-width:360px}
 }
+
+.product-detail-copy .text-link{margin-top:16px}
