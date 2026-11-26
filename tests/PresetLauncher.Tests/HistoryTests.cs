@@ -4,6 +4,7 @@ using System.Globalization;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PresetLauncher.Models;
 using PresetLauncher.Services;
+using PresetLauncher.Views.Pages;
 
 namespace PresetLauncher.Tests;
 
@@ -61,6 +62,38 @@ public sealed class HistoryTests
         Assert.AreEqual("File not found.", legacy.ErrorMessage);
         Assert.AreEqual(false, legacy.RecordedResult);
         Assert.IsNull(new ExecutionDetail().RecordedResult);
+    }
+
+    [TestMethod]
+    [DataRow("en", "Technical error: The system cannot find the file specified.")]
+    [DataRow("fr", "Erreur technique : The system cannot find the file specified.")]
+    public void LegacyFailureLeadsWithTheRecordedMessage(string language, string expected)
+    {
+        var localization = new LocalizationService();
+        localization.SetLanguage(language);
+        var detail = new ExecutionDetail
+        {
+            ExecutableName = "Example program", Success = false,
+            ErrorMessage = "The system cannot find the file specified."
+        };
+
+        var lines = HistoryRow.ProgramLines(detail, localization).ToArray();
+        Assert.AreEqual(expected, lines[1]);
+        Assert.AreEqual(1, lines.Count(line => line.Contains(detail.ErrorMessage, StringComparison.Ordinal)));
+        Assert.HasCount(4, lines);
+    }
+
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(3)]
+    [DataRow(5)]
+    [DataRow(6)]
+    public async Task ClipboardRetriesAndStopsAfterSuccessOrFiveAttempts(int successOnAttempt)
+    {
+        int calls = 0;
+        bool copied = await ClipboardText.TrySetAsync(() => ++calls == successOnAttempt);
+        Assert.AreEqual(successOnAttempt <= 5, copied);
+        Assert.AreEqual(Math.Min(successOnAttempt, 5), calls);
     }
 
     [TestMethod]

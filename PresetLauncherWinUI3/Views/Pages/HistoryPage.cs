@@ -2,7 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using PresetLauncher.Models;
-using Windows.ApplicationModel.DataTransfer;
+using PresetLauncher.Services;
 using static PresetLauncher.Views.DesktopUi;
 
 namespace PresetLauncher.Views.Pages;
@@ -100,14 +100,12 @@ public sealed class HistoryPage : DesktopPage
     }
 
     internal async void CopyDiagnostics(string contents) =>
-        await Shell.RunOperationAsync(() =>
+        await Shell.RunOperationAsync(async () =>
         {
-            var package = new DataPackage();
-            package.SetText(contents);
-            Clipboard.SetContent(package);
-            Clipboard.Flush();
-            Report("history.copied", InfoBarSeverity.Success);
-            return Task.CompletedTask;
+            if (await ClipboardText.CopyAsync(contents))
+                Report("history.copied", InfoBarSeverity.Success);
+            else
+                Report("history.copyFailed", InfoBarSeverity.Error);
         }, "history.copyFailed", pageEnabled: true);
 
     internal async Task DeleteEntryAsync(ExecutionHistory entry, string name)

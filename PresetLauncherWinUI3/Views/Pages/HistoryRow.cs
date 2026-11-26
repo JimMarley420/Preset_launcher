@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using PresetLauncher.Models;
+using PresetLauncher.Services;
 using static PresetLauncher.Views.DesktopUi;
 
 namespace PresetLauncher.Views.Pages;
@@ -141,14 +142,13 @@ public sealed class HistoryRow : UserControl
         for (int index = start; index < end; index++)
         {
             var block = new StackPanel { Spacing = 3 };
-            var lines = ProgramLines(programs[index]).ToArray();
+            var lines = ProgramLines(programs[index], App.Localization).ToArray();
             block.Children.Add(Text(lines[0], "DesktopSectionTitle"));
-            block.Children.Add(Text(lines[1]));
-            foreach (var line in lines.Skip(2))
+            for (int line = 1; line < lines.Length; line++)
             {
-                var text = Text(line, "DesktopSecondaryText");
+                var text = Text(lines[line], line == 1 ? null : "DesktopSecondaryText");
                 text.IsTextSelectionEnabled = true;
-                AutomationProperties.SetName(text, line);
+                AutomationProperties.SetName(text, lines[line]);
                 block.Children.Add(text);
             }
             page.Children.Add(index + 1 < end ? Row(block) : block);
@@ -183,41 +183,51 @@ public sealed class HistoryRow : UserControl
             row.PresetName, EntryTiming(entry, "g"), T($"history.status.{result.Status}"),
             LaunchCounts(result), T("history.acceptanceHelp")
         };
-        var programs = entry.Details.Select(detail => string.Join(Environment.NewLine, ProgramLines(detail)));
+        var programs = entry.Details.Select(detail => string.Join(Environment.NewLine, ProgramLines(detail, App.Localization)));
         return string.Join(Environment.NewLine + Environment.NewLine,
             new[] { string.Join(Environment.NewLine, summary) }.Concat(
                 entry.Details.Count == 0 ? [T("history.noPrograms")] : programs));
     }
 
-    private static IEnumerable<string> ProgramLines(ExecutionDetail detail)
+    internal static IEnumerable<string> ProgramLines(ExecutionDetail detail, LocalizationService localization)
     {
-        yield return string.IsNullOrWhiteSpace(detail.ExecutableName) ? T("history.unnamedProgram") : detail.ExecutableName;
+        yield return string.IsNullOrWhiteSpace(detail.ExecutableName)
+            ? localization.Get("history.unnamedProgram")
+            : detail.ExecutableName;
         var result = detail.RecordedResult;
+        var failure = detail.Failure;
+        var technicalError = string.IsNullOrWhiteSpace(detail.ErrorMessage)
+            ? null
+            : localization.Get("history.technicalError", detail.ErrorMessage);
+        bool leadWithError = result is false && failure == LaunchFailure.Unknown && technicalError is not null;
         yield return result switch
         {
-            true => T("history.requestAccepted"),
-            false => T($"history.error.{detail.Failure}"),
-            null => T("history.requestUnknown")
+            true => localization.Get("history.requestAccepted"),
+            false when leadWithError => technicalError!,
+            false => localization.Get($"history.error.{failure}"),
+            null => localization.Get("history.requestUnknown")
         };
-        yield return string.IsNullOrWhiteSpace(detail.ExecutablePath) ? T("history.pathUnknown") : detail.ExecutablePath;
-        yield return T("history.recordedTime", Timestamp(detail.StartedAt, "G"));
+        yield return string.IsNullOrWhiteSpace(detail.ExecutablePath)
+            ? localization.Get("history.pathUnknown")
+            : detail.ExecutablePath;
+        yield return localization.Get("history.recordedTime", Timestamp(detail.StartedAt, "G", localization));
 
         if (result is not false) yield break;
         if (detail.NativeErrorCode is int code)
-            yield return T("history.windowsCode", code);
-        if (!string.IsNullOrWhiteSpace(detail.ErrorMessage))
-            yield return T("history.technicalError", detail.ErrorMessage);
-        else if (detail.NativeErrorCode is null)
-            yield return T("history.errorUnavailable");
-        if (detail.Failure != LaunchFailure.Unknown)
-            yield return T($"history.help.{detail.Failure}");
+            yield return localization.Get("history.windowsCode", code);
+        if (technicalError is not null && !leadWithError)
+            yield return technicalError;
+        else if (technicalError is null && detail.NativeErrorCode is null)
+            yield return localization.Get("history.errorUnavailable");
+        if (failure != LaunchFailure.Unknown)
+            yield return localization.Get($"history.help.{failure}");
     }
 
-    private static string Timestamp(DateTime timestamp, string format) =>
-        HistoryQuery.LocalTime(timestamp)?.ToString(format, App.Localization.Culture) ?? T("history.timeUnknown");
+    private static string Timestamp(DateTime timestamp, string format, LocalizationService localization) =>
+        HistoryQuery.LocalTime(timestamp)?.ToString(format, localization.Culture) ?? localization.Get("history.timeUnknown");
 
     private static string EntryTiming(ExecutionHistory entry, string format = "t") => T("history.timeAndDuration",
-        Timestamp(entry.ExecutedAt, format),
+        Timestamp(entry.ExecutedAt, format, App.Localization),
         entry.Duration is { } duration ? T("history.duration", duration.TotalSeconds) : T("history.durationUnknown"));
 
     private static string LaunchCounts(ExecutionResult result) => result.Unrecorded > 0

@@ -93,7 +93,7 @@ public class LocalizationService
         ("history.error.InvalidFormat", "Invalid executable format", "Format d’exécutable non valide"),
         ("history.error.NoAssociation", "No application associated with this file", "Aucune application associée à ce fichier"),
         ("history.error.PathNotFound", "Path not found", "Chemin introuvable"),
-        ("history.error.Unknown", "Launch failure of unknown cause", "Échec du lancement de cause inconnue"),
+        ("history.error.Unknown", "Launch request failed", "Échec de la demande de lancement"),
         ("history.errorUnavailable", "No technical error was recorded.", "Aucune erreur technique n’a été enregistrée."),
         ("history.failure", "{0:N0}/{1:N0} start requests accepted · Failed: {2:N0}", "{0:N0}/{1:N0} demandes de lancement acceptées · Échecs : {2:N0}"),
         ("history.filter", "Filter history", "Filtrer l’historique"),
