@@ -1,0 +1,370 @@
+version: 2.1
+
+parameters:
+  validation-executor:
+    type: enum
+    enum: [windows-x64, linux-small]
+    default: windows-x64
+
+executors:
+  linux-small:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+  windows-x64:
+    machine:
+      image: windows-server-2022-gui:2026.10.2
+    resource_class: windows.medium
+    shell: powershell.exe -NoProfile -ExecutionPolicy Bypass
+    environment:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      Platform: x64
+      ContinuousIntegrationBuild: "true"
+      NuGetAudit: "true"
+      NuGetAuditMode: all
+      NuGetAuditLevel: low
+      WarningsAsErrors: "NU1900;NU1903;NU1904;NU1905"
+
+commands:
+  prepare-dotnet:
+    steps:
+      - restore_cache:
+          keys:
+            - v1-sdk-archive-windows-x64-main-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+      - run:
+          name: Select pinned .NET SDK
+          command: '& .circleci/prepare-dotnet.ps1'
+  save-sdk-cache:
+    steps:
+      - save_cache:
+          key: v1-sdk-archive-windows-x64-{{ .Branch }}-{{ checksum "global.json" }}-{{ checksum ".circleci/dotnet-sdk.sha512" }}
+          paths:
+            - artifacts/sdk-cache
+  restore-nuget-cache:
+    steps:
+      - run:
+          name: Fingerprint tracked NuGet inputs
+          command: python .circleci/nuget_inputs.py
+      - restore_cache:
+          keys:
+            - v3-nuget-windows-x64-main-{{ checksum "artifacts/nuget-inputs.json" }}
+  save-nuget-cache:
+    steps:
+      - save_cache:
+          key: v3-nuget-windows-x64-{{ .Branch }}-{{ checksum "artifacts/nuget-inputs.json" }}
+          paths:
+            - ~/.nuget/packages
+  validate-architecture:
+    parameters:
+      step-name:
+        type: string
+      architecture:
+        type: enum
+        enum: [x64, x86, arm64]
+      phase:
+        type: enum
+        enum: [Publish, Compile, Smoke]
+    steps:
+      - run:
+          name: << parameters.step-name >>
+          no_output_timeout: 20m
+          command: '& .circleci/validate-windows.ps1 -Phase << parameters.phase >> -Architecture << parameters.architecture >>'
+
+jobs:
+  validate-pr-title:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Validate pull request title
+          command: python .circleci/check_pr.py title
+
+  validate-update-label:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Validate update policy label
+          command: python .circleci/check_pr.py update-label
+
+  plan-release:
+    docker:
+      - image: cimg/python:3.13.16-node
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Test PR policy, release and architecture contracts
+          command: python -m unittest discover -s .circleci
+      - run:
+          name: Validate pinned update signing public key
+          command: python .circleci/sign_update.py check-key
+      - run:
+          name: Calculate version and update policy
+          command: python .circleci/release.py plan
+      - run:
+          name: Validate GitHub label Worker
+          command: |
+            node --version
+            node --check tools/auto-labeler/worker.mjs
+            node --test tools/auto-labeler/worker.test.mjs
+      - run:
+          name: Validate website JavaScript
+          command: node --check website/assets/site.js
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artifacts/release-plan.json
+      - store_artifacts:
+          path: artifacts/release-plan.json
+
+  validate-windows:
+    parameters:
+      runner:
+        type: executor
+    executor: << parameters.runner >>
+    retention:
+      caches: 7d
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - when:
+          condition:
+            equal: [linux-small, << pipeline.parameters.validation-executor >>]
+          steps:
+            - run:
+                name: Verify Windows validation is not applicable
+                command: python .circleci/ci_scope.py verify
+      - unless:
+          condition:
+            equal: [linux-small, << pipeline.parameters.validation-executor >>]
+          steps:
+            - prepare-dotnet
+            - restore-nuget-cache
+            - run:
+                name: Restore and audit application and test dependencies
+                no_output_timeout: 15m
+                command: |
+                  $ErrorActionPreference = 'Stop'
+                  $plan = Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json
+                  if ($plan.sha -cne $env:CIRCLE_SHA1 -or $plan.version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid Windows plan' }
+                  $timer = [Diagnostics.Stopwatch]::StartNew()
+                  dotnet restore tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --runtime win-x64 -p:Platform=x64 -p:Configuration=Release "-p:Version=$($plan.version)" -p:NuGetAudit=true -p:NuGetAuditMode=all '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905'
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                  Write-Host "x64 regression restore and audit: $($timer.Elapsed)"
+            - run:
+                name: Run regression tests
+                no_output_timeout: 15m
+                command: |
+                  $ErrorActionPreference = 'Stop'
+                  $results = Join-Path (Get-Location).Path 'artifacts\test-results'
+                  $junit = Join-Path (Get-Location).Path 'artifacts\junit'
+                  New-Item -ItemType Directory -Force $results, $junit | Out-Null
+                  $version = (Get-Content artifacts/release-plan.json -Raw | ConvertFrom-Json).version
+                  dotnet test tests/PresetLauncher.Tests/PresetLauncher.Tests.csproj --no-restore --configuration Release --runtime win-x64 -p:Platform=x64 -p:ContinuousIntegrationBuild=true -p:Version=$version --settings tests/ci.runsettings --results-directory $results --logger "junit;LogFilePath=$junit\junit.xml;MethodFormat=Class;FailureBodyFormat=Verbose" --logger "trx;LogFileName=tests.trx" --collect "Code Coverage;Format=Cobertura"
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                  [xml]$report = Get-Content (Join-Path $junit 'junit.xml') -Raw
+                  if ($report.SelectNodes('//testcase').Count -eq 0) { throw 'JUnit report contains no test cases' }
+                  [xml]$trx = Get-Content (Join-Path $results 'tests.trx') -Raw
+                  if ($trx.DocumentElement.LocalName -ne 'TestRun' -or
+                      $trx.SelectNodes("//*[local-name()='UnitTestResult']").Count -eq 0) { throw 'TRX report contains no test results' }
+                  # VSTest can write a second copy outside the TRX deployment folder.
+                  $deployment = $trx.SelectSingleNode("//*[local-name()='Deployment']/@runDeploymentRoot")
+                  $coverage = $trx.SelectNodes("//*[local-name()='Collector'][@uri='datacollector://microsoft/CodeCoverage/2.0']//*[local-name()='A']/@href")
+                  if (-not $deployment -or $coverage.Count -ne 1 -or $coverage[0].Value -notlike '*.cobertura.xml') {
+                    throw 'TRX must reference one Cobertura coverage report'
+                  }
+                  $attachmentDir = Join-Path (Join-Path $results $deployment.Value) 'In'
+                  [xml]$cobertura = Get-Content (Join-Path $attachmentDir $coverage[0].Value) -Raw
+                  $appLines = $cobertura.SelectNodes("//package[@name='PresetLauncherWinUI3']//line[@hits > 0]")
+                  if ($appLines.Count -eq 0 -or $cobertura.DocumentElement.LocalName -ne 'coverage' -or
+                      [int]$cobertura.coverage.'lines-covered' -le 0) { throw 'Cobertura report contains no covered application lines' }
+            - store_test_results:
+                path: artifacts/junit
+            - store_artifacts:
+                path: artifacts/junit
+                destination: junit
+            - store_artifacts:
+                path: artifacts/test-results
+                destination: test-reports
+
+            - run:
+                name: Prepare pinned Inno Setup compiler
+                command: '& .circleci/validate-windows.ps1 -Phase PrepareCompiler'
+            - validate-architecture:
+                step-name: Publish and verify x64 payload
+                architecture: x64
+                phase: Publish
+            - validate-architecture:
+                step-name: Publish and verify x86 payload
+                architecture: x86
+                phase: Publish
+            - validate-architecture:
+                step-name: Publish and verify ARM64 payload
+                architecture: arm64
+                phase: Publish
+            - validate-architecture:
+                step-name: Compile x64 installer
+                architecture: x64
+                phase: Compile
+            - validate-architecture:
+                step-name: Compile x86 installer
+                architecture: x86
+                phase: Compile
+            - validate-architecture:
+                step-name: Compile ARM64 installer
+                architecture: arm64
+                phase: Compile
+            - validate-architecture:
+                step-name: Smoke test x64 installer and native app
+                architecture: x64
+                phase: Smoke
+            - validate-architecture:
+                step-name: Smoke test x86 installer and app under WOW64
+                architecture: x86
+                phase: Smoke
+            - validate-architecture:
+                step-name: Verify ARM64 installer rejects the x64 host
+                architecture: arm64
+                phase: Smoke
+            - run:
+                name: Write Windows validation evidence
+                command: '& .circleci/validate-windows.ps1 -Phase Evidence'
+            - store_artifacts:
+                path: artifacts/installer-logs
+                destination: installer-logs
+            # Branch jobs can read main's caches, but do not create duplicate archives.
+            - when:
+                condition:
+                  equal: [main, << pipeline.git.branch >>]
+                steps:
+                  - save-nuget-cache
+                  - save-sdk-cache
+
+            - persist_to_workspace:
+                root: .
+                paths:
+                  - artifacts/windows-validation.json
+                  - Installer/Output
+
+  evidence-gate:
+    parameters:
+      gate:
+        type: string
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - when:
+          condition:
+            equal: [linux-small, << pipeline.parameters.validation-executor >>]
+          steps:
+            - run:
+                name: Confirm Windows gate is not applicable
+                command: python .circleci/ci_scope.py check-plan
+      - unless:
+          condition:
+            equal: [linux-small, << pipeline.parameters.validation-executor >>]
+          steps:
+            - run:
+                name: Verify Windows validation evidence
+                command: python .circleci/release.py gate << parameters.gate >>
+
+  publish-release:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Publish verified GitHub release
+          no_output_timeout: 15m
+          command: |
+            python .circleci/release.py publish
+
+  deploy-website:
+    docker:
+      - image: cimg/python:3.13.16
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Publish GitHub Pages website
+          command: python .circleci/deploy_website.py
+
+workflows:
+  ci:
+    when:
+      not:
+        equal: [gh-pages, << pipeline.git.branch >>]
+    jobs:
+      - validate-pr-title
+      - validate-update-label
+      - plan-release:
+          requires:
+            - validate-pr-title
+      - validate-windows:
+          runner: << pipeline.parameters.validation-executor >>
+          requires:
+            - plan-release
+      - evidence-gate:
+          name: dependency-audit
+          gate: dependency-audit
+          requires:
+            - validate-windows
+      - evidence-gate:
+          name: build-windows
+          gate: build-windows
+          requires:
+            - validate-windows
+      - evidence-gate:
+          name: test-windows
+          gate: test-windows
+          requires:
+            - validate-windows
+      - evidence-gate:
+          name: package-installer
+          gate: package-installer
+          requires:
+            - validate-windows
+      - evidence-gate:
+          name: smoke-installer
+          gate: smoke-installer
+          requires:
+            - validate-windows
+      - publish-release:
+          requires:
+            - validate-update-label
+            - dependency-audit
+            - build-windows
+            - test-windows
+            - package-installer
+            - smoke-installer
+          context: presetlauncher-release
+          serial-group: << pipeline.project.slug >>/github-release
+          filters:
+            branches:
+              only: main
+            tags:
+              ignore: /.*/
+      - deploy-website:
+          requires:
+            - publish-release
+          context: presetlauncher-website
+          serial-group: << pipeline.project.slug >>/github-pages
+          filters:
+            branches:
+              only: main
+            tags:
+              ignore: /.*/
