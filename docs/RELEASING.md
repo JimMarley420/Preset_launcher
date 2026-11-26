@@ -46,7 +46,7 @@ Reserve required updates for security, data integrity, compatibility or a delibe
 
    Verify that restriction is supported and enforced by your integration before enabling publication. Store the token as GH_RELEASE_TOKEN only in this context. Never put it in project-level variables, checkout, test or fork jobs.
 3. Protect main with required reviews and the actual CI check names from a successful branch build. Require reviewed changes to CircleCI and release scripts. Enable immutable releases if available.
-4. Merge only after every branch CI job succeeds. A main pipeline calculates the version, builds, tests, packages and checks fresh install and upgrade. Publication is serialized and rejects stale plans or an advanced main branch. Documentation-only changes do not publish.
+4. Merge only after every branch CI job succeeds. A main pipeline calculates the version. Releasing changes build, test, package and check fresh install and upgrade on Windows. Publication is serialized and rejects stale plans or an advanced main branch. Non-releasing documentation-only changes do not publish.
 5. CircleCI creates a draft, uploads the three validated installers and SHA256SUMS.txt in deterministic order, verifies the GitHub asset sizes and digests, then publishes it as latest. GitHub generates release notes. Never overwrite published assets or reuse a version.
 
 GitHub API reads retry transient HTTP and network errors up to three times with exponential backoff and jitter. The cumulative sleep budget is 30 seconds per request, including actual sleep time. Requests with rate-limit responses require valid server timing within the remaining budget. Without it, GitHub's minimum 60-second secondary-limit wait exceeds the budget and the request fails. The 30-second socket timeout is not an end-to-end deadline. Release creation, asset uploads and publication are not retried automatically because the outcome of a failed write may be ambiguous. The final main ref check follows release decision collection immediately before publication. The check and PATCH are not atomic.
@@ -58,7 +58,7 @@ If publication fails after creating a draft, inspect the draft and its target co
 
 ### PROD ruleset
 
-Require these eight CircleCI status checks in the PROD ruleset.
+Require these nine CircleCI status checks in the PROD ruleset.
 
 - `ci/circleci: plan-release`
 - `ci/circleci: dependency-audit`
@@ -68,8 +68,9 @@ Require these eight CircleCI status checks in the PROD ruleset.
 - `ci/circleci: validate-pr-title`
 - `ci/circleci: validate-update-label`
 - `ci/circleci: smoke-installer`
+- `ci/circleci: validate-windows`
 
-CircleCI validates on one Windows VM. The named Linux gates require Windows evidence bound to the commit, version and validation lane. The package and publication checks independently hash the installers and verify the exact asset set. Keep the eight required names and the separately serialized publication job. See [CI lanes and measurement](DEVELOPMENT.md#continuous-integration).
+CircleCI uses dynamic configuration (`.circleci/config.yml` continues into `.circleci/continue.yml`). The setup job selects a Linux-only lane only for allowlisted non-application paths and a non-releasing plan. A PR must target the current main tip; stale, stacked, mixed, unknown and uncertain changes use the existing Windows lane. Main checks its first-parent diff and the full pending release plan, so a documentation merge cannot suppress a pending application release. The Linux validation job rechecks the scope and plan before the named gates report that Windows is not applicable; it does not produce Windows test evidence. Otherwise the named Linux gates require genuine Windows evidence bound to the commit, version and validation lane. The package and publication checks independently hash the installers and verify the exact asset set. Keep the nine required names and the separately serialized publication job. If setup cannot be rerun or the selected lane becomes stale, trigger a fresh pipeline. The website deployment remains after publication so release pages never precede the GitHub release. See [CI lanes and measurement](DEVELOPMENT.md#continuous-integration).
 
 Main alone writes verified SDK and dependency caches. Use the existing seven-day retention for new caches. Check usage and cap workspace retention at the period required for workflow retries. The pipeline retains a workspace copy for validation/publication and keeps test reports and smoke logs. GitHub Releases is the permanent distribution location.
 
