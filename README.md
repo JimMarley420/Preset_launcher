@@ -13,7 +13,8 @@
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/JimMarley420/Preset_launcher/releases/latest">Download for Windows</a></strong> ·
+  <strong><a href="https://jimmarley420.github.io/Preset_launcher/download.html">Download for Windows</a></strong> ·
+  <a href="https://jimmarley420.github.io/Preset_launcher/">Website</a> ·
   <a href="https://github.com/JimMarley420/Preset_launcher/releases">Releases</a> ·
   <a href="https://github.com/JimMarley420/Preset_launcher/issues">Issues and suggestions</a>
 </p>

@@ -13,7 +13,8 @@
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/JimMarley420/Preset_launcher/releases/latest">Télécharger pour Windows</a></strong> ·
+  <strong><a href="https://jimmarley420.github.io/Preset_launcher/fr/download.html">Télécharger pour Windows</a></strong> ·
+  <a href="https://jimmarley420.github.io/Preset_launcher/fr/">Site officiel</a> ·
   <a href="https://github.com/JimMarley420/Preset_launcher/releases">Versions</a> ·
   <a href="https://github.com/JimMarley420/Preset_launcher/issues">Assistance et suggestions</a>
 </p>
