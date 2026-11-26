@@ -89,3 +89,21 @@ Desktop.ini
 
 # Unpackaged app artefacts
 /PresetLauncherWinUI3/Package.appxmanifest
+
+# Environment files
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# Private keys and certificates
+*.pem
+*.key
+*.pfx
+*.p12
+!/.circleci/update-policy-public.pem
+
+# Local credentials
+credentials.json
+secrets.json
