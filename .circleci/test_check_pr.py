@@ -101,3 +101,23 @@ class IndependentChecksTests(unittest.TestCase):
         item["base"]["ref"] = "other-branch"
         with self.assertRaisesRegex(ValueError, "Stacked validation"):
             validate(item, "title")
+
+
+class ProvisionalBranchPolicyTests(unittest.TestCase):
+    def test_main_target_build_is_independent_of_update_labels(self):
+        for title, rank in (("feat: add preset", 2), ("fix: repair", 1),
+                            ("feat!: incompatible format", 3), ("docs: edit guide", 0)):
+            for labels in ([], ["update: optional"], ["update: recommended"],
+                           ["update: required"], ["update: typo"],
+                           ["update: optional", "update: required"]):
+                with self.subTest(title=title, labels=labels):
+                    item = {**pr(title, labels), "base": {"ref": "main"},
+                            "head": {"repo": {"full_name": "example/fork"}}}
+                    self.assertEqual(branch_decision(item),
+                                     {"number": 3, "rank": rank,
+                                      "policy": "optional" if rank else None})
+
+    def test_invalid_title_still_blocks_branch_planning(self):
+        item = {**pr("Invalid title"), "base": {"ref": "main"}}
+        with self.assertRaisesRegex(ValueError, "Conventional Commit"):
+            branch_decision(item)

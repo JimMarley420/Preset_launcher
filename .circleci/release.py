@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import subprocess
 import sys
-from policy import LEVELS, pr_decision
+from policy import LEVELS, bump, pr_decision
 from sign_update import sign, sign_message, verify, verify_message
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
@@ -193,12 +193,17 @@ def validate_installer(branch, pr, sha):
 
 
 def branch_decision(pr):
-    decision = pr_decision(pr)
+    # Open PR builds use a provisional policy, independent of maintainer labels.
+    # Keep the existing strict eligibility checks for stacked PRs.
     if pr["base"]["ref"] != "main":
+        decision = pr_decision(pr)
         head_repo = pr["head"]["repo"]
         if decision["rank"] or not head_repo or head_repo["full_name"] != REPO:
             raise ValueError("Stacked validation requires a non-releasing PR from this repository")
-    return decision
+        return decision
+    rank = bump(pr["title"], pr.get("body"))
+    return {"number": pr["number"], "rank": rank,
+            "policy": "optional" if rank else None}
 
 
 def installer_name(value, architecture):
@@ -428,6 +433,8 @@ def plan():
     branch = os.environ.get("CIRCLE_BRANCH", "")
     pr = None if branch == "main" else branch_pr(sha, branch)
     result = make_plan(previous, collect_decisions(previous, sha, branch, pr), sha)
+    if branch != "main":
+        result["validation_only"] = True
     result["validate_installer"] = validate_installer(branch, pr, sha)
     if result["validate_installer"] and (result["release"] or branch != "main"):
         result["previous_installers"] = previous_assets or {"x64": installer_asset(previous)}
@@ -440,6 +447,8 @@ def publish():
     data = json.loads(PLAN.read_text(encoding="utf-8"))
     if os.environ.get("CIRCLE_BRANCH") != "main" or git("rev-parse", "HEAD") != data["sha"]:
         raise ValueError("Release publication requires the validated main commit")
+    if data.get("validation_only"):
+        raise ValueError("PR validation plans cannot be published")
     if not data["release"]:
         print("No releasing commits; nothing to publish.")
         return

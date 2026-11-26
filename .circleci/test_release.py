@@ -398,6 +398,23 @@ class PublishTests(unittest.TestCase):
                 release.publish()
             request.assert_not_called()
 
+    def test_validation_only_plan_cannot_publish_even_on_main(self):
+        data = json.loads(self.plan.read_text(encoding="utf-8"))
+        data["validation_only"] = True
+        self.plan.write_text(json.dumps(data), encoding="utf-8")
+        with patch.object(release, "request") as request:
+            with self.assertRaisesRegex(ValueError, "validation plans cannot be published"):
+                release.publish()
+            request.assert_not_called()
+
+    def test_invalid_merged_policy_still_blocks_publication(self):
+        with patch.object(release, "collect_decisions",
+                          side_effect=ValueError("Select exactly one label")), \
+             patch.object(release, "request", side_effect=self.response):
+            with self.assertRaisesRegex(ValueError, "Select exactly one label"):
+                release.publish()
+        self.assertTrue(all(method == "GET" for method, _, _ in self.calls))
+
     def test_stale_plan_fails_before_mutation(self):
         self.previous = {"tag_name": "v1.2.7", "body": "<!-- presetlauncher:min-supported=0.0.0 -->"}
         with patch.object(release, "request", side_effect=self.response):
