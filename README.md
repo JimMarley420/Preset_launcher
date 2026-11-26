@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d874f101-7f59-45f0-b0a0-7ce8702f2735" alt="PresetLauncher application" width="880">
+  <img src="website/assets/screenshots/presets-en.png" alt="PresetLauncher application" width="880">
 </p>
 
 ## About

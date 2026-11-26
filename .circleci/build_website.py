@@ -61,8 +61,8 @@ SEO = {
         'Découvrez PresetLauncher, un lanceur Windows indépendant sous licence MIT développé en C# et WinUI 3.'),
 }
 SCREENSHOTS = (
-    'https://github.com/user-attachments/assets/d874f101-7f59-45f0-b0a0-7ce8702f2735',
-    'https://github.com/user-attachments/assets/f793c7ed-9a23-4a1a-a7f7-33bc0f7a3db0',
+    SITE + 'assets/screenshots/presets-en.png',
+    SITE + 'assets/screenshots/presets-fr.png',
 )
 SITEMAP_NS = 'http://www.sitemaps.org/schemas/sitemap/0.9'
 XHTML_NS = 'http://www.w3.org/1999/xhtml'

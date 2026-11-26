@@ -136,6 +136,39 @@ class WebsiteTests(unittest.TestCase):
             self.assertEqual(set(locations), expected)
             self.assertIn(base + 'download.html', (output / 'llms.txt').read_text(encoding='utf-8'))
 
+    def test_screenshots_use_localized_assets(self):
+        expected = {'en': ('presets', 'history', 'statistics', 'settings'),
+                    'fr': ('presets', 'history', 'settings')}
+        base = 'https://jimmarley420.github.io/Preset_launcher/'
+        latest = fixture('v7.2.3')
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'site'
+            render(SOURCE, output, latest, [latest])
+            for lang, names in expected.items():
+                folder = output / 'fr' if lang == 'fr' else output
+                prefix = '../' if lang == 'fr' else ''
+                for name in ('index', 'features', 'screenshots'):
+                    with self.subTest(lang=lang, page=name):
+                        body = (folder / (name + '.html')).read_text(encoding='utf-8')
+                        parsed = Links()
+                        parsed.feed(body)
+                        files = [link for link in parsed.links if '/screenshots/' in link]
+                        shown = names if name == 'screenshots' else ('presets',)
+                        expected_links = [prefix + 'assets/screenshots/' + item + '-' + lang + '.png'
+                                          for item in shown]
+                        self.assertEqual(files, [link for url in expected_links for link in (url, url)])
+                        for link in expected_links:
+                            asset = folder / link
+                            self.assertEqual(asset.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
+                        self.assertNotIn('github.com/user-attachments/assets/', body)
+                        preview = base + 'assets/screenshots/presets-' + lang + '.png'
+                        self.assertEqual(parsed.meta['og:image'], preview)
+                        if name == 'index':
+                            self.assertEqual(parsed.schema[0]['screenshot'], preview)
+                        if name == 'screenshots':
+                            self.assertEqual(body.count('gallery-entry--portrait'), 1)
+                            self.assertIn('loading="lazy"', body)
+
     def test_only_available_architectures_linked(self):
         text = release_downloads(fixture('v7.2.3', ('',)), False)
         self.assertIn('Windows x64', text)
