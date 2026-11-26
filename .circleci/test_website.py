@@ -153,7 +153,7 @@ class WebsiteTests(unittest.TestCase):
                         parsed = Links()
                         parsed.feed(body)
                         files = [link for link in parsed.links if '/screenshots/' in link]
-                        shown = names if name == 'screenshots' else ('presets',)
+                        shown = names
                         expected_links = [prefix + 'assets/screenshots/' + item + '-' + lang + '.png'
                                           for item in shown]
                         self.assertEqual(files, [link for url in expected_links for link in (url, url)])
