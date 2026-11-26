@@ -293,6 +293,17 @@ jobs:
           command: |
             python .circleci/release.py publish
 
+  publish-winget:
+    executor: linux-small
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Submit verified release to WinGet
+          no_output_timeout: 15m
+          command: python .circleci/publish_winget.py
+
   deploy-website:
     docker:
       - image: cimg/python:3.13.16
@@ -363,6 +374,16 @@ workflows:
             - publish-release
           context: presetlauncher-website
           serial-group: << pipeline.project.slug >>/github-pages
+          filters:
+            branches:
+              only: main
+            tags:
+              ignore: /.*/
+      - publish-winget:
+          requires:
+            - publish-release
+          context: presetlauncher-winget
+          serial-group: << pipeline.project.slug >>/winget
           filters:
             branches:
               only: main

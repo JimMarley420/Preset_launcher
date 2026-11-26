@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/JimMarley420/Preset_launcher/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/JimMarley420/Preset_launcher?style=flat-square"></a>
   <a href="https://github.com/JimMarley420/Preset_launcher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/JimMarley420/Preset_launcher/total?style=flat-square"></a>
+  <a href="https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/JimmyMarley/PresetLauncher"><img alt="WinGet" src="https://img.shields.io/badge/WinGet-JimmyMarley.PresetLauncher-0078D4?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square"></a>
 </p>
 
@@ -33,6 +34,20 @@ PresetLauncher groups programs into presets. Create a preset for work, gaming or
 * Choose between light and dark themes, in English or French.
 
 ## Installation
+
+### WinGet
+
+```powershell
+winget install --id JimmyMarley.PresetLauncher --exact --source winget
+```
+
+To update an existing installation:
+
+```powershell
+winget upgrade --id JimmyMarley.PresetLauncher --exact --source winget
+```
+
+### Manual installation
 
 Download the installer for your processor from the [latest release](https://github.com/JimMarley420/Preset_launcher/releases/latest).
 

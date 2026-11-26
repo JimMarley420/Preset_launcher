@@ -4,6 +4,20 @@
 
 ## Premiers pas
 
+Installez PresetLauncher avec WinGet depuis PowerShell ou Windows Terminal :
+
+```powershell
+winget install --id JimmyMarley.PresetLauncher --exact --source winget
+```
+
+Pour une mise à jour via WinGet, utilisez :
+
+```powershell
+winget upgrade --id JimmyMarley.PresetLauncher --exact --source winget
+```
+
+Pour une installation manuelle :
+
 Choisissez le programme d’installation adapté dans la [dernière version](https://github.com/JimMarley420/Preset_launcher/releases/latest). Le paquet inclut .NET et Windows App SDK.
 
 | Processeur Windows | Programme d’installation |
