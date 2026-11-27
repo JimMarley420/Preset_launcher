@@ -69,6 +69,7 @@ internal static class Program
     private static int Execute(string directory, string pipeId, int parentId, ref bool committed, ref string? installer,
         LocalizationService localization)
     {
+        using var deadline = new CancellationTokenSource(UpdateHandoffProtocol.Timeout);
         using var pins = UpdateStaging.PinDirectory(directory);
         using var lease = UpdateStaging.Use(directory);
         using var parent = Process.GetProcessById(parentId);
@@ -77,18 +78,13 @@ internal static class Program
         var architecture = RuntimeInformation.ProcessArchitecture;
         var installation = UpdateInstallation.Find(launcher, architecture);
 
-        ReleaseUpdate update;
-        using var pipe = new NamedPipeClientStream(".", UpdateStaging.PipePrefix + pipeId, PipeDirection.InOut, PipeOptions.CurrentUserOnly);
-        pipe.Connect(10_000);
+        using var pipe = new NamedPipeClientStream(".", UpdateStaging.PipePrefix + pipeId, PipeDirection.InOut,
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        pipe.ConnectAsync(10_000, deadline.Token).GetAwaiter().GetResult();
         if (!UpdateStaging.IsServer(pipe, parentId))
             throw new InvalidDataException("Unexpected handoff owner.");
-        using var reader = new BinaryReader(pipe, Encoding.UTF8, leaveOpen: true);
-        var length = reader.ReadInt32();
-        if (length is <= 0 or > UpdateService.MaxReleaseBytes)
-            throw new InvalidDataException("Invalid signed release length.");
-        var bytes = new byte[length];
-        pipe.ReadExactly(bytes);
-        update = UpdateService.ParseArchitectureRelease(Encoding.UTF8.GetString(bytes), installation.Version,
+        var bytes = UpdateHandoffProtocol.ReadReleaseAsync(pipe, deadline.Token).GetAwaiter().GetResult();
+        var update = UpdateService.ParseArchitectureRelease(Encoding.UTF8.GetString(bytes), installation.Version,
                      UpdatePolicySignature.PublicKey(), architecture, static (_, _) => { })
                  ?? throw new InvalidDataException("Installer is not an upgrade.");
 
@@ -96,12 +92,15 @@ internal static class Program
         using (var verified = UpdateStaging.PinFile(installer))
         {
             if (verified.Length != update.Size ||
-                !CryptographicOperations.FixedTimeEquals(SHA256.HashData(verified), Convert.FromHexString(update.Sha256)))
+                !CryptographicOperations.FixedTimeEquals(SHA256.HashDataAsync(verified, deadline.Token).AsTask().GetAwaiter().GetResult(),
+                    Convert.FromHexString(update.Sha256)))
                 throw new InvalidDataException("Installer changed after download.");
             var executable = UpdateStaging.InstallerPath(verified, installer);
-            pipe.WriteByte(UpdateStaging.Ready);
-            committed = pipe.ReadByte() == UpdateStaging.Commit;
-            if (!committed) return 1;
+            UpdateHandoffProtocol.SendAsync(pipe, UpdateHandoffProtocol.Ready, deadline.Token).GetAwaiter().GetResult();
+            UpdateHandoffProtocol.ExpectAsync(pipe, UpdateHandoffProtocol.Commit, deadline.Token).GetAwaiter().GetResult();
+            UpdateHandoffProtocol.SendAsync(pipe, UpdateHandoffProtocol.Accepted, deadline.Token).GetAwaiter().GetResult();
+            committed = true;
+            pipe.Dispose();
             if (!parent.WaitForExit(120_000))
             {
                 Notify(localization, "update.shutdownFailed");
@@ -144,10 +143,11 @@ internal static class Program
             start.ArgumentList.Add(Path.GetFileName(directory));
             start.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
             using var restarted = Process.Start(start) ?? throw new InvalidOperationException("Launcher did not start.");
-            restarted.WaitForInputIdle(10_000);
-            if (restarted.HasExited)
-                throw new InvalidOperationException("The relaunched application exited during startup.");
-            return 0;
+            var outcome = UpdateStartup.WaitForLaunch(restarted, installed.LauncherPath, TimeSpan.FromSeconds(30));
+            if (outcome is UpdateLaunchResult.Started or UpdateLaunchResult.AlreadyRunning)
+                return 0;
+            Notify(localization, "update.relaunchUnconfirmed");
+            return 1;
         }
         catch (Exception ex)
         {

@@ -269,6 +269,7 @@ public class LocalizationService
         ("update.setupUnexpected", "The installer returned an unexpected result ({0}). Open PresetLauncher to check for updates.", "Le programme d’installation a renvoyé un résultat inattendu ({0}). Ouvrez PresetLauncher pour vérifier les mises à jour."),
         ("update.rebootRequired", "Windows needs to restart. Restart your computer, then open PresetLauncher to check the installation.", "Windows doit redémarrer. Redémarrez votre ordinateur, puis ouvrez PresetLauncher pour vérifier l’installation."),
         ("update.relaunchFailed", "PresetLauncher could not reopen after setup. Open it from the Start menu to check the installation.", "PresetLauncher n’a pas pu se rouvrir après l’installation. Ouvrez-le depuis le menu Démarrer pour vérifier l’installation."),
+        ("update.relaunchUnconfirmed", "Setup finished, but PresetLauncher did not confirm startup. Open it from the Start menu if needed.", "L’installation est terminée, mais PresetLauncher n’a pas confirmé son démarrage. Au besoin, ouvrez-le depuis le menu Démarrer."),
     ];
 
     private static readonly IReadOnlyDictionary<string, string> English =

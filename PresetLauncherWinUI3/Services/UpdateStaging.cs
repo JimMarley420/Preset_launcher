@@ -11,8 +11,6 @@ internal static class UpdateStaging
 {
     internal const string HelperName = "PresetLauncher.Update.exe";
     internal const string PipePrefix = "PresetLauncher.Update.";
-    internal const int Ready = 1;
-    internal const int Commit = 2;
     private const string Prefix = "PresetLauncher-handoff-";
     private const string Finished = "finished";
     private const string Lease = "active";
@@ -43,9 +41,9 @@ internal static class UpdateStaging
         using var marker = new FileStream(Path.Combine(directory, Finished), FileMode.CreateNew, FileAccess.Write);
     }
 
-    internal static FileStream PinFile(string path)
+    internal static FileStream PinFile(string path, FileMode mode = FileMode.Open)
     {
-        var handle = CreateFile(path, 0x80000000, FileShare.Read, IntPtr.Zero, FileMode.Open,
+        var handle = CreateFile(path, 0x80000000, FileShare.Read, IntPtr.Zero, mode,
             0x00200000, IntPtr.Zero); // GENERIC_READ, OPEN_REPARSE_POINT
         try
         {

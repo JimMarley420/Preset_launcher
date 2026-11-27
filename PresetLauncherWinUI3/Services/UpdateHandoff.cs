@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
@@ -39,29 +38,41 @@ internal static class UpdateHandoff
         var pipeId = Guid.NewGuid().ToString("N");
         using var pipe = new NamedPipeServerStream(UpdateStaging.PipePrefix + pipeId, PipeDirection.InOut,
             1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        using var timeout = new CancellationTokenSource(UpdateHandoffProtocol.Timeout);
         var start = new ProcessStartInfo(destination) { WorkingDirectory = Environment.SystemDirectory, UseShellExecute = false };
         start.ArgumentList.Add(pipeId);
         start.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
         start.ArgumentList.Add(App.Localization.Language);
         using var helper = Process.Start(start) ?? throw new InvalidOperationException("Update helper did not start.");
-        var connecting = pipe.WaitForConnectionAsync(timeout.Token);
-        var exited = helper.WaitForExitAsync(timeout.Token);
-        if (await Task.WhenAny(connecting, exited) == exited)
-            throw new IOException("Update helper exited before connecting.");
-        await connecting;
-        if (!UpdateStaging.IsClient(pipe, helper.Id))
-            throw new IOException("Unexpected update helper connection.");
+        try
+        {
+            var connecting = pipe.WaitForConnectionAsync(timeout.Token);
+            var exited = helper.WaitForExitAsync(timeout.Token);
+            if (await Task.WhenAny(connecting, exited) == exited && !connecting.IsCompleted)
+            {
+                timeout.Cancel();
+                try { await connecting; }
+                catch (OperationCanceledException ex) { throw new IOException("Update helper exited before connecting.", ex); }
+                throw new IOException("Update helper exited before connecting.");
+            }
+            await connecting;
+            if (!UpdateStaging.IsClient(pipe, helper.Id))
+                throw new IOException("Unexpected update helper connection.");
 
-        var length = new byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32LittleEndian(length, json.Length);
-        await pipe.WriteAsync(length, timeout.Token);
-        await pipe.WriteAsync(json, timeout.Token);
-        var reply = new byte[1];
-        await pipe.ReadExactlyAsync(reply, timeout.Token);
-        if (reply[0] != UpdateStaging.Ready)
-            throw new IOException("Update helper rejected the handoff.");
-        await pipe.WriteAsync(new byte[] { UpdateStaging.Commit }, timeout.Token);
-        timeout.Cancel();
+            await UpdateHandoffProtocol.WriteReleaseAsync(pipe, json, timeout.Token);
+            await UpdateHandoffProtocol.ExpectAsync(pipe, UpdateHandoffProtocol.Ready, timeout.Token);
+            await UpdateHandoffProtocol.SendAsync(pipe, UpdateHandoffProtocol.Commit, timeout.Token);
+            await UpdateHandoffProtocol.ExpectAsync(pipe, UpdateHandoffProtocol.Accepted, timeout.Token);
+        }
+        catch
+        {
+            // Disconnect first so a pre-commit helper can release the staging lease.
+            pipe.Dispose();
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            try { await helper.WaitForExitAsync(cleanup.Token); }
+            catch (OperationCanceledException ex) { Debug.WriteLine(ex); }
+            throw;
+        }
+        finally { timeout.Cancel(); }
     }
 }

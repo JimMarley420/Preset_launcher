@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using PresetLauncher.Services;
 
@@ -14,7 +16,21 @@ public partial class App : Application
     public MainWindow MainWindow { get; private set; } = null!;
     public UpdateCoordinator Updates { get; } = new();
 
-    public App() => InitializeComponent();
+    public App()
+    {
+        try { UpdateStartup.EnterApplication(AppContext.BaseDirectory); }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 32)
+        {
+            // Exit before creating a window or retaining DLLs while Setup is writing.
+            Environment.Exit(UpdateStartup.InstallationBusyExitCode);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
+        {
+            Debug.WriteLine(ex);
+            Environment.Exit(1);
+        }
+        InitializeComponent();
+    }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -34,6 +50,11 @@ public partial class App : Application
         async void OnRootLoaded(object sender, RoutedEventArgs e)
         {
             root.Loaded -= OnRootLoaded;
+            try { UpdateStartup.SignalReady(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or WaitHandleCannotBeOpenedException)
+            {
+                Debug.WriteLine(ex);
+            }
             try { await Updates.CheckAsync(manual: false); }
             finally { MainWindow.FinishStartup(); }
         }

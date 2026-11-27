@@ -10,6 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../PresetLauncherWinUI3/Services/UpdateInstallation.cs" Link="UpdateInstallation.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateHandoffProtocol.cs" Link="UpdateHandoffProtocol.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateStartup.cs" Link="UpdateStartup.cs" />
     <Compile Include="../../PresetLauncherWinUI3/Services/UpdateStaging.cs" Link="UpdateStaging.cs" />
     <Compile Include="../../PresetLauncherWinUI3/Services/UpdateService.cs" Link="UpdateService.cs" />
     <Compile Include="../../PresetLauncherWinUI3/Services/UpdatePolicySignature.cs" Link="UpdatePolicySignature.cs" />
