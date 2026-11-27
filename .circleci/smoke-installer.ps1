@@ -46,10 +46,12 @@ if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path $architect
 }
 if (-not (Test-Path $setup -PathType Leaf)) { throw "Installer not found: $setup" }
 
-function Invoke-Package([string]$Path, [string]$LogName, [switch]$NoClose) {
+function Invoke-Package([string]$Path, [string]$LogName, [switch]$NoClose, [switch]$ForceClose) {
     $log = Join-Path $logs $LogName
     $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LANG=english /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log
+    if ($NoClose -and $ForceClose) { throw 'Conflicting installer closure options' }
     if ($NoClose) { $arguments += ' /NOCLOSEAPPLICATIONS /NORESTARTAPPLICATIONS' }
+    if ($ForceClose) { $arguments += ' /FORCECLOSEAPPLICATIONS' }
     $process = Start-Process -FilePath $Path -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
     try { return $process.ExitCode }
     finally { $process.Dispose() }
@@ -221,6 +223,23 @@ function Assert-ApplicationStarts([string]$Phase) {
                             Write-Host 'Setup correctly rejected an active launcher.'
                         }
                         Assert-RedirectedLaunches $process $exe
+                        if ($Phase -eq 'fresh') {
+                            $policyBefore = (Get-FileHash -LiteralPath $policyFile -Algorithm SHA256).Hash
+                            $lockBefore = (Get-FileHash -LiteralPath $policyLock -Algorithm SHA256).Hash
+                            $code = Invoke-Package $setup 'close-running-launcher.log' -ForceClose
+                            if ($code -ne 0) { throw "Setup could not install with an active launcher: $code" }
+                            if (-not $process.WaitForExit(5000)) { throw 'Setup did not close the original launcher' }
+                            if (Get-Process PresetLauncherWinUI3 -ErrorAction SilentlyContinue | Where-Object Path -eq $exe) {
+                                throw 'Unattended setup unexpectedly relaunched the application'
+                            }
+                            Assert-CurrentPackage
+                            Assert-UserData
+                            if ((Get-FileHash -LiteralPath $policyFile -Algorithm SHA256).Hash -ne $policyBefore -or
+                                (Get-FileHash -LiteralPath $policyLock -Algorithm SHA256).Hash -ne $lockBefore) {
+                                throw 'Installation while running changed protected update policy'
+                            }
+                            Write-Host 'Setup closed the active launcher and completed installation.'
+                        }
                         return
                     }
                 }
@@ -282,6 +301,7 @@ try {
     Assert-UserData
     Assert-StartupBlockedBySetup
     Assert-ApplicationStarts fresh
+    Assert-ApplicationStarts after-close
     $policyHash = (Get-FileHash $policyFile -Algorithm SHA256).Hash
     $policyLockHash = (Get-FileHash $policyLock -Algorithm SHA256).Hash
     if ($Architecture -in 'x64', 'x86') {
