@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
@@ -10,7 +9,6 @@ namespace PresetLauncher.Services;
 internal static class UpdateStaging
 {
     internal const string HelperName = "PresetLauncher.Update.exe";
-    internal const string PipePrefix = "PresetLauncher.Update.";
     private const string Prefix = "PresetLauncher-handoff-";
     private const string Finished = "finished";
     private const string Lease = "active";
@@ -29,17 +27,6 @@ internal static class UpdateStaging
 
     internal static FileStream Use(string directory) =>
         new(Path.Combine(directory, Lease), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-
-    internal static bool IsClient(NamedPipeServerStream pipe, int pid) =>
-        GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var actual) && actual == pid;
-
-    internal static bool IsServer(NamedPipeClientStream pipe, int pid) =>
-        GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var actual) && actual == pid;
-
-    internal static void Complete(string directory)
-    {
-        using var marker = new FileStream(Path.Combine(directory, Finished), FileMode.CreateNew, FileAccess.Write);
-    }
 
     internal static FileStream PinFile(string path, FileMode mode = FileMode.Open)
     {
@@ -176,11 +163,5 @@ internal static class UpdateStaging
     [DllImport("kernel32.dll", EntryPoint = "GetFinalPathNameByHandleW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint GetFinalPathNameByHandle(SafeFileHandle file, StringBuilder name, int capacity, uint flags);
 
-    [DllImport("kernel32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetNamedPipeClientProcessId(SafePipeHandle pipe, out uint processId);
 
-    [DllImport("kernel32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint processId);
 }

@@ -255,21 +255,11 @@ public class LocalizationService
         ("update.transfer", "{0:P0} · {1} of {2}", "{0:P0} · {1} sur {2}"),
         ("update.verifying", "Verifying the installer…", "Vérification du programme d’installation…"),
         ("update.preparingInstallation", "Preparing installation…", "Préparation de l’installation…"),
-        ("update.handoff", "Closing PresetLauncher to install the update…", "Fermeture de PresetLauncher pour installer la mise à jour…"),
+        ("update.handoff", "Complete the installation in the setup window.", "Terminez l’installation dans la fenêtre du programme d’installation."),
         ("update.cancelling", "Cancelling download…", "Annulation du téléchargement…"),
         ("update.downloadCancelled", "Download cancelled.", "Téléchargement annulé."),
         ("update.shutdownPostponed", "Installation was postponed. Your edits are still open.", "L’installation a été reportée. Vos modifications restent ouvertes."),
-        ("update.installedCopyRequired", "Open the registered PresetLauncher installation without administrator privileges to install this update.", "Ouvrez l’installation enregistrée de PresetLauncher sans droits d’administrateur pour installer cette mise à jour."),
-        ("update.handoffFailed", "Couldn’t prepare the update. Close other instances of PresetLauncher and retry.", "Impossible de préparer la mise à jour. Fermez les autres instances de PresetLauncher et réessayez."),
-        ("update.recoveryTitle", "PresetLauncher update", "Mise à jour de PresetLauncher"),
-        ("update.shutdownFailed", "PresetLauncher did not close. Close other instances, then reopen it to check for updates.", "PresetLauncher ne s’est pas fermé. Fermez les autres instances, puis rouvrez l’application pour vérifier les mises à jour."),
-        ("update.setupStartFailed", "The installer could not start. Open PresetLauncher to try again.", "Le programme d’installation n’a pas pu démarrer. Ouvrez PresetLauncher pour réessayer."),
-        ("update.setupCancelled", "Installation was cancelled. Open PresetLauncher to try again.", "L’installation a été annulée. Ouvrez PresetLauncher pour réessayer."),
-        ("update.setupFailed", "Installation failed. Open PresetLauncher to retry, or install the latest version from GitHub.", "L’installation a échoué. Ouvrez PresetLauncher pour réessayer ou installez la dernière version depuis GitHub."),
-        ("update.setupUnexpected", "The installer returned an unexpected result ({0}). Open PresetLauncher to check for updates.", "Le programme d’installation a renvoyé un résultat inattendu ({0}). Ouvrez PresetLauncher pour vérifier les mises à jour."),
-        ("update.rebootRequired", "Windows needs to restart. Restart your computer, then open PresetLauncher to check the installation.", "Windows doit redémarrer. Redémarrez votre ordinateur, puis ouvrez PresetLauncher pour vérifier l’installation."),
-        ("update.relaunchFailed", "PresetLauncher could not reopen after setup. Open it from the Start menu to check the installation.", "PresetLauncher n’a pas pu se rouvrir après l’installation. Ouvrez-le depuis le menu Démarrer pour vérifier l’installation."),
-        ("update.relaunchUnconfirmed", "Setup finished, but PresetLauncher did not confirm startup. Open it from the Start menu if needed.", "L’installation est terminée, mais PresetLauncher n’a pas confirmé son démarrage. Au besoin, ouvrez-le depuis le menu Démarrer."),
+        ("update.setupOpenFailed", "Couldn’t open the installer. Retry or download it from GitHub.", "Impossible d’ouvrir le programme d’installation. Réessayez ou téléchargez-le depuis GitHub."),
     ];
 
     private static readonly IReadOnlyDictionary<string, string> English =
