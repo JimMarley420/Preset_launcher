@@ -1,7 +1,6 @@
 using System.Diagnostics;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using PresetLauncher.Views;
+using PresetLauncher.Views.Pages;
 
 namespace PresetLauncher.Services;
 
@@ -9,218 +8,254 @@ public sealed class UpdateCoordinator
 {
     private readonly UpdateService _service = new();
     private bool _checking;
-    private static string T(string key, params object[] args) => App.Localization.Get(key, args);
+    private static string T(string key) => App.Localization.Get(key);
 
-    public async Task CheckAsync(bool manual)
+    public async Task CheckAsync(bool manual, Action<string, InfoBarSeverity>? report = null)
     {
-        if (_checking || App.Current.MainWindow?.Content?.XamlRoot is not { } root)
+        var window = App.Current.MainWindow;
+        if (_checking || window?.Content?.XamlRoot is null)
             return;
         _checking = true;
         var installed = _service.GetInstalledVersion();
-        var settings = App.Settings.CurrentSettings;
         var required = false;
+        var closing = false;
+        var policyUnavailable = false;
+        UpdatePage? page = null;
         try
         {
             if (installed == "0.0.0")
             {
-                if (manual) await MessageAsync(root, "settings.checkUpdate", T("update.sourceBuild"));
+                report?.Invoke("update.sourceBuild", InfoBarSeverity.Informational);
                 return;
             }
 
-            // Fail closed if the protected state cannot be read or persisted.
+            var settings = App.Settings.CurrentSettings;
             required = true;
-            SetGate(true);
-            UpdatePolicyStore store;
+            window.SetUpdateGate(true);
+            var store = new UpdatePolicyStore();
             KnownUpdatePolicy known;
-            try
-            {
-                store = new UpdatePolicyStore();
-                known = store.Load(settings.MinimumSupportedVersion);
-            }
+            try { known = store.Load(settings.MinimumSupportedVersion); }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
-                await MessageAsync(root, "update.policyErrorTitle", T("update.policyErrorMessage"));
-                CloseApp();
+                policyUnavailable = true;
+                await ExitRecoveryAsync("update.policyErrorMessage");
                 return;
             }
             required = _service.IsUpdateAvailable(installed, known.Minimum.ToString(3));
-            SetGate(required);
+            window.SetUpdateGate(required);
+
             while (true)
             {
-                ReleaseUpdate? update;
+                ReleaseUpdate? offer;
                 try
                 {
-                    update = await _service.GetLatestUpdateAsync(installed, (version, minimum) =>
+                    offer = await _service.GetLatestUpdateAsync(installed, (version, minimum) =>
                     {
-                        required |= _service.IsUpdateAvailable(installed, minimum.ToString(3));
-                        SetGate(required);
+                        window.SetUpdateGate(true);
+                        policyUnavailable = true;
                         known = store.Observe(version, minimum);
+                        policyUnavailable = false;
+                        required = _service.IsUpdateAvailable(installed, known.Minimum.ToString(3));
+                        window.SetUpdateGate(required);
                     });
-                    required = _service.IsUpdateAvailable(installed, known.Minimum.ToString(3));
-                    SetGate(required);
-                    if (required && (update is null || _service.IsUpdateAvailable(update.Version.ToString(3), known.Minimum.ToString(3))))
-                        throw new InvalidDataException("No release satisfies the known minimum version.");
+                    if (required && (offer is null || offer.Version < known.Minimum))
+                        throw new InvalidDataException("No installer meets the protected minimum version.");
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine(ex);
-                    var message = T(ex is UpdateAssetException ? "update.architectureAssetUnavailable" : "settings.updateCheckFailed");
-                    if (required)
+                    var key = ex is UpdateAssetException ? "update.architectureAssetUnavailable" : "settings.updateCheckFailed";
+                    if (policyUnavailable)
+                        await ExitRecoveryAsync("update.policyErrorMessage");
+                    else if (required)
                     {
-                        if (await RetryRequiredAsync(root, message)) continue;
-                        CloseApp();
+                        var recovery = ShowPage(null);
+                        var action = await recovery.PromptAsync(T(key) + "\n\n" + T("update.requiredRetry"),
+                            ("update.retry", UpdateAction.Retry), ("update.exit", UpdateAction.Exit));
+                        if (action == UpdateAction.Retry || !await TryExitAsync())
+                            continue;
                     }
-                    else if (manual)
-                        await MessageAsync(root, "dialog.error", message);
+                    else report?.Invoke(key, InfoBarSeverity.Error);
                     return;
                 }
 
-                if (update is null)
+                if (offer is null)
                 {
-                    if (manual) await MessageAsync(root, "settings.checkUpdate", T("settings.updateUpToDate"));
+                    report?.Invoke("settings.updateUpToDate", InfoBarSeverity.Success);
                     return;
                 }
-
-                required |= UpdateService.IsRequired(installed, update);
-                SetGate(required);
-                if (!required && !UpdateService.ShouldPrompt(installed, update, settings.SkippedUpdateVersion, manual,
+                if (!required && !UpdateService.ShouldPrompt(installed, offer, settings.SkippedUpdateVersion, manual,
                     settings.DeferredUpdateVersion, settings.DeferredUpdateUntil))
                     return;
 
-                var recommended = !required && update.Policy == UpdatePolicy.Recommended;
-                var dialog = new ContentDialog
+                var screen = ShowPage(offer);
+                var recommended = !required && offer.Policy == UpdatePolicy.Recommended;
+                var secondary = required ? ("update.exit", UpdateAction.Exit) :
+                    recommended ? ("update.remindTomorrow", UpdateAction.Postpone) : ("update.later", UpdateAction.Postpone);
+                while (true)
                 {
-                    XamlRoot = root,
-                    Title = T(required ? "update.requiredTitle" : recommended ? "update.recommendedTitle" : "settings.updateAvailable"),
-                    Content = DesktopUi.Text(T(required ? "update.requiredMessage" : recommended ? "update.recommendedMessage" : "update.optionalMessage", installed, update.Version.ToString(3))),
-                    PrimaryButtonText = T("update.install"),
-                    SecondaryButtonText = required || recommended ? "" : T("update.skip"),
-                    CloseButtonText = T(required ? "update.exit" : recommended ? "update.remindTomorrow" : "update.later"),
-                    DefaultButton = ContentDialogButton.Primary
-                };
-                var choice = await dialog.ShowAsync();
-                if (choice != ContentDialogResult.Primary)
-                {
-                    if (required) CloseApp();
-                    else if (recommended)
+                    var choice = await screen.PromptAsync(null, ("update.install", UpdateAction.Install), secondary,
+                        skip: !required && !recommended);
+                    if (choice == UpdateAction.Install)
+                        break;
+                    if (choice == UpdateAction.Exit)
                     {
-                        App.Settings.Update(value =>
+                        if (await TryExitAsync()) return;
+                        continue;
+                    }
+                    if (choice == UpdateAction.Skip || recommended)
+                    {
+                        try { SaveDismissal(offer, choice); }
+                        catch (Exception ex)
                         {
-                            value.DeferredUpdateVersion = update.Version.ToString(3);
-                            value.DeferredUpdateUntil = DateTimeOffset.UtcNow.AddHours(24);
-                        });
-                    }
-                    else if (choice == ContentDialogResult.Secondary)
-                    {
-                        App.Settings.Update(value => value.SkippedUpdateVersion = update.Version.ToString(3));
+                            Debug.WriteLine(ex);
+                            report?.Invoke("settings.saveFailed", InfoBarSeverity.Error);
+                        }
                     }
                     return;
                 }
 
-                string? installer = null;
-                bool launched = false;
-                try
+                while (true)
                 {
-                    installer = await DownloadAsync(root, update);
-                    using var process = Process.Start(new ProcessStartInfo { FileName = installer, UseShellExecute = true });
-                    if (process is null) throw new InvalidOperationException("Installer did not start.");
-                    launched = true;
-                    App.Current.MainWindow?.Close();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine(ex);
-                    if (installer is not null && !launched)
+                    var error = await DownloadAndInstallAsync(window, screen, offer);
+                    if (error is null)
                     {
-                        try { Directory.Delete(Path.GetDirectoryName(installer)!, recursive: true); }
-                        catch (IOException cleanup) { Debug.WriteLine(cleanup); }
-                        catch (UnauthorizedAccessException cleanup) { Debug.WriteLine(cleanup); }
+                        closing = true;
+                        window.CloseForUpdate();
+                        return;
                     }
-
-                    if (required)
+                    while (true)
                     {
-                        if (await RetryRequiredAsync(root, T("settings.updateDownloadError"))) continue;
-                        CloseApp();
+                        var next = await screen.PromptAsync(T(error), ("update.retry", UpdateAction.Retry),
+                            required ? ("update.exit", UpdateAction.Exit) : ("update.later", UpdateAction.Postpone));
+                        if (next == UpdateAction.Retry) break;
+                        if (next == UpdateAction.Postpone || await TryExitAsync()) return;
                     }
-                    else if (ex is not OperationCanceledException)
-                        await MessageAsync(root, "dialog.error", T("settings.updateDownloadError"));
-                    return;
                 }
             }
         }
         catch (Exception ex)
         {
             Debug.WriteLine(ex);
-            // A known mandatory update cannot be bypassed by a failed modal dialog.
-            if (required) CloseApp();
-            else if (manual)
-                await MessageAsync(root, "dialog.error", T("settings.saveFailed"));
-        }
-        finally { _checking = false; }
-    }
-
-    private static void SetGate(bool blocked)
-    {
-        if (App.Current.MainWindow is MainWindow window) window.SetUpdateGate(blocked);
-    }
-
-    private static void CloseApp()
-    {
-        App.Current.MainWindow?.Close();
-    }
-
-    private async Task<string> DownloadAsync(XamlRoot root, ReleaseUpdate update)
-    {
-        using var cancellation = new CancellationTokenSource();
-        var status = new TextBlock { Text = T("settings.updatePreparing"), TextWrapping = TextWrapping.Wrap };
-        var progressBar = new ProgressBar { Minimum = 0, Maximum = 100 };
-        var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(status);
-        panel.Children.Add(progressBar);
-        var dialog = new ContentDialog
-        {
-            XamlRoot = root,
-            Title = T("settings.updateDownloadingInstalling"),
-            Content = panel,
-            CloseButtonText = T("dialog.cancel")
-        };
-        bool closed = false;
-        dialog.Closed += (_, _) => { closed = true; cancellation.Cancel(); };
-        var showing = dialog.ShowAsync();
-        try
-        {
-            var progress = new Progress<int>(percent =>
+            if (required || policyUnavailable)
             {
-                progressBar.Value = percent;
-                status.Text = T("settings.updateProgress", percent / 100d);
-            });
-            return await _service.DownloadVerifiedAsync(update, progress, cancellation.Token);
+                window.SetUpdateGate(true);
+                try { await ExitRecoveryAsync("update.policyErrorMessage"); }
+                catch (Exception failure)
+                {
+                    Debug.WriteLine(failure);
+                    closing = true;
+                    window.CloseForUpdate();
+                }
+            }
+            else report?.Invoke("settings.updateCheckFailed", InfoBarSeverity.Error);
         }
         finally
         {
-            if (!closed) dialog.Hide();
-            await showing;
+            if (!closing && !required && !policyUnavailable) window.ShowUpdate(null);
+            _checking = false;
+        }
+
+        UpdatePage ShowPage(ReleaseUpdate? offer)
+        {
+            page ??= new UpdatePage();
+            page.ShowOffer(installed, offer, required || policyUnavailable);
+            window.ShowUpdate(page);
+            return page;
+        }
+
+        async Task<bool> TryExitAsync()
+        {
+            if (!await window.CanCloseForUpdateAsync())
+                return false;
+            closing = true;
+            window.CloseForUpdate();
+            return true;
+        }
+
+        async Task ExitRecoveryAsync(string key)
+        {
+            var recovery = ShowPage(null);
+            do
+            {
+                await recovery.PromptAsync(T(key), null, ("update.exit", UpdateAction.Exit));
+            } while (!await TryExitAsync());
         }
     }
 
-    private static async Task<bool> RetryRequiredAsync(XamlRoot root, string message)
+    private static void SaveDismissal(ReleaseUpdate offer, UpdateAction action)
     {
-        var dialog = new ContentDialog
+        var version = offer.Version.ToString(3);
+        App.Settings.Update(settings =>
         {
-            XamlRoot = root,
-            Title = T("update.requiredTitle"),
-            Content = DesktopUi.Text(message + "\n\n" + T("update.requiredRetry")),
-            PrimaryButtonText = T("update.retry"),
-            CloseButtonText = T("update.exit")
-        };
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+            if (action == UpdateAction.Skip)
+                settings.SkippedUpdateVersion = version;
+            else
+            {
+                settings.DeferredUpdateVersion = version;
+                settings.DeferredUpdateUntil = DateTimeOffset.UtcNow.AddHours(24);
+            }
+        });
     }
 
-    private static async Task MessageAsync(XamlRoot root, string title, string message)
+    private async Task<string?> DownloadAndInstallAsync(MainWindow window, UpdatePage screen, ReleaseUpdate offer)
     {
-        var dialog = new ContentDialog { XamlRoot = root, Title = T(title), Content = DesktopUi.Text(message), CloseButtonText = T("dialog.ok") };
-        await dialog.ShowAsync();
+        DirectoryInfo? directory = null;
+        var handedOff = false;
+        using var cancel = new CancellationTokenSource();
+        var error = "settings.updateDownloadError";
+        try
+        {
+            if (!await window.CanCloseForUpdateAsync())
+                return "update.shutdownPostponed";
+            error = "update.installedCopyRequired";
+            UpdateHandoff.CheckInstallation();
+            error = "settings.updateDownloadError";
+            screen.ShowProgress("settings.updatePreparing", Cancel);
+            directory = UpdateStaging.Create();
+            using var pins = UpdateStaging.PinDirectory(directory.FullName);
+            using var lease = UpdateStaging.Use(directory.FullName);
+            var lastPercent = -1;
+            await _service.DownloadVerifiedAsync(offer, directory, progress =>
+            {
+                if (cancel.IsCancellationRequested) return;
+                var percent = (int)(progress.Transferred * 100 / progress.Total);
+                if (progress.Verifying)
+                    screen.ShowProgress("update.verifying", Cancel);
+                else if (percent != lastPercent)
+                {
+                    lastPercent = percent;
+                    screen.ShowProgress("update.downloading", Cancel, progress);
+                }
+            }, cancel.Token);
+            cancel.Token.ThrowIfCancellationRequested();
+            error = "update.handoffFailed";
+            screen.ShowProgress("update.preparingInstallation");
+            await UpdateHandoff.StartAsync(offer, directory.FullName);
+            handedOff = true;
+            try { screen.ShowProgress("update.handoff"); }
+            catch (Exception ex) { Debug.WriteLine(ex); }
+            return null;
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            return "update.downloadCancelled";
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine(ex);
+            return error;
+        }
+        finally
+        {
+            if (!handedOff && directory is not null) UpdateStaging.Clean(directory.FullName);
+        }
+
+        void Cancel()
+        {
+            cancel.Cancel();
+            screen.ShowProgress("update.cancelling");
+        }
     }
 }

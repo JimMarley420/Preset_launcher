@@ -29,6 +29,10 @@ EVIDENCE = Path("artifacts/windows-validation.json")
 ARCHITECTURES = json.loads((Path(__file__).resolve().parent.parent / "Installer/architectures.json").read_text())
 VERSION = re.compile(r"v?(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\Z")
 POLICY = re.compile(r"^<!-- presetlauncher:min-supported=([0-9.]+) -->\r?$", re.M)
+APP_NOTES_BEGIN = "<!-- presetlauncher-app-notes:v1:begin -->"
+APP_NOTES_END = "<!-- presetlauncher-app-notes:v1:end -->"
+SUMMARY_BEGIN = "<!-- presetlauncher-summary:begin -->"
+SUMMARY_END = "<!-- presetlauncher-summary:end -->"
 # Last main commit before mandatory PR metadata was introduced.
 ROLLOUT_BASE = "8535d8e943a6503d4982ff9a5164ef66392ba3ea"
 
@@ -381,6 +385,43 @@ def signed_update_markers(data, installers):
             f"<!-- presetlauncher:manifest-v2={manifest} -->")
 
 
+def application_notes(decisions, token):
+    def clean(text):
+        text = re.sub(r"(?i)presetlauncher(?:-app-notes\s*:|\s*:|\s*-summary:).*", "", text)
+        return re.sub(r"[<>\x00-\x1f\x7f]", " ", text).strip()
+
+    lines = []
+    seen = set()
+    for decision in decisions:
+        number = decision["number"]
+        if decision["rank"] <= 0 or number in seen:
+            continue
+        seen.add(number)
+        pull = request(API + f"/pulls/{number}", token=token)
+        if pr_decision(pull) != decision:
+            raise ValueError("PR release metadata changed while generating notes")
+
+        body = (pull.get("body") or "").splitlines()
+        summary = ""
+        if body.count(SUMMARY_BEGIN) == body.count(SUMMARY_END) == 1:
+            start, end = body.index(SUMMARY_BEGIN), body.index(SUMMARY_END)
+            if end == start + 2:
+                candidate = body[start + 1].strip()
+                if len(candidate) <= 240 and "<" not in candidate and ">" not in candidate:
+                    summary = clean(candidate)
+        if not summary:
+            summary = clean(pull["title"].split(": ", 1)[1])
+        if summary:
+            # Publisher summaries are factual text, not a second Markdown document.
+            summary = re.sub(r"([\\`*_[\]#])", r"\\\1", summary[:240])
+            lines.append(f"- {summary}")
+
+    notes = "\n".join(lines)
+    if len(notes.encode("utf-8")) > 48_000 or len(lines) > 500:
+        raise ValueError("Application-facing release notes exceed the supported size")
+    return f"{APP_NOTES_BEGIN}\n{notes}\n{APP_NOTES_END}"
+
+
 def validated_installers(data, required_gate=None):
     evidence = json.loads(EVIDENCE.read_text(encoding="utf-8-sig"))
     full = data["validate_installer"]
@@ -495,7 +536,8 @@ def publish():
                      "previous_tag_name": data["previous"]}, token)
     if re.search(r"(?m)^<!-- presetlauncher:", notes["body"]):
         raise ValueError("Generated notes contain reserved update metadata")
-    body = markers + "\n\n" + notes["body"]
+    full_notes = re.sub(r"(?i)presetlauncher-app-notes(?=\s*:)", "presetlauncher&#45;app-notes", notes["body"])
+    body = markers + "\n\n" + full_notes + "\n\n" + application_notes(expected["decisions"], token)
     release = request(API + "/releases", "POST",
                       {"tag_name": tag, "target_commitish": data["sha"], "name": f"PresetLauncher {tag}",
                        "body": body, "draft": True, "prerelease": False}, token)

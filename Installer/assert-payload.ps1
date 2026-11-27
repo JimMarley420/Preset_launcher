@@ -1,6 +1,6 @@
 param([string]$Directory, [int]$Machine)
 $ErrorActionPreference = 'Stop'
-foreach ($name in 'PresetLauncherWinUI3.exe', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'Microsoft.UI.Xaml.dll') {
+foreach ($name in 'PresetLauncherWinUI3.exe', 'PresetLauncher.Update.exe', 'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll', 'Microsoft.UI.Xaml.dll') {
     $path = Join-Path $Directory $name
     $reader = [IO.BinaryReader]::new([IO.File]::OpenRead($path))
     try {

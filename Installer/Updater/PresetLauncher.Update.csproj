@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateInstallation.cs" Link="UpdateInstallation.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateHandoffProtocol.cs" Link="UpdateHandoffProtocol.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateStartup.cs" Link="UpdateStartup.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateStaging.cs" Link="UpdateStaging.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateService.cs" Link="UpdateService.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdatePolicySignature.cs" Link="UpdatePolicySignature.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/UpdateReleaseNotes.cs" Link="UpdateReleaseNotes.cs" />
+    <Compile Include="../../PresetLauncherWinUI3/Services/LocalizationService.cs" Link="LocalizationService.cs" />
+    <EmbeddedResource Include="../architectures.json" LogicalName="PresetLauncher.Architectures" />
+    <EmbeddedResource Include="../../.circleci/update-policy-public.pem" LogicalName="PresetLauncher.UpdatePolicyPublicKey" />
+  </ItemGroup>
+</Project>

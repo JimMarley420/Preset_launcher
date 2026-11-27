@@ -1,8 +1,10 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using PresetLauncher.Services;
 using PresetLauncher.Views;
 
 namespace PresetLauncher;
@@ -17,6 +19,18 @@ internal static class Program
     [STAThread]
     private static int Main()
     {
+        // Refuse startup before WinUI initializes, so setup receives a normal exit code.
+        try { UpdateStartup.EnterApplication(AppContext.BaseDirectory); }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 32)
+        {
+            return UpdateStartup.InstallationBusyExitCode;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
+        {
+            Debug.WriteLine(ex);
+            return 1;
+        }
+
         WinRT.ComWrappersSupport.InitializeComWrappers();
         var current = AppInstance.GetCurrent();
 

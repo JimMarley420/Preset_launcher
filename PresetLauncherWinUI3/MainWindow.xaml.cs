@@ -137,6 +137,22 @@ public sealed partial class MainWindow : Window
         UpdateInput();
     }
 
+    internal void ShowUpdate(UpdatePage? page)
+    {
+        UpdateHost.Content = page;
+        UpdateHost.Visibility = page is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateInput();
+    }
+
+    internal Task<bool> CanCloseForUpdateAsync() =>
+        PageHost.Content is PresetEditorPage editor ? editor.CanLeaveAsync(Root.XamlRoot) : Task.FromResult(true);
+
+    internal void CloseForUpdate()
+    {
+        _closing = true;
+        Close();
+    }
+
     internal void FinishStartup()
     {
         _busy = false;
@@ -171,19 +187,21 @@ public sealed partial class MainWindow : Window
     private void UpdateInput(bool pageEnabled = false)
     {
         if (_closed) return;
-        NavView.IsEnabled = !_updateBlocked;
+        var updating = UpdateHost.Content is not null;
+        NavView.Visibility = _updateBlocked || updating ? Visibility.Collapsed : Visibility.Visible;
+        NavView.IsEnabled = !_updateBlocked && !updating;
         foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
             item.IsEnabled = !_busy;
         if (NavView.SettingsItem is NavigationViewItem settings)
             settings.IsEnabled = !_busy;
-        PageHost.IsEnabled = !_updateBlocked && (!_busy || pageEnabled);
+        PageHost.IsEnabled = !_updateBlocked && !updating && (!_busy || pageEnabled);
     }
 
     private async void HandleClosing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
-        if (_closing || _updateBlocked)
+        if (_closing)
             return;
-        if (_busy)
+        if (_busy || _updateBlocked || UpdateHost.Content is not null)
         {
             args.Cancel = true;
             return;

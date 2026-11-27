@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using PresetLauncher.Services;
 
@@ -18,6 +19,7 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        _ = Task.Run(() => UpdateStaging.CleanOldAsync(Environment.GetCommandLineArgs()));
         Settings = new SettingsService();
         Settings.Load();
         Localization = new LocalizationService();
@@ -34,6 +36,11 @@ public partial class App : Application
         async void OnRootLoaded(object sender, RoutedEventArgs e)
         {
             root.Loaded -= OnRootLoaded;
+            try { UpdateStartup.SignalReady(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or WaitHandleCannotBeOpenedException)
+            {
+                Debug.WriteLine(ex);
+            }
             try { await Updates.CheckAsync(manual: false); }
             finally { MainWindow.FinishStartup(); }
         }
