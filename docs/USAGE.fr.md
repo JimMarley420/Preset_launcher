@@ -57,7 +57,7 @@ Aucune commande ne permet de dupliquer ou d’exporter un seul preset, de modifi
 
 ## Mises à jour
 
-PresetLauncher consulte GitHub Releases au démarrage et depuis les paramètres. L’écran de mise à jour présente les notes de la version proposée et donne accès à la publication complète et à l’historique des versions. Sélectionnez **Installer la mise à jour** pour lancer le téléchargement et vérifier la politique signée, la taille et l’empreinte SHA-256 du programme d’installation. PresetLauncher se ferme pendant l’installation et se rouvre si elle réussit. Une installation partagée peut demander une autorisation d’administrateur, et Windows peut nécessiter un redémarrage.
+PresetLauncher consulte GitHub Releases au démarrage et depuis les paramètres. L’écran de mise à jour présente les notes de la version proposée et donne accès à la publication complète et à l’historique des versions. Sélectionnez **Installer la mise à jour** pour lancer le téléchargement et vérifier la politique signée, la taille et l’empreinte SHA-256 du programme d’installation. L’assistant Inno Setup habituel s’ouvre et PresetLauncher se ferme. Terminez l’assistant, puis rouvrez PresetLauncher depuis la dernière page ou le menu Démarrer. Une installation partagée peut demander une autorisation d’administrateur, et Windows peut nécessiter un redémarrage.
 
 - Les mises à jour facultatives peuvent être reportées ou ignorées.
 - Les mises à jour recommandées peuvent être reportées de 24 heures.

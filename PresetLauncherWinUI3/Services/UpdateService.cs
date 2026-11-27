@@ -12,7 +12,6 @@ public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVers
 {
     internal Uri? ReleaseUri { get; init; }
     internal string? Notes { get; init; }
-    internal string? SignedReleaseJson { get; init; }
 }
 
 internal readonly record struct UpdateDownloadProgress(long Transferred, long Total, bool Verifying = false);
@@ -154,8 +153,7 @@ public sealed class UpdateService
         return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest, policy)
         {
             ReleaseUri = new Uri($"https://github.com/{Repository}/releases/tag/{tag}"),
-            Notes = UpdateReleaseNotes.Extract(body),
-            SignedReleaseJson = json
+            Notes = UpdateReleaseNotes.Extract(body)
         };
     }
 

@@ -83,6 +83,7 @@ function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogNa
 
 function Assert-CurrentPackage {
     & "$root/Installer/assert-payload.ps1" -Directory $installDir -Machine $entry.machine
+    if (Test-Path -LiteralPath (Join-Path $installDir 'PresetLauncher.Update.exe')) { throw 'Retired silent update helper is still installed' }
     if (-not (Test-Path -LiteralPath $architectureRegistryPath)) {
         throw "Missing installation architecture registration: $Architecture"
     }

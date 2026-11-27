@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -74,29 +73,32 @@ public sealed class UpdateExperienceTests
     }
 
     [TestMethod]
-    [DataRow(0, null)]
-    [DataRow(1, "update.setupStartFailed")]
-    [DataRow(2, "update.setupCancelled")]
-    [DataRow(4, "update.setupFailed")]
-    [DataRow(5, "update.setupCancelled")]
-    [DataRow(7, "update.setupFailed")]
-    [DataRow(8, "update.rebootRequired")]
-    [DataRow(3010, "update.rebootRequired")]
-    [DataRow(-1, "update.setupUnexpected")]
-    public void ClassifiesInstallerExitCodes(int code, string? expected) =>
-        Assert.AreEqual(expected, UpdateInstallation.ResultKey(code));
+    public void UpdateOpensTheNormalInteractiveInstallerWithoutOverrides()
+    {
+        const string installer = @"C:\Temp\PresetLauncher Setup.exe";
+        var start = InteractiveUpdateInstaller.StartInfo(installer);
+        Assert.AreEqual(installer, start.FileName);
+        Assert.IsTrue(start.UseShellExecute);
+        Assert.AreEqual(Environment.SystemDirectory, start.WorkingDirectory);
+        Assert.AreEqual("", start.Verb);
+        Assert.AreEqual("", start.Arguments);
+        Assert.AreEqual(0, start.ArgumentList.Count);
+    }
 
     [TestMethod]
-    [DataRow(true, "/ALLUSERS")]
-    [DataRow(false, "/CURRENTUSER")]
-    public void SilentArgumentsPreserveScopeWithoutGivingSetupAnAlternateDirectory(bool allUsers, string scope)
+    public async Task ChangedInstallerIsRejectedBeforeProcessCreation()
     {
-        var installation = new UpdateInstallation(@"C:\Program Files\PresetLauncher", allUsers, new Version(1, 6, 0));
-        ProcessStartInfo start = installation.InstallerStartInfo(@"C:\Temp\PresetLauncher Setup.exe");
-        Assert.AreEqual(@"C:\Temp\PresetLauncher Setup.exe", start.FileName);
-        Assert.AreEqual(allUsers ? "runas" : "", start.Verb);
-        CollectionAssert.AreEqual(new[] { "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-",
-            "/RESTARTEXITCODE=3010", "/NOCLOSEAPPLICATIONS", "/NORESTARTAPPLICATIONS", scope }, start.ArgumentList.ToArray());
+        var directory = UpdateStaging.Create();
+        var path = Path.Combine(directory.FullName, "PresetLauncher_Setup_2.0.0.exe");
+        try
+        {
+            File.WriteAllBytes(path, [1, 2, 3]);
+            var offer = new ReleaseUpdate(new Version(2, 0, 0), new Version(1, 7, 0),
+                new Uri("https://github.com/JimMarley420/Preset_launcher/releases/download/v2.0.0/PresetLauncher_Setup_2.0.0.exe"),
+                3, new string('0', 64));
+            await Assert.ThrowsExactlyAsync<InvalidDataException>(() => InteractiveUpdateInstaller.OpenVerifiedAsync(path, offer));
+        }
+        finally { UpdateStaging.Clean(directory.FullName); }
     }
 
     [TestMethod]

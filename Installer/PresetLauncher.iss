@@ -92,6 +92,9 @@ Filename: "{app}\{#AppExeName}"; \
   Description: "{cm:LaunchProgram,{#AppName}}"; \
   Flags: nowait postinstall skipifsilent
 
+[InstallDelete]
+Type: files; Name: "{app}\PresetLauncher.Update.exe"
+
 [UninstallDelete]
 Type: files; Name: "{app}\.presetlauncher-install.lock"
 

@@ -202,22 +202,19 @@ public sealed class UpdateCoordinator
     private async Task<string?> DownloadAndInstallAsync(MainWindow window, UpdatePage screen, ReleaseUpdate offer)
     {
         DirectoryInfo? directory = null;
-        var handedOff = false;
+        var installerOpened = false;
         using var cancel = new CancellationTokenSource();
         var error = "settings.updateDownloadError";
         try
         {
             if (!await window.CanCloseForUpdateAsync())
                 return "update.shutdownPostponed";
-            error = "update.installedCopyRequired";
-            UpdateHandoff.CheckInstallation();
-            error = "settings.updateDownloadError";
             screen.ShowProgress("settings.updatePreparing", Cancel);
             directory = UpdateStaging.Create();
             using var pins = UpdateStaging.PinDirectory(directory.FullName);
             using var lease = UpdateStaging.Use(directory.FullName);
             var lastPercent = -1;
-            await _service.DownloadVerifiedAsync(offer, directory, progress =>
+            var installer = await _service.DownloadVerifiedAsync(offer, directory, progress =>
             {
                 if (cancel.IsCancellationRequested) return;
                 var percent = (int)(progress.Transferred * 100 / progress.Total);
@@ -230,10 +227,10 @@ public sealed class UpdateCoordinator
                 }
             }, cancel.Token);
             cancel.Token.ThrowIfCancellationRequested();
-            error = "update.handoffFailed";
+            error = "update.setupOpenFailed";
             screen.ShowProgress("update.preparingInstallation");
-            await UpdateHandoff.StartAsync(offer, directory.FullName);
-            handedOff = true;
+            await InteractiveUpdateInstaller.OpenVerifiedAsync(installer, offer);
+            installerOpened = true;
             try { screen.ShowProgress("update.handoff"); }
             catch (Exception ex) { Debug.WriteLine(ex); }
             return null;
@@ -249,7 +246,7 @@ public sealed class UpdateCoordinator
         }
         finally
         {
-            if (!handedOff && directory is not null) UpdateStaging.Clean(directory.FullName);
+            if (!installerOpened && directory is not null) UpdateStaging.Clean(directory.FullName);
         }
 
         void Cancel()
