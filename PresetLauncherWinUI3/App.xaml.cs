@@ -29,6 +29,7 @@ public partial class App : Application
         var root = (FrameworkElement)MainWindow.Content;
         root.Loaded += OnRootLoaded;
         MainWindow.Activate();
+        Program.AttachWindow(MainWindow);
 
         async void OnRootLoaded(object sender, RoutedEventArgs e)
         {
