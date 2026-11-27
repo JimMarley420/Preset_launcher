@@ -106,6 +106,18 @@ function Assert-CurrentPackage {
 # These existing controls are enabled only once the startup and mandatory-update
 # gates release input. The edit control also proves the app loaded the fixture.
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class SmokeWindow
+{
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindowAsync(IntPtr window, int command);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsIconic(IntPtr window);
+}
+'@
 $newPreset = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, 'New preset')
 $editPreset = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty, 'Edit Preserve me')
 $recovery = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,
@@ -130,6 +142,50 @@ function Assert-StartupBlockedBySetup {
     }
     finally { $exclusive.Dispose() }
     Write-Host 'Startup correctly rejected an exclusive installation lock.'
+}
+
+function Assert-RedirectedLaunches([Diagnostics.Process]$Primary, [string]$Exe) {
+    $Primary.Refresh()
+    $handle = $Primary.MainWindowHandle
+    [void][SmokeWindow]::ShowWindowAsync($handle, 6) # SW_MINIMIZE
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while (-not [SmokeWindow]::IsIconic($handle)) {
+        if ($Primary.HasExited -or $timer.Elapsed.TotalSeconds -ge 5) {
+            throw 'Could not minimize the primary window'
+        }
+        Start-Sleep -Milliseconds 50
+    }
+
+    $secondary = [Collections.Generic.List[Diagnostics.Process]]::new()
+    try {
+        $timer.Restart()
+        foreach ($i in 1..4) {
+            $secondary.Add((Start-Process -FilePath $Exe -WorkingDirectory $installDir -PassThru))
+        }
+        foreach ($child in $secondary) {
+            $remaining = [Math]::Max(0, 20000 - [int]$timer.ElapsedMilliseconds)
+            if (-not $child.WaitForExit($remaining)) { throw "Secondary instance $($child.Id) did not exit" }
+            if ($child.ExitCode -ne 0) { throw "Secondary instance exited with $($child.ExitCode)" }
+        }
+        while ([SmokeWindow]::IsIconic($handle)) {
+            if ($Primary.HasExited -or $timer.Elapsed.TotalSeconds -ge 25) {
+                throw 'Redirected launch did not restore the existing window'
+            }
+            Start-Sleep -Milliseconds 50
+        }
+        $Primary.Refresh()
+        if ($Primary.HasExited -or $Primary.MainWindowHandle -ne $handle) {
+            throw 'The original application window did not survive activation'
+        }
+        Write-Host 'Concurrent relaunches exited and restored the original window.'
+    }
+    finally {
+        foreach ($child in $secondary) {
+            if (-not $child.HasExited) { Stop-Process -InputObject $child -Force }
+            $child.WaitForExit()
+            $child.Dispose()
+        }
+    }
 }
 
 function Assert-ApplicationStarts([string]$Phase) {
@@ -163,6 +219,7 @@ function Assert-ApplicationStarts([string]$Phase) {
                             }
                             Write-Host 'Setup correctly rejected an active launcher.'
                         }
+                        Assert-RedirectedLaunches $process $exe
                         return
                     }
                 }
