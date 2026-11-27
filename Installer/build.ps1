@@ -77,7 +77,7 @@ try {
             dotnet publish $project -c Release -r $entry.rid --self-contained true --no-restore --artifacts-path $work --output $publish @properties
             if ($LASTEXITCODE -ne 0) { throw "Publish failed: $target" }
             $helperOutput = Join-Path $work update-helper
-            $helperProperties = @("-p:Version=$Version", '-p:DebugType=none', '-p:NuGetAudit=true', '-p:NuGetAuditMode=all',
+            $helperProperties = @("-p:Platform=$($entry.platform)", "-p:PlatformTarget=$($entry.platform)", "-p:Version=$Version", '-p:DebugType=none', '-p:NuGetAudit=true', '-p:NuGetAuditMode=all',
                 '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905')
             dotnet publish Installer/Updater/PresetLauncher.Update.csproj -c Release -r $entry.rid --artifacts-path $work --output $helperOutput @helperProperties
             if ($LASTEXITCODE -ne 0) { throw "Update helper publish failed: $target" }
