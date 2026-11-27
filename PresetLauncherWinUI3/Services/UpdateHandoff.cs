@@ -36,6 +36,7 @@ internal static class UpdateHandoff
             throw new InvalidDataException("The staged update helper changed.");
 
         var pipeId = Guid.NewGuid().ToString("N");
+        using var authorization = UpdateHandoffProtocol.CreateAuthorization(pipeId);
         using var pipe = new NamedPipeServerStream(UpdateStaging.PipePrefix + pipeId, PipeDirection.InOut,
             1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         using var timeout = new CancellationTokenSource(UpdateHandoffProtocol.Timeout);
@@ -63,14 +64,29 @@ internal static class UpdateHandoff
             await UpdateHandoffProtocol.ExpectAsync(pipe, UpdateHandoffProtocol.Ready, timeout.Token);
             await UpdateHandoffProtocol.SendAsync(pipe, UpdateHandoffProtocol.Commit, timeout.Token);
             await UpdateHandoffProtocol.ExpectAsync(pipe, UpdateHandoffProtocol.Accepted, timeout.Token);
+            timeout.Token.ThrowIfCancellationRequested();
+            if (!authorization.Set())
+                throw new IOException("Could not authorize installation.");
         }
-        catch
+        catch (Exception original)
         {
-            // Disconnect first so a pre-commit helper can release the staging lease.
+            // No authorization was issued. The parent is still alive and no setup can start.
             pipe.Dispose();
-            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            try { await helper.WaitForExitAsync(cleanup.Token); }
-            catch (OperationCanceledException ex) { Debug.WriteLine(ex); }
+            try
+            {
+                if (!helper.HasExited)
+                {
+                    try { helper.Kill(); }
+                    catch (InvalidOperationException) when (helper.HasExited) { }
+                    catch (System.ComponentModel.Win32Exception) when (helper.HasExited) { }
+                }
+                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await helper.WaitForExitAsync(cleanup.Token);
+            }
+            catch (Exception failure)
+            {
+                throw new IOException("Update helper could not be stopped.", new AggregateException(original, failure));
+            }
             throw;
         }
         finally { timeout.Cancel(); }

@@ -61,6 +61,22 @@ public sealed class UpdateHandoffTests
     }
 
     [TestMethod]
+    public void FinalAcknowledgementDoesNotAuthorizeInstallationUntilTheParentSignals()
+    {
+        var id = Guid.NewGuid().ToString("N");
+        using var parent = UpdateHandoffProtocol.CreateAuthorization(id);
+        using var helper = EventWaitHandle.OpenExisting(UpdateHandoffProtocol.AuthorizationName(id));
+        Assert.IsFalse(helper.WaitOne(0));
+        Assert.ThrowsExactly<IOException>(() => UpdateHandoffProtocol.CreateAuthorization(id));
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        Assert.ThrowsExactly<OperationCanceledException>(() => UpdateHandoffProtocol.WaitForAuthorization(helper, cancelled.Token));
+        Assert.IsTrue(parent.Set());
+        Assert.IsTrue(helper.WaitOne(0));
+        UpdateHandoffProtocol.WaitForAuthorization(helper, CancellationToken.None);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task CancellingDeadlineReleasesPartialHeaderOrPayload(bool hasFullHeader)

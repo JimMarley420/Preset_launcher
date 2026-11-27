@@ -83,6 +83,7 @@ internal static class Program
         pipe.ConnectAsync(10_000, deadline.Token).GetAwaiter().GetResult();
         if (!UpdateStaging.IsServer(pipe, parentId))
             throw new InvalidDataException("Unexpected handoff owner.");
+        using var authorization = EventWaitHandle.OpenExisting(UpdateHandoffProtocol.AuthorizationName(pipeId));
         var bytes = UpdateHandoffProtocol.ReadReleaseAsync(pipe, deadline.Token).GetAwaiter().GetResult();
         var update = UpdateService.ParseArchitectureRelease(Encoding.UTF8.GetString(bytes), installation.Version,
                      UpdatePolicySignature.PublicKey(), architecture, static (_, _) => { })
@@ -99,6 +100,7 @@ internal static class Program
             UpdateHandoffProtocol.SendAsync(pipe, UpdateHandoffProtocol.Ready, deadline.Token).GetAwaiter().GetResult();
             UpdateHandoffProtocol.ExpectAsync(pipe, UpdateHandoffProtocol.Commit, deadline.Token).GetAwaiter().GetResult();
             UpdateHandoffProtocol.SendAsync(pipe, UpdateHandoffProtocol.Accepted, deadline.Token).GetAwaiter().GetResult();
+            UpdateHandoffProtocol.WaitForAuthorization(authorization, deadline.Token);
             committed = true;
             pipe.Dispose();
             if (!parent.WaitForExit(120_000))

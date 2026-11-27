@@ -9,6 +9,25 @@ internal static class UpdateHandoffProtocol
     internal const byte Commit = 2;
     internal const byte Accepted = 3;
 
+    // The helper cannot install until the parent has actually received Accepted.
+    // Unlike a final pipe write, setting this local event has no acknowledgement gap.
+    internal static string AuthorizationName(string pipeId) => @"Local\PresetLauncher.Update.Authorization." + pipeId;
+
+    internal static EventWaitHandle CreateAuthorization(string pipeId)
+    {
+        var signal = new EventWaitHandle(false, EventResetMode.ManualReset, AuthorizationName(pipeId), out var created);
+        if (created) return signal;
+        signal.Dispose();
+        throw new IOException("Update authorization already exists.");
+    }
+
+    internal static void WaitForAuthorization(EventWaitHandle signal, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (WaitHandle.WaitAny([signal, cancellation.WaitHandle]) != 0)
+            cancellation.ThrowIfCancellationRequested();
+    }
+
     internal static async Task<byte[]> ReadReleaseAsync(Stream pipe, CancellationToken cancellation)
     {
         var header = new byte[sizeof(int)];
