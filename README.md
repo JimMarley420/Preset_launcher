@@ -44,6 +44,8 @@ Download the installer for your processor from the [latest release](https://gith
 
 Check **Settings → System → About → System type**. Use a Microsoft-supported Windows version.
 
+PresetLauncher checks for updates at startup and under **Settings → Check for updates**. The update screen shows the offered version and its release notes. After you select **Install update**, setup runs in the background and PresetLauncher reopens after a successful installation. Windows may ask for administrator approval for an installation shared by all users or require a restart.
+
 ## Documentation
 
 [User guide](docs/USAGE.md) · [Build from source](docs/DEVELOPMENT.md#build-from-source) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)

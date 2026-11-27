@@ -205,5 +205,6 @@ public sealed class SettingsPage : DesktopPage
         }, "settings.reset.failed");
 
     private async void CheckUpdates(object sender, RoutedEventArgs args) =>
-        await Shell.RunOperationAsync(() => App.Current.Updates.CheckAsync(manual: true), "settings.updateCheckFailed");
+        await Shell.RunOperationAsync(() => App.Current.Updates.CheckAsync(manual: true, report: (key, severity) => Report(key, severity)),
+            "settings.updateCheckFailed");
 }

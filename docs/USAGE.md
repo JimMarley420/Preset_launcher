@@ -57,7 +57,7 @@ Preset duplication, individual preset export, argument editing and password lock
 
 ## Updates
 
-PresetLauncher checks GitHub Releases at startup and from Settings. It verifies the signed policy, installer size and SHA-256 before opening the installer.
+PresetLauncher checks GitHub Releases at startup and from Settings. The update screen shows the notes for the version offered and links to the full release and version history. Selecting **Install update** starts a download and verifies the signed policy, installer size and SHA-256. PresetLauncher closes during installation and reopens after setup succeeds. A shared installation may ask for administrator approval, and Windows may require a restart.
 
 - Optional updates can be postponed or skipped.
 - Recommended updates can be postponed for 24 hours.

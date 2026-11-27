@@ -70,7 +70,11 @@ function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogNa
     $code = Invoke-Package $Path $LogName
     Write-Host ("{0}: {1:F2}s" -f $LogName, $timer.Elapsed.TotalSeconds)
     if ($code -ne 0) { throw "Setup failed: $code" }
-    if (-not (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe') -PathType Leaf)) { throw 'Installed executable missing' }
+    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
+    if (-not (Test-Path $exe -PathType Leaf)) { throw 'Installed executable missing' }
+    if (Get-Process PresetLauncherWinUI3 -ErrorAction SilentlyContinue | Where-Object Path -eq $exe) {
+        throw 'Unattended setup unexpectedly launched PresetLauncher'
+    }
     if (-not (Test-Path $shortcut -PathType Leaf)) { throw 'Start menu shortcut missing' }
     if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $ExpectedVersion) { throw 'Unexpected installed registry version' }
 }

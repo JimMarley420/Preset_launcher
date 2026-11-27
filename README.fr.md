@@ -44,6 +44,8 @@ Téléchargez le programme d’installation adapté depuis la [dernière version
 
 Consultez **Paramètres → Système → Informations système → Type du système**. Utilisez une version de Windows prise en charge par Microsoft.
 
+PresetLauncher vérifie les mises à jour au démarrage et dans **Paramètres → Rechercher des mises à jour**. L’écran de mise à jour affiche la version proposée et ses notes. Lorsque vous sélectionnez **Installer la mise à jour**, l’installation s’effectue en arrière-plan et PresetLauncher se rouvre si elle réussit. Windows peut demander une autorisation d’administrateur pour une installation partagée par tous les utilisateurs ou nécessiter un redémarrage.
+
 ## Documentation
 
 [Guide d'utilisation](docs/USAGE.fr.md) · [Compiler le projet](docs/DEVELOPMENT.md#build-from-source) · [Contribuer](CONTRIBUTING.md) · [Sécurité](SECURITY.md)

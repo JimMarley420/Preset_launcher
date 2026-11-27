@@ -76,6 +76,12 @@ try {
             $timer.Restart()
             dotnet publish $project -c Release -r $entry.rid --self-contained true --no-restore --artifacts-path $work --output $publish @properties
             if ($LASTEXITCODE -ne 0) { throw "Publish failed: $target" }
+            $helperOutput = Join-Path $work update-helper
+            $helperProperties = @("-p:Version=$Version", '-p:DebugType=none', '-p:NuGetAudit=true', '-p:NuGetAuditMode=all',
+                '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905')
+            dotnet publish Installer/Updater/PresetLauncher.Update.csproj -c Release -r $entry.rid --artifacts-path $work --output $helperOutput @helperProperties
+            if ($LASTEXITCODE -ne 0) { throw "Update helper publish failed: $target" }
+            Copy-Item -LiteralPath (Join-Path $helperOutput 'PresetLauncher.Update.exe') -Destination $publish
             & "$PSScriptRoot/assert-payload.ps1" -Directory $publish -Machine $entry.machine
             Write-Host "$target publish and PE verification: $($timer.Elapsed)"
         }

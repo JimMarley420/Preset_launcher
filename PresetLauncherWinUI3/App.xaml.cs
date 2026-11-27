@@ -18,6 +18,7 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        _ = Task.Run(() => UpdateStaging.CleanOldAsync(Environment.GetCommandLineArgs()));
         Settings = new SettingsService();
         Settings.Load();
         Localization = new LocalizationService();

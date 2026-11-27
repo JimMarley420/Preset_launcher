@@ -63,7 +63,7 @@ public sealed class PresetEditorPage : DesktopPage
         ShowPrograms();
     }
 
-    public async Task<bool> CanLeaveAsync()
+    public async Task<bool> CanLeaveAsync(XamlRoot? dialogRoot = null)
     {
         if (!IsDirty)
             return true;
@@ -72,7 +72,7 @@ public sealed class PresetEditorPage : DesktopPage
         _leaving = true;
         try
         {
-            return await Confirm(XamlRoot, "editor.discard", T("editor.discardMessage"), "editor.discardAction");
+            return await Confirm(dialogRoot ?? XamlRoot, "editor.discard", T("editor.discardMessage"), "editor.discardAction");
         }
         finally { _leaving = false; }
     }

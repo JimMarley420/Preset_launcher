@@ -8,7 +8,14 @@ namespace PresetLauncher.Services;
 
 public enum UpdatePolicy { Optional, Recommended, Required }
 
-public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVersion, Uri DownloadUri, long Size, string Sha256, UpdatePolicy Policy = UpdatePolicy.Optional);
+public sealed record ReleaseUpdate(Version Version, Version MinimumSupportedVersion, Uri DownloadUri, long Size, string Sha256, UpdatePolicy Policy = UpdatePolicy.Optional)
+{
+    internal Uri? ReleaseUri { get; init; }
+    internal string? Notes { get; init; }
+    internal string? SignedReleaseJson { get; init; }
+}
+
+internal readonly record struct UpdateDownloadProgress(long Transferred, long Total, bool Verifying = false);
 
 public sealed class UpdateAssetException : IOException;
 
@@ -22,6 +29,7 @@ public sealed class UpdateService
     private static readonly Regex PolicyLevel = new(@"^<!-- presetlauncher:update-policy=(optional|recommended|required) -->\r?$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
     private static readonly HttpClient SharedClient = CreateClient();
     private readonly HttpClient _client;
+    internal const int MaxReleaseBytes = 2 * 1024 * 1024;
 
     public UpdateService() : this(SharedClient) { }
 
@@ -29,7 +37,7 @@ public sealed class UpdateService
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = 2 * 1024 * 1024 };
+        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan, MaxResponseContentBufferSize = MaxReleaseBytes };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("PresetLauncher/1.0");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -143,8 +151,17 @@ public sealed class UpdateService
             item.GetProperty("browser_download_url").GetString() != expectedUrl ||
             !string.Equals(item.GetProperty("digest").GetString(), $"sha256:{digest}", StringComparison.OrdinalIgnoreCase))
             throw new UpdateAssetException();
-        return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest, policy);
+        return new ReleaseUpdate(latest, minimum, new Uri(expectedUrl), size, digest, policy)
+        {
+            ReleaseUri = new Uri($"https://github.com/{Repository}/releases/tag/{tag}"),
+            Notes = UpdateReleaseNotes.Extract(body),
+            SignedReleaseJson = json
+        };
     }
+
+    internal static Uri VersionHistoryUri(string language) => new(
+        language == "fr" ? "https://jimmarley420.github.io/Preset_launcher/fr/changelog.html"
+                         : "https://jimmarley420.github.io/Preset_launcher/changelog.html");
 
     public static ReleaseUpdate? ParseSignedRelease(string json, Version installed, string publicKey)
     {
@@ -217,11 +234,30 @@ public sealed class UpdateService
 
     public async Task<string> DownloadVerifiedAsync(ReleaseUpdate update, IProgress<int>? progress = null, CancellationToken ct = default)
     {
+        var directory = Directory.CreateTempSubdirectory("PresetLauncher-update-");
+        try
+        {
+            return await DownloadVerifiedAsync(update, directory, value =>
+            {
+                if (!value.Verifying) progress?.Report((int)(value.Transferred * 100 / value.Total));
+            }, ct);
+        }
+        catch
+        {
+            try { directory.Delete(); }
+            catch (IOException ex) { System.Diagnostics.Debug.WriteLine(ex); }
+            catch (UnauthorizedAccessException ex) { System.Diagnostics.Debug.WriteLine(ex); }
+            throw;
+        }
+    }
+
+    internal async Task<string> DownloadVerifiedAsync(ReleaseUpdate update, DirectoryInfo directory,
+        Action<UpdateDownloadProgress> progress, CancellationToken ct)
+    {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromMinutes(10));
         var token = timeout.Token;
-        var directory = Directory.CreateTempSubdirectory("PresetLauncher-update-");
-        var path = Path.Combine(directory.FullName, $"PresetLauncher_Setup_{update.Version.ToString(3)}.exe");
+        var path = Path.Combine(directory.FullName, InstallerFileName(update));
         try
         {
             using var response = await _client.GetAsync(update.DownloadUri, HttpCompletionOption.ResponseHeadersRead, token);
@@ -235,7 +271,6 @@ public sealed class UpdateService
                 throw new InvalidDataException("Installer size does not match GitHub metadata.");
 
             await using var input = await response.Content.ReadAsStreamAsync(token);
-            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             long total = 0;
             await using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, useAsync: true))
             {
@@ -246,24 +281,30 @@ public sealed class UpdateService
                     total += read;
                     if (total > update.Size || total > MaxInstallerSize)
                         throw new InvalidDataException("Installer exceeds expected size.");
-                    hash.AppendData(buffer, 0, read);
                     await output.WriteAsync(buffer.AsMemory(0, read), token);
-                    progress?.Report((int)(total * 100 / update.Size));
+                    progress(new(total, update.Size));
                 }
             }
 
-            if (total != update.Size ||
-                !CryptographicOperations.FixedTimeEquals(hash.GetHashAndReset(), Convert.FromHexString(update.Sha256)))
+            progress(new(total, update.Size, Verifying: true));
+            await using var installer = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, useAsync: true);
+            if (total != update.Size || installer.Length != update.Size)
+                throw new InvalidDataException("Installer size does not match the signed release.");
+            var digest = await SHA256.HashDataAsync(installer, token);
+            if (!CryptographicOperations.FixedTimeEquals(digest, Convert.FromHexString(update.Sha256)))
                 throw new InvalidDataException("Installer integrity verification failed.");
             token.ThrowIfCancellationRequested();
             return path;
         }
         catch
         {
-            try { directory.Delete(recursive: true); }
+            try { File.Delete(path); }
             catch (IOException ex) { System.Diagnostics.Debug.WriteLine(ex); }
             catch (UnauthorizedAccessException ex) { System.Diagnostics.Debug.WriteLine(ex); }
             throw;
         }
     }
+
+    internal static string InstallerFileName(ReleaseUpdate update) =>
+        Path.GetFileName(update.DownloadUri.AbsolutePath);
 }
