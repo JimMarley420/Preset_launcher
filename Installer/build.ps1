@@ -76,6 +76,15 @@ try {
             $timer.Restart()
             dotnet publish $project -c Release -r $entry.rid --self-contained true --no-restore --artifacts-path $work --output $publish @properties
             if ($LASTEXITCODE -ne 0) { throw "Publish failed: $target" }
+            $helperOutput = Join-Path $work update-helper
+            $helperProperties = @("-p:Platform=$($entry.platform)", "-p:PlatformTarget=$($entry.platform)", "-p:Version=$Version", '-p:DebugType=none', '-p:NuGetAudit=true', '-p:NuGetAuditMode=all',
+                '-p:WarningsAsErrors=NU1900%3BNU1903%3BNU1904%3BNU1905')
+            dotnet publish Installer/Updater/PresetLauncher.Update.csproj -c Release -r $entry.rid --artifacts-path $work --output $helperOutput @helperProperties
+            if ($LASTEXITCODE -ne 0) { throw "Update helper publish failed: $target" }
+            Copy-Item -LiteralPath (Join-Path $helperOutput 'PresetLauncher.Update.exe') -Destination $publish
+            $helperBytes = (Get-Item -LiteralPath (Join-Path $publish 'PresetLauncher.Update.exe')).Length
+            $payloadBytes = (Get-ChildItem -LiteralPath $publish -Recurse -File | Measure-Object Length -Sum).Sum
+            Write-Host "$target installed payload: $payloadBytes bytes; update helper: $helperBytes bytes"
             & "$PSScriptRoot/assert-payload.ps1" -Directory $publish -Machine $entry.machine
             Write-Host "$target publish and PE verification: $($timer.Elapsed)"
         }
@@ -95,7 +104,7 @@ try {
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $output "$name.exe") -PathType Leaf)) {
             throw "Installer compilation failed: $target"
         }
-        Write-Host "$target installer compression: $($timer.Elapsed)"
+        Write-Host "$target installer compression: $($timer.Elapsed); installer: $((Get-Item -LiteralPath (Join-Path $output "$name.exe")).Length) bytes"
     }
 }
 finally {

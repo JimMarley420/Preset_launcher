@@ -71,6 +71,49 @@ class ReleasePlanTests(unittest.TestCase):
             self.plan("fix: a")
 
 
+class AppNotesTests(unittest.TestCase):
+    def test_uses_only_unique_releasing_prs_in_plan_order(self):
+        def pull(number, title, body="", releasing=True):
+            return {"number": number, "title": title, "body": body,
+                    "labels": [{"name": "update: optional"}] if releasing else []}
+
+        pulls = [
+            pull(5, "feat: update history and documentation",
+                 "Internal test report\n<!-- presetlauncher-summary:begin -->\n"
+                 "Filter history by launch result.\n<!-- presetlauncher-summary:end -->"),
+            pull(6, "docs: update README", releasing=False),
+            pull(8, "chore!: remove support for an obsolete migration format"),
+            pull(12, "fix: keep shortcuts valid",
+                 "<!-- presetlauncher-summary:begin -->\n" + "a" * 241
+                 + "\n<!-- presetlauncher-summary:end -->"),
+        ]
+        decisions = [pr_decision(item) for item in pulls]
+        decisions.insert(3, decisions[0])
+        with patch.object(release, "request", side_effect=lambda url, **_: {
+            "5": pulls[0], "8": pulls[2], "12": pulls[3],
+        }[url.rsplit("/", 1)[1]]) as request:
+            expected = ("<!-- presetlauncher-app-notes:v1:begin -->\n"
+                        "- Filter history by launch result.\n"
+                        "- remove support for an obsolete migration format\n"
+                        "- keep shortcuts valid\n<!-- presetlauncher-app-notes:v1:end -->")
+            self.assertEqual(release.application_notes(decisions, "test-token"), expected)
+            self.assertEqual(release.application_notes(decisions, "test-token"), expected)
+            self.assertEqual(request.call_count, 6)
+
+    def test_reserved_or_ambiguous_summary_uses_factual_title(self):
+        for content in (
+            "presetlauncher:manifest-v2=payload",
+            release.APP_NOTES_BEGIN,
+            release.SUMMARY_END + "\n" + release.SUMMARY_BEGIN + "\nAnother note",
+        ):
+            pull = {"number": 4, "title": "fix: preserve saved preferences",
+                    "body": f"{release.SUMMARY_BEGIN}\n{content}\n{release.SUMMARY_END}",
+                    "labels": [{"name": "update: optional"}]}
+            with self.subTest(content=content), patch.object(release, "request", return_value=pull):
+                self.assertEqual(release.application_notes([pr_decision(pull)], "test-token"),
+                                 f"{release.APP_NOTES_BEGIN}\n- preserve saved preferences\n{release.APP_NOTES_END}")
+
+
 class InstallerLaneTests(unittest.TestCase):
     def test_regular_changes_use_fast_lane(self):
         self.assertFalse(release.needs_installer([
@@ -363,9 +406,15 @@ class PublishTests(unittest.TestCase):
             return []
         if url.endswith("/releases/generate-notes"):
             return {"body": "Changes"}
+        if url.endswith("/pulls/3"):
+            return {"number": 3, "title": "fix: repair", "body": "",
+                    "labels": [{"name": "update: optional"}]}
         if url.endswith("/releases") and method == "POST":
             self.assertTrue(payload["draft"])
             self.assertIn("<!-- presetlauncher:signature-v1=test-signature -->", payload["body"])
+            self.assertIn("\n\nChanges\n\n<!-- presetlauncher-app-notes:v1:begin -->\n"
+                          "- repair\n<!-- presetlauncher-app-notes:v1:end -->", payload["body"])
+            self.assertEqual(payload["body"].count(release.APP_NOTES_BEGIN), 1)
             self.assertEqual(payload["target_commitish"], self.sha)
             return {"id": 42}
         if "/assets?" in url:

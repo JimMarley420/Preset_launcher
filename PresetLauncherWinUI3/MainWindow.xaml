@@ -24,6 +24,8 @@
                 </NavigationView.MenuItems>
                 <ContentControl x:Name="PageHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
             </NavigationView>
+            <ContentControl x:Name="UpdateHost" Grid.Row="1" Visibility="Collapsed"
+                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
         </Grid>
     </Grid>
 </Window>

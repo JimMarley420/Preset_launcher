@@ -46,9 +46,11 @@ if ((Test-Path $dataDir) -or (Test-Path $registryPath) -or (Test-Path $architect
 }
 if (-not (Test-Path $setup -PathType Leaf)) { throw "Installer not found: $setup" }
 
-function Invoke-Package([string]$Path, [string]$LogName) {
+function Invoke-Package([string]$Path, [string]$LogName, [switch]$NoClose) {
     $log = Join-Path $logs $LogName
-    $process = Start-Process -FilePath $Path -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LANG=english /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log) -WindowStyle Hidden -Wait -PassThru
+    $arguments = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LANG=english /DIR="{0}" /TASKS="" /LOG="{1}"' -f $installDir, $log
+    if ($NoClose) { $arguments += ' /NOCLOSEAPPLICATIONS /NORESTARTAPPLICATIONS' }
+    $process = Start-Process -FilePath $Path -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
     try { return $process.ExitCode }
     finally { $process.Dispose() }
 }
@@ -70,7 +72,11 @@ function Install-Package([string]$Path, [string]$ExpectedVersion, [string]$LogNa
     $code = Invoke-Package $Path $LogName
     Write-Host ("{0}: {1:F2}s" -f $LogName, $timer.Elapsed.TotalSeconds)
     if ($code -ne 0) { throw "Setup failed: $code" }
-    if (-not (Test-Path (Join-Path $installDir 'PresetLauncherWinUI3.exe') -PathType Leaf)) { throw 'Installed executable missing' }
+    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
+    if (-not (Test-Path $exe -PathType Leaf)) { throw 'Installed executable missing' }
+    if (Get-Process PresetLauncherWinUI3 -ErrorAction SilentlyContinue | Where-Object Path -eq $exe) {
+        throw 'Unattended setup unexpectedly launched PresetLauncher'
+    }
     if (-not (Test-Path $shortcut -PathType Leaf)) { throw 'Start menu shortcut missing' }
     if ((Get-ItemProperty -Path $registryPath).DisplayVersion -ne $ExpectedVersion) { throw 'Unexpected installed registry version' }
 }
@@ -105,6 +111,27 @@ $editPreset = [Windows.Automation.PropertyCondition]::new([Windows.Automation.Au
 $recovery = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,
     'Application data could not be read. The original file was kept. Restore a backup in Settings.')
 
+function Assert-StartupBlockedBySetup {
+    $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
+    $lockPath = Join-Path $installDir '.presetlauncher-install.lock'
+    if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf)) { throw 'Setup did not create its installation lock' }
+    $exclusive = [IO.File]::Open($lockPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -PassThru
+        try {
+            if (-not $process.WaitForExit(15000)) { throw 'Application did not exit while setup held the installation lock' }
+            if ($process.ExitCode -ne 1618) { throw "Unexpected blocked startup exit code: $($process.ExitCode)" }
+        }
+        finally {
+            if (-not $process.HasExited) { Stop-Process -InputObject $process -Force }
+            $process.WaitForExit()
+            $process.Dispose()
+        }
+    }
+    finally { $exclusive.Dispose() }
+    Write-Host 'Startup correctly rejected an exclusive installation lock.'
+}
+
 function Assert-ApplicationStarts([string]$Phase) {
     $exe = Join-Path $installDir 'PresetLauncherWinUI3.exe'
     Write-Host "Starting application ($Phase)"
@@ -124,6 +151,18 @@ function Assert-ApplicationStarts([string]$Phase) {
                     if ($create -and $edit -and $create.Current.IsEnabled -and $edit.Current.IsEnabled -and
                         (Test-Path $policyFile -PathType Leaf) -and (Test-Path $policyLock -PathType Leaf)) {
                         Write-Host ("Startup ({0}): {1:F2}s" -f $Phase, $timer.Elapsed.TotalSeconds)
+                        if ($Phase -eq 'fresh') {
+                            $before = (Get-FileHash -LiteralPath (Join-Path $installDir 'PresetLauncherWinUI3.dll') -Algorithm SHA256).Hash
+                            $code = Invoke-Package $setup 'busy-installation.log' -NoClose
+                            $log = Get-Content (Join-Path $logs 'busy-installation.log') -Raw
+                            if ($code -ne 7 -or $log -notmatch 'Unable to acquire application installation lock \(Windows error 32\)') {
+                                throw "Setup did not reject an active launcher at its installation lock: $code"
+                            }
+                            if ($process.HasExited -or (Get-FileHash -LiteralPath (Join-Path $installDir 'PresetLauncherWinUI3.dll') -Algorithm SHA256).Hash -ne $before) {
+                                throw 'Rejected setup closed the launcher or changed application files'
+                            }
+                            Write-Host 'Setup correctly rejected an active launcher.'
+                        }
                         return
                     }
                 }
@@ -183,6 +222,7 @@ try {
     Install-Package $setup $version 'install.log'
     Assert-CurrentPackage
     Assert-UserData
+    Assert-StartupBlockedBySetup
     Assert-ApplicationStarts fresh
     $policyHash = (Get-FileHash $policyFile -Algorithm SHA256).Hash
     $policyLockHash = (Get-FileHash $policyLock -Algorithm SHA256).Hash
