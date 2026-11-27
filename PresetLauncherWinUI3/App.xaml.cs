@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using PresetLauncher.Services;
@@ -16,21 +15,7 @@ public partial class App : Application
     public MainWindow MainWindow { get; private set; } = null!;
     public UpdateCoordinator Updates { get; } = new();
 
-    public App()
-    {
-        try { UpdateStartup.EnterApplication(AppContext.BaseDirectory); }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 32)
-        {
-            // Exit before creating a window or retaining DLLs while Setup is writing.
-            Environment.Exit(UpdateStartup.InstallationBusyExitCode);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Win32Exception)
-        {
-            Debug.WriteLine(ex);
-            Environment.Exit(1);
-        }
-        InitializeComponent();
-    }
+    public App() => InitializeComponent();
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
